@@ -234,7 +234,8 @@
       S.live = new EventSource('api/live');
       S.live.onmessage = (e) => {
         const d = JSON.parse(e.data);
-        S.servers = d.servers;
+        // uživo stižu samo osnovna polja: spoji ih sa punim podacima da se ne izgube verzija, uptime, Xray/WG
+        S.servers = d.servers.map((x) => ({ ...(S.servers.find((o) => o.id === x.id) || {}), ...x }));
         const off = d.servers.filter((s) => s.status === 'offline').length;
         const badge = `${d.servers.filter((s) => s.status === 'online').length}/${d.servers.filter((s) => s.status !== 'disabled').length}`;
         if (S.badges && S.badges.servers !== badge) { S.badges.servers = badge; paintNav(); }
@@ -718,10 +719,11 @@
     if (r) { toast('Spremljeno.'); pageServers(); }
   }
   async function srvMore(id) {
+    S.servers = await GET('servers');
     const s = S.servers.find((x) => x.id === Number(id));
     const r = await modal(`<h2>${esc(s.name)}</h2>
       <div class="mini-grid"><div class="mini"><small>Agent</small><b>${esc(s.version || '—')}</b></div><div class="mini"><small>Uptime</small><b>${s.uptime ? Math.floor(s.uptime / 86400) + ' d ' + Math.floor(s.uptime % 86400 / 3600) + ' h' : '—'}</b></div>
-        <div class="mini"><small>Xray</small><b class="${s.xray_ok ? 'ok' : 'bad'}">${s.xray_ok ? 'radi' : 'ne radi'}</b></div><div class="mini"><small>WireGuard</small><b class="${s.wg_ok ? 'ok' : 'bad'}">${s.wg_ok ? 'radi' : 'ne radi'}</b></div></div>
+        <div class="mini"><small>Xray (VLESS)</small><b class="${s.xray_ok ? 'ok' : 'bad'}">${s.xray_ok ? 'radi' : !s.enabled ? 'ugašen' : 'ne radi'}</b></div><div class="mini"><small>WireGuard</small><b class="${s.wg_ok ? 'ok' : 'bad'}">${s.wg_ok ? 'radi' : !s.enabled ? 'ugašen' : 'ne radi'}</b></div></div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <button class="btn" value="install">Prikaži komandu za instalaciju</button>
         <button class="btn" value="locate">Odredi lokaciju iz IP adrese</button>
