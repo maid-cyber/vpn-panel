@@ -97,8 +97,33 @@ ${support ? `<p class="muted" style="text-align:center">Podrška: ${esc(support)
 </main></body></html>`;
 }
 
+// podaci za Veltrix aplikaciju: nalog i gotovi sing-box outboundi za svaki server
+function appJson(u, s, link) {
+  const st = vpn.userStatus(u);
+  const owner = u.owner_id ? one('SELECT brand, contact FROM admins WHERE id = ?', u.owner_id) : null;
+  const wl = s.res_whitelabel && owner?.brand;
+  const plan = u.plan_id ? one('SELECT name FROM plans WHERE id = ?', u.plan_id) : null;
+  const ok = vpn.CAN_CONNECT.has(st);
+  const servers = ok ? vpn.serversForUser(u).filter((sv) => sv.reality_pub).map((sv) => {
+    const out = [];
+    if (s.proto_vless) out.push({ type: 'vless', server: sv.host, server_port: sv.vless_port, uuid: u.uuid, flow: 'xtls-rprx-vision',
+      tls: { enabled: true, server_name: sv.sni, utls: { enabled: true, fingerprint: 'chrome' }, reality: { enabled: true, public_key: sv.reality_pub, short_id: sv.short_id } } });
+    if (s.proto_ss) {
+      const l = new URL(vpn.ssLink(u, sv));
+      const [method, ...pw] = decodeURIComponent(l.username).split(':');
+      out.push({ type: 'shadowsocks', server: sv.host, server_port: sv.ss_port || 8388, method, password: pw.join(':') });
+    }
+    return { id: sv.id, name: sv.name, city: sv.city || sv.name, country: (sv.country || '').toUpperCase(), host: sv.host, port: sv.vless_port, outbounds: out };
+  }).filter((x) => x.outbounds.length) : [];
+  return {
+    brand: wl ? owner.brand : s.brand, support: (wl ? owner.contact : s.support_contact) || '', announce: s.sub_announce || '',
+    username: u.username, plan: plan?.name || '', status: st, can_connect: ok, expires_at: u.expires_at, created_at: u.created_at,
+    traffic_used: u.traffic_up + u.traffic_down, traffic_limit: u.traffic_limit, devices: u.devices, link, servers,
+  };
+}
+
 async function handle(req, res, p) {
-  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+))?$/);
+  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app))?$/);
   if (!m) return send(res, 404, 'Not found');
   const u = one('SELECT * FROM users WHERE sub_token = ?', m[1]);
   if (!u) return send(res, 404, 'Link nije ispravan ili je zamijenjen novim.');
@@ -107,6 +132,7 @@ async function handle(req, res, p) {
   const base = (s.sub_url || s.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`).replace(/\/+$/, '');
   const link = `${base}/s/${u.sub_token}`;
 
+  if (m[3]) return send(res, 200, appJson(u, s, link), { 'cache-control': 'no-store' });
   if (m[2]) {
     const sv = one('SELECT * FROM servers WHERE id = ? AND enabled = 1', Number(m[2]));
     if (!sv || !s.proto_wg || !vpn.serversForUser(u).some((x) => x.id === sv.id)) return send(res, 404, 'Server nije dostupan.');
