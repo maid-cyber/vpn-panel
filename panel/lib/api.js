@@ -70,6 +70,7 @@ route('GET', 'me', null, (c) => {
     totp_on: !!admin.totp_on, must2fa: !!s.require_2fa && !admin.totp_on && admin.role !== 'reseller',
     credit: isRes(me) ? me.credit : null, perms, version: VERSION,
     res_path: !isRes(me) && s.res_portal ? s.reseller_path : null, portal: c.portal,
+    msg_template: s.msg_template, support: s.support_contact,
     brand: s.brand, currency: s.currency, timezone: s.timezone, accent: s.accent, theme: s.theme, maintenance: !!s.maintenance,
     pay: isRes(me) ? { methods: s.pay_methods, usdt: s.pay_usdt, iban: s.pay_iban, paypal: s.pay_paypal, min: s.res_min_topup } : null,
   };

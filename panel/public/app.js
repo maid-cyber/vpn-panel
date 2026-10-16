@@ -482,6 +482,7 @@
           <div style="display:flex;flex-wrap:wrap;gap:6px">
             <button class="btn sm" data-a="copy" data-v="${esc(u.sub_link)}">${ic('copy')}Kopiraj</button>
             <a class="btn sm" href="${esc(u.sub_link)}" target="_blank" rel="noopener">Stranica kupca</a>
+            <button class="btn sm red" data-a="sendCustomer" data-id="${u.id}">${ic('send')}Pošalji kupcu</button>
             ${u.vless.length ? `<button class="btn sm" data-a="links" data-id="${u.id}">VLESS / WireGuard</button>` : ''}
           </div>
         </div>
@@ -601,6 +602,60 @@
       <div class="dlg-actions"><button class="btn" value="cancel">Zatvori</button></div>`);
     if (r) r.close();
   }
+  // ---- slanje pristupa kupcu (WhatsApp, Telegram, Viber, e-mail, QR slika)
+  function customerMessage(u) {
+    const t = S.me.msg_template || 'Tvoj {brend}: {link}';
+    const map = { korisnik: u.username, plan: u.plan || '', istice: fmtDate(u.expires_at), dana: String(Math.max(0, u.days_left)), link: u.sub_link, brend: S.me.brand, podrska: S.me.support || '' };
+    return t.replace(/\{(\w+)\}/g, (m, k) => map[k] ?? m).replace(/\n*Pomoć: *$/, '').trim();
+  }
+  async function qrPng(u) {
+    const svg = u.qr.includes('xmlns') ? u.qr : u.qr.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    const img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    await img.decode();
+    const W = 900, H = 1080, c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#E3172B'; g.fillRect(0, 0, W, 14);
+    g.drawImage(img, 90, 110, 720, 720);
+    g.fillStyle = '#111114'; g.textAlign = 'center';
+    g.font = '800 46px "Inter Display", Inter, sans-serif'; g.fillText(S.me.brand.toUpperCase(), W / 2, 80);
+    g.font = '600 30px Inter, sans-serif'; g.fillText('Skeniraj u aplikaciji Hiddify', W / 2, 900);
+    g.fillStyle = '#5d5d6b'; g.font = '400 26px Inter, sans-serif';
+    g.fillText(`${u.plan || ''} · vrijedi do ${fmtDate(u.expires_at)}`, W / 2, 950);
+    if (S.me.support) g.fillText('Pomoć: ' + S.me.support, W / 2, 995);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `${S.me.brand.replace(/\W+/g, '-')}-${u.username}.png`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  async function sendCustomer() {
+    const u = S.lastUser;
+    const msg = customerMessage(u);
+    const contact = String(u.contact || '').trim();
+    const phone = /^\+?[\d\s()/-]{7,}$/.test(contact) ? contact.replace(/[^\d]/g, '') : '';
+    const tg = /^@[\w]{4,}$/.test(contact) ? contact.slice(1) : '';
+    const mail = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(contact) ? contact : '';
+    const enc = encodeURIComponent;
+    const textNoLink = msg.replace(u.sub_link, '').replace(/\n{3,}/g, '\n\n');
+    const links = [
+      ['WhatsApp', `https://wa.me/${phone}?text=${enc(msg)}`, phone ? `na ${contact}` : 'izaberi kontakt'],
+      ['Telegram', tg ? `https://t.me/${tg}` : `https://t.me/share/url?url=${enc(u.sub_link)}&text=${enc(textNoLink)}`, tg ? `otvori chat sa @${tg} pa zalijepi poruku` : 'izaberi kontakt'],
+      ['Viber', `viber://forward?text=${enc(msg)}`, 'izaberi kontakt'],
+      ['E-mail', `mailto:${mail}?subject=${enc(S.me.brand + ' pristup')}&body=${enc(msg)}`, mail || 'upiši adresu'],
+    ];
+    const r = await modal(`<h2>Pošalji kupcu · ${esc(u.username)}</h2>
+      <p class="muted" style="margin:0">Poruka ima link na stranicu kupca, gdje su QR kod i dugmad za aplikacije. Tekst poruke mijenjaš u Postavke → Pretplata.</p>
+      <textarea class="input" id="custMsg" style="min-height:190px;font-size:13.5px">${esc(msg)}</textarea>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+        ${links.map(([n, href, sub]) => `<a class="btn" style="flex-direction:column;align-items:flex-start;gap:0;height:auto;padding:10px 12px" href="${esc(href)}" target="_blank" rel="noopener" data-a="sendVia" data-tg="${n === 'Telegram' && tg ? '1' : ''}"><b>${n}</b><small class="muted" style="font-weight:400">${esc(sub)}</small></a>`).join('')}
+      </div>
+      <div class="dlg-actions"><button class="btn" type="button" data-a="qrPng">${ic('down')}QR kod kao slika</button><button class="btn" type="button" data-a="copyMsg">${ic('copy')}Kopiraj poruku</button><button class="btn red" value="cancel">Gotovo</button></div>`);
+    if (r) r.close();
+  }
+
   async function bulk() {
     const ids = [...S.sel];
     const r = await formLoop(`<h2>Masovne akcije · ${ids.length} korisnika</h2>
@@ -1104,6 +1159,19 @@
     editNote: (d) => editNote(d.id).catch(fail),
     uAct: (d) => userAction(d.id, d.act),
     links: () => showLinks(),
+    sendCustomer: () => sendCustomer().catch(fail),
+    copyMsg: () => copy($('#custMsg').value),
+    qrPng: () => qrPng(S.lastUser).catch(fail),
+    sendVia: (d, el, e) => {
+      // ako je poruka ručno mijenjana, ubaci izmijenjen tekst u link
+      const msg = $('#custMsg')?.value;
+      if (!msg) return;
+      if (d.tg) { copy(msg); return; }
+      const href = el.getAttribute('href');
+      const enc = encodeURIComponent(msg);
+      if (href.startsWith('https://wa.me/') || href.startsWith('viber://')) el.href = href.replace(/text=[^&]*/, 'text=' + enc);
+      else if (href.startsWith('mailto:')) el.href = href.replace(/body=[^&]*/, 'body=' + enc);
+    },
     bulk: () => bulk().catch(fail),
     editPlan: (d) => editPlan(d.id).catch(fail),
     newServer: () => newServer().catch(fail),
