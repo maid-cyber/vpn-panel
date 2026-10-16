@@ -196,9 +196,54 @@ sudo -u vpnpanel VPN_DATA_DIR=/var/lib/vpn-panel node /opt/vpn-panel/panel/reset
 
 Ispiše adresu panela, a 2FA i IP ograničenje isključi.
 
+## 11. Kupci: Telegram bot, e-mail i podsjetnici
+
+**Telegram bot za kupce:**
+1. Kod @BotFather napravi poseban bot, ne onaj za tvoje obavijesti.
+2. Token upiši u Postavke → Obavještenja → Token bota za kupce i uključi bota.
+3. Na stranici kupca pojavi se dugme **Poveži Telegram**.
+
+Povezani kupci dobijaju podsjetnike pred istek i tvoje poruke, a sami mogu pitati `/status`.
+
+**E-mail:** upiši SMTP podatke u Postavke → Obavještenja (npr. Brevo, Gmail ili Zoho) i klikni **Probni e-mail**. Kad je e-mail podešen:
+- "Pošalji kupcu" može poslati pristup direktno na mail;
+- reselleri dobijaju fakture na mail;
+- podsjetnici idu i na e-mail.
+
+**Podsjetnici** se šalju kad je ostalo onoliko dana koliko piše kod "Ističe uskoro", i još jednom dan prije isteka.
+
+**Poruka svima** (dugme u Korisnicima) ide na Telegram i e-mail. Možeš je prikazati i u aplikaciji kupca.
+
+## 12. Protokoli, blokade i uređaji
+
+- **VLESS + Reality** je glavni protokol. **Shadowsocks 2022** i **WireGuard** su rezerve, a pališ ih u Postavke → Serveri. Shadowsocks koristi port 8388, koji možeš promijeniti kod servera.
+- **Blokade** rade preko DNS-a na samom serveru:
+  - reklame: AdGuard DNS;
+  - stranice za odrasle: AdGuard Family DNS;
+  - malver i phishing: Quad9 DNS;
+  - torrent se blokira posebno.
+- **Limit uređaja:**
+  - Server broji različite IP adrese po korisniku u zadnje 3 minute. Broji samo u memoriji i ništa ne sprema na disk.
+  - Možeš birati: samo prikaz, ili blokada na 15 minuta kad je uređaja previše.
+  - Više uređaja iza istog WiFi-ja ima jednu IP adresu i broji se kao jedan uređaj.
+- **Pametna pretplata:** kupci ne dobijaju servere koji ne rade ili su puni, pa se aplikacija sama prebaci na drugi.
+- **Xray** na serverima se sam ažurira jednom sedmično, noću.
+
+## 13. Reselleri: registracija, nivoi, white-label, kartica
+
+- **Registracija:** uključi je u Postavke → Reselleri. Na adresi za resellere tada se pojavi "Postani reseller", a ti svaki novi nalog odobravaš u listi resellera.
+- **Automatski nivo:** svakog 1. u mjesecu reseller pređe na viši nivo ako je prošli mjesec kupio dovoljno kredita (preporučena kupovina kod nivoa).
+- **White-label:** kupci resellera vide njegov brend i kontakt, i u aplikaciji i na svojoj stranici.
+- **Produži sam:** kod korisnika resellera se može uključiti automatsko produženje sa kredita, dan prije isteka.
+- **Stripe:** upiši ključeve u Postavke → Plaćanja. U Stripeu dodaj webhook na adresu koju ti panel pokaže, s događajem `checkout.session.completed`. Reseller tada u Kredit i uplate plaća karticom, a kredit se doda sam.
+
+## 14. Backup na S3 i ažuriranje panela
+
+- **S3:** upiši endpoint, regiju, bucket i ključeve u Postavke → Backup (Backblaze B2, Cloudflare R2, Wasabi ili AWS) i klikni **Probaj S3**. Svaki backup ode i tamo.
+- **Ažuriranje:** u Postavke → Sistem vidiš svoju i najnoviju verziju. Ažuriraš klikom na **Ažuriraj**, a dugme proradi nakon prvog ručnog ažuriranja na verziju 1.2.0. Log ažuriranja je u `/var/log/vpn-panel-update.log`.
+
 ## Šta još nije gotovo
 
-- **Limit uređaja** se prikazuje i prodaje, ali ga serveri još ne provjeravaju.
-- **Automatske poruke kupcima** pred istek su označene "uskoro". Za njih treba kupčev Telegram bot.
-- **Blokiranje torrenta i sadržaja za odrasle** radi samo na VLESS-u. Na WireGuardu reklame blokira AdGuard DNS.
-- **Mobilne i desktop aplikacije** dolaze kasnije. Do tada kupci koriste Hiddify, v2rayNG ili Streisand s pretplatnim linkom.
+- **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.
+- **Panel na engleskom:** još ne postoji.
+- **Mobilne i desktop aplikacije pod tvojim brendom:** dolaze kasnije. Do tada kupci koriste Hiddify, v2rayNG, Streisand, V2Box, Happ ili Shadowrocket s pretplatnim linkom.

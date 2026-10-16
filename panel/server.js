@@ -69,6 +69,7 @@ async function onRequest(req, res) {
     if (p.startsWith('/s/')) return await sub.handle(req, res, p);
     if (p.startsWith('/agent/') || p.startsWith('/install/')) return await nodes.handle(req, res, p);
     if (p.startsWith('/api/v1/')) return await apiv1.handle(req, res, p);
+    if (p === '/stripe/webhook' && req.method === 'POST') return await require('./lib/stripe').webhook(req, res);
     if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
 
     // dva ulaza: tajna admin adresa i (ako je uključeno) posebna adresa za resellere

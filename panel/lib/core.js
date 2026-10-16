@@ -3,7 +3,8 @@
 const { one, all, run, tx, log, now, bumpDaily } = require('./db');
 const settings = require('./settings');
 const vpn = require('./vpn');
-const { fail } = require('./http');
+const { fail, esc } = require('./http');
+const mail = require('./mail');
 const { notify, webhook } = require('./notify');
 
 const GB = 1024 ** 3;
@@ -15,7 +16,8 @@ function userRow(u, t = now()) {
     id: u.id, username: u.username, plan_id: u.plan_id, plan: u.plan_name || null, owner_id: u.owner_id, owner: u.owner_name || null,
     status, disabled: !!u.disabled, expires_at: u.expires_at, days_left: Math.ceil((u.expires_at - t) / vpn.DAY),
     traffic_used: u.traffic_up + u.traffic_down, traffic_limit: u.traffic_limit, devices: u.devices,
-    note: u.note, contact: u.contact, last_seen: u.last_seen, last_server: u.last_server_name || null, created_at: u.created_at,
+    note: u.note, contact: u.contact, email: u.email || '', auto_renew: !!u.auto_renew, tg: !!u.tg_chat,
+    devices_seen: u.devices_seen || 0, blocked_until: u.blocked_until || 0, last_seen: u.last_seen, last_server: u.last_server_name || null, created_at: u.created_at,
   };
 }
 
@@ -52,6 +54,12 @@ function chargeReseller(reseller, plan, userId, what) {
   const after = fresh.credit - price;
   if (after < 10 && fresh.credit >= 10) notify('n_lowcredit', `Reselleru ${reseller.username} ostalo je €${after.toFixed(2)} kredita.`);
   return price;
+}
+
+function cleanEmail(v) {
+  v = String(v || '').trim().slice(0, 120);
+  if (v && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v)) fail(400, 'E-mail adresa nije ispravna.');
+  return v;
 }
 
 function validUsername(name) {
@@ -93,6 +101,7 @@ function createUser(actor, body) {
     Number(body.devices || plan.devices || settings.get('default_devices') || 3), String(body.note || '').slice(0, 500), String(body.contact || '').slice(0, 120),
     wg.priv, wg.pub, now());
     const id = Number(r.lastInsertRowid);
+    if (body.email || body.auto_renew) run('UPDATE users SET email = ?, auto_renew = ? WHERE id = ?', cleanEmail(body.email), body.auto_renew ? 1 : 0, id);
     let charged = 0;
     if (actor.role === 'reseller') charged = chargeReseller(actor, plan, id, 'Novi korisnik ' + username);
     const paid = Number(body.paid || 0);
@@ -173,6 +182,30 @@ function rekey(actor, id) {
   log(actor.username, 'Novi ključ', u.username);
 }
 
+const INVOICE_SELECT = 'SELECT t.*, a.username AS reseller, a.contact, a.email AS remail, a.brand AS rbrand FROM transactions t LEFT JOIN admins a ON a.id = t.reseller_id WHERE t.id = ?';
+function invoiceHtml(t, forMail) {
+  const s = settings.load();
+  const vat = Number(s.vat || 0), net = vat ? t.amount / (1 + vat / 100) : t.amount;
+  const cur = s.currency === 'EUR' ? '€' : s.currency + ' ';
+  return `<!doctype html><html lang="bs"><head><meta charset="utf-8"><title>Faktura ${esc(t.invoice_no || t.id)}</title>
+<style>body{font-family:Arial,sans-serif;max-width:720px;margin:40px auto;color:#111;padding:0 20px}h1{font-size:26px;margin:0}table{width:100%;border-collapse:collapse;margin-top:24px}td,th{border-bottom:1px solid #ddd;padding:10px;text-align:left}.r{text-align:right}.top{display:flex;justify-content:space-between;gap:20px}small{color:#555}@media print{button{display:none}}</style></head><body>
+<div class="top"><div><h1>${esc(s.inv_company || s.brand)}</h1><small style="white-space:pre-line">${esc(s.inv_address)}</small></div>
+<div class="r"><strong>Faktura ${esc(t.invoice_no || '#' + t.id)}</strong><br><small>${new Date(t.ts).toLocaleDateString('bs-BA')}</small></div></div>
+<p style="margin-top:28px"><strong>Kupac:</strong> ${esc(t.rbrand || t.reseller || t.note || '—')}${t.contact ? `<br><small>${esc(t.contact)}</small>` : ''}</p>
+<table><tr><th>Opis</th><th class="r">Iznos</th></tr>
+<tr><td>${t.type === 'topup' ? 'Kredit za VPN usluge' : esc(t.note || 'VPN usluga')}</td><td class="r">${cur}${net.toFixed(2)}</td></tr>
+${vat ? `<tr><td>PDV ${vat}%</td><td class="r">${cur}${(t.amount - net).toFixed(2)}</td></tr>` : ''}
+<tr><th>Ukupno</th><th class="r">${cur}${t.amount.toFixed(2)}</th></tr></table>
+<p><small>Način plaćanja: ${esc(t.method || '—')}</small></p>${forMail ? '' : '<button onclick="print()">Štampaj / PDF</button>'}</body></html>`;
+}
+function mailInvoice(txId) {
+  const t = one(INVOICE_SELECT, txId);
+  if (!t || !t.remail || !settings.get('mail_invoices') || !mail.configured()) return;
+  mail.sendMail({ to: t.remail, subject: `Faktura ${t.invoice_no} · ${settings.get('brand')}`, text: `Hvala na uplati. Kredit: +${t.credit_delta}. Faktura ${t.invoice_no} je u prilogu ove poruke (HTML).`, html: invoiceHtml(t, true) })
+    .then(() => log('sistem', 'Faktura poslana mailom', `${t.invoice_no} → ${t.reseller}`))
+    .catch((e) => log('sistem', 'Faktura nije poslana mailom', e.message, 'warn'));
+}
+
 function addCredit(actor, resellerId, body) {
   const r = one("SELECT * FROM admins WHERE id = ? AND role = 'reseller'", Number(resellerId));
   if (!r) fail(404, 'Reseller ne postoji.');
@@ -191,6 +224,7 @@ function addCredit(actor, resellerId, body) {
       run('UPDATE transactions SET invoice_no = ? WHERE id = ?', inv, id);
       notify('n_payment', `Kredit +€${amount} · ${r.username}${body.method ? ` (${body.method})` : ''}`);
       webhook('reseller.topup', { reseller: r.username, amount, method: body.method || '' });
+      setImmediate(() => mailInvoice(id));
     }
     log(actor.username, kind === 'topup' ? 'Kredit dodan' : 'Kredit ispravljen', `${r.username} ${amount > 0 ? '+' : ''}€${amount}`);
     return id;
@@ -199,5 +233,5 @@ function addCredit(actor, resellerId, body) {
 
 module.exports = {
   GB, USER_SELECT, userRow, getUser, createUser, extendUser, deleteUser, setDisabled, resetTraffic, rekey,
-  addCredit, resellerPrice, history, suggestUsername, round2,
+  addCredit, resellerPrice, history, suggestUsername, round2, cleanEmail, invoiceHtml, INVOICE_SELECT,
 };

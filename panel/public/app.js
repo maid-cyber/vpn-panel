@@ -93,6 +93,7 @@
   const ST = {
     active: ['Aktivan', 't-ok'], expiring: ['Ističe uskoro', 't-warn'], grace: ['Grace period', 't-warn'],
     expired: ['Istekao', 't-bad'], limited: ['Potrošen promet', 't-orange'], disabled: ['Ugašen', 't-grey'],
+    devices: ['Previše uređaja', 't-orange'],
   };
   const stTag = (s) => `<span class="tag ${ST[s]?.[1] || 't-grey'}">${ST[s]?.[0] || s}</span>`;
   const SRV = { online: 'Online', offline: 'Offline', pending: 'Čeka instalaciju', disabled: 'Ugašen', maintenance: 'Održavanje' };
@@ -150,6 +151,30 @@
   }
 
   // ------------------------------------------------------------------ prijava
+  let portalInfo = null;
+  async function loadPortal() {
+    if (!portalInfo) portalInfo = await GET('portal').catch(() => ({}));
+    const box = $('#signupBox');
+    if (box && portalInfo.signup) box.innerHTML = '<span class="muted">Nemaš nalog?</span> <a href="#" data-a="showSignup">Postani reseller</a>';
+  }
+  function renderSignup() {
+    $('#app').innerHTML = `<div class="login"><form class="card" id="signupForm">
+      <div class="login-logo">${logo(64)}<div class="wordmark" style="font-size:24px">${wordHtml(wordParts(document.title.split(' · ')[0]).main)}</div><div class="login-hint">Registracija za resellere</div></div>
+      <label class="field">Korisničko ime<input class="input" name="username" required minlength="3" maxlength="30" autocomplete="username"></label>
+      <label class="field">Šifra (bar 8 znakova)<input class="input" name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+      <label class="field">Kontakt (Telegram, WhatsApp)<input class="input" name="contact" required placeholder="@korisnik ili +387…"></label>
+      <label class="field">E-mail (za fakture, opcionalno)<input class="input" name="email" type="email"></label>
+      <button class="btn red block" type="submit">Pošalji zahtjev</button>
+      <p class="muted" id="signupMsg" role="alert" style="margin:0;min-height:20px"></p>
+      <div style="text-align:center"><a href="#" data-a="showLogin">Nazad na prijavu</a></div></form></div>`;
+    $('#signupForm').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await POST('signup', Object.fromEntries(new FormData(e.target).entries()));
+        $('#signupForm').innerHTML = `<div class="login-logo">${logo(64)}<h2>Zahtjev poslan ✓</h2><p class="muted" style="margin:0">Administrator će pregledati tvoj nalog i javiti ti se. Kad bude odobren, prijavi se istim imenom i šifrom.</p></div><a class="btn block" href="#" data-a="showLogin">Nazad na prijavu</a>`;
+      } catch (err) { $('#signupMsg').textContent = err.message; $('#signupMsg').style.color = 'var(--bad)'; }
+    };
+  }
   function renderLogin(need2fa, saved) {
     stopLive();
     $('#app').innerHTML = `<div class="login"><form class="card" id="loginForm" autocomplete="on">
@@ -159,7 +184,9 @@
       : `<label class="field">Korisničko ime<input class="input" name="username" autocomplete="username" required></label>
         <label class="field">Šifra<input class="input" name="password" type="password" autocomplete="current-password" required></label>`}
       <button class="btn red block" type="submit">Prijavi se</button>
-      <p class="muted" id="loginErr" role="alert" style="margin:0;min-height:20px;color:var(--bad)"></p></form></div>`;
+      <p class="muted" id="loginErr" role="alert" style="margin:0;min-height:20px;color:var(--bad)"></p>
+      <div id="signupBox" style="text-align:center;font-size:13.5px"></div></form></div>`;
+    if (document.documentElement.dataset.portal === 'reseller' && !need2fa) loadPortal();
     $('#loginForm').onsubmit = async (e) => {
       e.preventDefault();
       const d = Object.fromEntries(new FormData(e.target).entries());
@@ -413,13 +440,14 @@
       !isRes() && can('resellers') ? GET('resellers').catch(() => []) : Promise.resolve([]),
     ]);
     S.plans = plans; S.resellers = resellers;
-    const chips = [['all', 'Svi', d.counts.all], ['active', 'Aktivni', d.counts.active + d.counts.expiring + d.counts.grace], ['expiring', 'Ističu', d.counts.expiring], ['expired', 'Istekli', d.counts.expired], ['limited', 'Potrošen promet', d.counts.limited], ['disabled', 'Ugašeni', d.counts.disabled]];
+    const chips = [['all', 'Svi', d.counts.all], ['active', 'Aktivni', d.counts.active + d.counts.expiring + d.counts.grace], ['expiring', 'Ističu', d.counts.expiring], ['expired', 'Istekli', d.counts.expired], ['limited', 'Potrošen promet', d.counts.limited], ['disabled', 'Ugašeni', d.counts.disabled], ...(d.counts.devices ? [['devices', 'Previše uređaja', d.counts.devices]] : [])];
     const cols = isRes() ? '1.6fr 1.2fr 1.4fr 1fr .9fr' : '28px 1.6fr 1.1fr 1fr 1.3fr 1fr .9fr';
     const wide = innerWidth >= 960;
     $('#view').innerHTML = `
       ${top(isRes() ? 'Moji korisnici' : 'Korisnici', `${d.counts.all} korisnika`, `
         ${!isRes() ? `<button class="btn hide-m" data-a="bulk" ${S.sel.size ? '' : 'disabled'}>Masovne akcije${S.sel.size ? ` (${S.sel.size})` : ''}</button>
-        <a class="btn hide-m" href="api/users.csv">${ic('down')}Izvoz CSV</a>` : ''}
+        <a class="btn hide-m" href="api/users.csv">${ic('down')}Izvoz CSV</a>
+        <button class="btn hide-m" data-a="broadcast">${ic('send')}Poruka svima</button>` : ''}
         <button class="btn red" data-a="newUser">${ic('plus')}<span>Novi korisnik</span></button>`)}
       <div class="chips">${chips.map(([k, l, n]) => `<button type="button" class="chip ${q.status === k ? 'on' : ''}" data-a="uStatus" data-k="${k}">${l}<span>${n}</span></button>`).join('')}</div>
       <div style="display:flex;flex-wrap:wrap;gap:10px">
@@ -469,7 +497,7 @@
       <div class="mini-grid" style="margin-top:14px">
         <div class="mini"><small>Plan</small><b>${esc(u.plan || '—')}</b></div>
         <div class="mini"><small>Ističe</small><b>${fmtDate(u.expires_at)}</b> <span class="muted" style="font-size:12px">(${daysTxt(u.days_left)})</span></div>
-        <div class="mini"><small>Limit uređaja</small><b>${u.devices}</b></div>
+        <div class="mini"><small>Uređaji sada / limit</small><b class="${u.devices_seen > u.devices ? 'warn' : ''}">${u.devices_seen || 0} / ${u.devices}</b>${u.status === 'devices' ? ` <button class="btn sm" data-a="unblock" data-id="${u.id}" style="margin-left:6px">Odblokiraj</button>` : ''}</div>
         <div class="mini"><small>Zadnje spajanje</small><b>${u.last_seen ? ago(u.last_seen) : 'nikad'}</b>${u.last_server ? ` <span class="muted" style="font-size:12px">· ${esc(u.last_server)}</span>` : ''}</div>
       </div>
       <div style="margin-top:14px"><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--soft);margin-bottom:6px"><span>Promet</span><span>${bytes(u.traffic_used)} / ${u.traffic_limit ? bytes(u.traffic_limit) : 'neograničeno'}</span></div>
@@ -483,7 +511,7 @@
             <button class="btn sm" data-a="copy" data-v="${esc(u.sub_link)}">${ic('copy')}Kopiraj</button>
             <a class="btn sm" href="${esc(u.sub_link)}" target="_blank" rel="noopener">Stranica kupca</a>
             <button class="btn sm red" data-a="sendCustomer" data-id="${u.id}">${ic('send')}Pošalji kupcu</button>
-            ${u.vless.length ? `<button class="btn sm" data-a="links" data-id="${u.id}">VLESS / WireGuard</button>` : ''}
+            ${u.vless.length || u.ss?.length || u.wg.length ? `<button class="btn sm" data-a="links" data-id="${u.id}">Konfiguracije</button>` : ''}
           </div>
         </div>
       </div>
@@ -495,7 +523,13 @@
         <button class="btn warnb" data-a="uAct" data-act="toggle" data-id="${u.id}">${u.disabled ? 'Upali' : 'Ugasi'}</button>
         <button class="btn danger" data-a="uAct" data-act="delete" data-id="${u.id}">Obriši</button>
       </div>
-      ${u.note || u.contact ? `<div style="margin-top:14px" class="muted">${u.contact ? `<div>Kontakt: <span style="color:var(--text)">${esc(u.contact)}</span></div>` : ''}${u.note ? `<div>Bilješka: <span style="color:var(--text)">${esc(u.note)}</span></div>` : ''}</div>` : ''}
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px" class="muted">
+        ${u.contact ? `<div>Kontakt: <span style="color:var(--text)">${esc(u.contact)}</span></div>` : ''}
+        ${u.email ? `<div>E-mail: <span style="color:var(--text)">${esc(u.email)}</span></div>` : ''}
+        <div>Telegram bot: <span style="color:var(--text)">${u.tg ? 'povezan ✓ (dobija podsjetnike)' : 'nije povezan'}</span></div>
+        ${u.note ? `<div>Bilješka: <span style="color:var(--text)">${esc(u.note)}</span></div>` : ''}
+        ${u.owner_id || isRes() ? `<label style="display:flex;gap:8px;align-items:center;color:var(--text);margin-top:4px"><input type="checkbox" class="cb" data-a="autoRenew" data-id="${u.id}" ${u.auto_renew ? 'checked' : ''}>Produži sam sa kredita resellera dan prije isteka</label>` : ''}
+      </div>
       <div style="margin-top:14px"><small class="muted">Historija</small><div class="hist">${u.history.map((h) => `<div><span>${fmtDT(h.ts)}</span><span>${esc(h.text)}</span></div>`).join('')}</div></div>`;
     S.lastUser = u;
     return u;
@@ -527,11 +561,13 @@
         ${resellers.length ? `<label class="field">Vlasnik<select class="input" name="owner_id"><option value="">Moj korisnik</option>${resellers.map((r) => `<option value="${r.id}">reseller · ${esc(r.username)}</option>`).join('')}</select></label>` : ''}
         <div class="row2"><label class="field">Plaćeno (€, opcionalno)<input class="input" name="paid" inputmode="decimal" placeholder="0"></label>
         <label class="field">Način plaćanja<input class="input" name="method" placeholder="npr. Wise"></label></div>` : `<p class="muted" style="margin:0">Cijena se skida sa tvog kredita (${money(S.me.credit)}).</p>`}
-      <div class="row2"><label class="field">Kontakt (opcionalno)<input class="input" name="contact" placeholder="Telegram, telefon…"></label>
-      <label class="field">Bilješka (opcionalno)<input class="input" name="note"></label></div>
+      <div class="row2"><label class="field">Kontakt (opcionalno)<input class="input" name="contact" placeholder="+387…, @telegram"></label>
+      <label class="field">E-mail kupca (opcionalno)<input class="input" name="email" type="email" placeholder="za podsjetnike"></label></div>
+      <label class="field">Bilješka (opcionalno)<input class="input" name="note"></label>
+      ${isR ? '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="auto_renew">Produži sam sa mog kredita dan prije isteka</label>' : ''}
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Napravi korisnika</button></div>`,
     async (d) => {
-      const body = { username: d.username, plan_id: Number(d.plan_id), note: d.note, contact: d.contact };
+      const body = { username: d.username, plan_id: Number(d.plan_id), note: d.note, contact: d.contact, email: d.email, auto_renew: !!d.auto_renew };
       if (!isR) Object.assign(body, { days: d.days ? Number(d.days) : undefined, traffic_gb: d.traffic_gb !== '' ? Number(d.traffic_gb) : undefined, owner_id: d.owner_id || undefined, paid: Number(String(d.paid || '0').replace(',', '.')), method: d.method });
       return (await POST(R('users'), body)).id;
     });
@@ -569,18 +605,20 @@
       <div class="row2"><label class="field">Promet GB (0 = neograničeno)<input class="input" name="traffic_gb" value="${u.traffic_limit ? (u.traffic_limit / 1024 ** 3).toFixed(0) : 0}" inputmode="decimal"></label>
       <label class="field">Limit uređaja<input class="input" name="devices" value="${u.devices}" inputmode="numeric"></label></div>
       ${resellers.length ? `<label class="field">Vlasnik<select class="input" name="owner_id"><option value="">Moj korisnik</option>${resellers.map((r) => `<option value="${r.id}" ${r.id === u.owner_id ? 'selected' : ''}>reseller · ${esc(r.username)}</option>`).join('')}</select></label>` : ''}
-      <div class="row2"><label class="field">Kontakt<input class="input" name="contact" value="${esc(u.contact)}"></label><label class="field">Bilješka<input class="input" name="note" value="${esc(u.note)}"></label></div>
+      <div class="row2"><label class="field">Kontakt<input class="input" name="contact" value="${esc(u.contact)}"></label><label class="field">E-mail<input class="input" name="email" type="email" value="${esc(u.email)}"></label></div>
+      <label class="field">Bilješka<input class="input" name="note" value="${esc(u.note)}"></label>
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
-    (d) => PUT('users/' + id, { username: d.username, plan_id: Number(d.plan_id), expires_at: new Date(d.expires + 'T23:59:00').getTime(), traffic_gb: Number(d.traffic_gb || 0), devices: Number(d.devices || 1), owner_id: d.owner_id ?? undefined, contact: d.contact, note: d.note }));
+    (d) => PUT('users/' + id, { username: d.username, plan_id: Number(d.plan_id), expires_at: new Date(d.expires + 'T23:59:00').getTime(), traffic_gb: Number(d.traffic_gb || 0), devices: Number(d.devices || 1), owner_id: d.owner_id ?? undefined, contact: d.contact, email: d.email, note: d.note }));
     if (ok) { toast('Spremljeno.'); refreshUser(); }
   }
   async function editNote(id) {
     const u = S.lastUser;
     const ok = await formLoop(`<h2>Bilješka · ${esc(u.username)}</h2>
       <label class="field">Kontakt<input class="input" name="contact" value="${esc(u.contact)}"></label>
+      <label class="field">E-mail kupca<input class="input" name="email" type="email" value="${esc(u.email)}"></label>
       <label class="field">Bilješka<textarea class="input" name="note">${esc(u.note)}</textarea></label>
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
-    (d) => PUT(R('users/' + id), { note: d.note, contact: d.contact }));
+    (d) => PUT(R('users/' + id), { note: d.note, contact: d.contact, email: d.email }));
     if (ok) refreshUser();
   }
   async function userAction(id, act) {
@@ -598,6 +636,7 @@
     const u = S.lastUser;
     const r = await modal(`<h2>Konfiguracije · ${esc(u.username)}</h2>
       ${u.vless.length ? `<b>VLESS + Reality</b>${u.vless.map((v) => `<div class="list-item"><span>${esc(v.server)}</span><button class="btn sm" type="button" data-a="copy" data-v="${esc(v.link)}">${ic('copy')}Kopiraj</button></div>`).join('')}` : ''}
+      ${u.ss?.length ? `<b>Shadowsocks 2022</b>${u.ss.map((v) => `<div class="list-item"><span>${esc(v.server)}</span><button class="btn sm" type="button" data-a="copy" data-v="${esc(v.link)}">${ic('copy')}Kopiraj</button></div>`).join('')}` : ''}
       ${u.wg.length ? `<b>WireGuard</b>${u.wg.map((w) => `<div class="list-item"><span>${esc(w.server)}</span><a class="btn sm" href="${esc(w.url)}" target="_blank" rel="noopener">${ic('down')}.conf</a><a class="btn sm" href="${esc(w.url)}?qr=1" target="_blank" rel="noopener">QR</a></div>`).join('')}` : ''}
       <div class="dlg-actions"><button class="btn" value="cancel">Zatvori</button></div>`);
     if (r) r.close();
@@ -652,10 +691,23 @@
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
         ${links.map(([n, href, sub]) => `<a class="btn" style="flex-direction:column;align-items:flex-start;gap:0;height:auto;padding:10px 12px" href="${esc(href)}" target="_blank" rel="noopener" data-a="sendVia" data-tg="${n === 'Telegram' && tg ? '1' : ''}"><b>${n}</b><small class="muted" style="font-weight:400">${esc(sub)}</small></a>`).join('')}
       </div>
+      ${S.me.mail_on ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="field" style="flex:1;min-width:200px">Pošalji e-mail odmah iz panela<input class="input" id="custMail" type="email" value="${esc(u.email || (mail ? contact : ''))}" placeholder="kupac@email.com"></label><button class="btn" type="button" data-a="mailCustomer" data-id="${u.id}">${ic('send')}Pošalji e-mail</button></div>` : ''}
       <div class="dlg-actions"><button class="btn" type="button" data-a="qrPng">${ic('down')}QR kod kao slika</button><button class="btn" type="button" data-a="copyMsg">${ic('copy')}Kopiraj poruku</button><button class="btn red" value="cancel">Gotovo</button></div>`);
     if (r) r.close();
   }
 
+  async function broadcast() {
+    const r = await formLoop(`<h2>Poruka svim kupcima</h2>
+      <p class="muted" style="margin:0">Ide kupcima koji su povezali Telegram bota${S.me.mail_on ? ' i/ili imaju e-mail' : ''}. Može se prikazati i u aplikaciji (Hiddify) i na stranici kupca.</p>
+      <label class="field">Poruka<textarea class="input" name="text" required style="min-height:140px" placeholder="npr. Večeras od 23 h kratko održavanje servera u Njemačkoj."></textarea></label>
+      <label class="field">Kome<select class="input" name="target"><option value="active">Samo aktivnim kupcima</option><option value="all">Svima</option></select></label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="tg" checked ${S.me.cbot ? '' : 'disabled'}>Telegram (bot za kupce)${S.me.cbot ? '' : ' · nije uključen u Postavkama'}</label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="email" ${S.me.mail_on ? '' : 'disabled'}>E-mail${S.me.mail_on ? '' : ' · nije podešen u Postavkama'}</label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="announce">Prikaži i u aplikaciji i na stranici kupca (zamijeni trenutnu poruku)</label>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Pošalji</button></div>`,
+    (d) => POST('users/broadcast', { text: d.text, target: d.target, tg: d.tg, email: d.email, announce: d.announce }));
+    if (r) toast(`Poslano: Telegram ${r.tg}, e-mail ${r.email}${r.announce ? ', i u aplikaciji' : ''}.`);
+  }
   async function bulk() {
     const ids = [...S.sel];
     const r = await formLoop(`<h2>Masovne akcije · ${ids.length} korisnika</h2>
@@ -747,9 +799,10 @@
       <details><summary class="muted" style="cursor:pointer">Napredno: IP, lokacija, portovi</summary>
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
         <div class="row2"><label class="field">IP ili domena (prazno = sam se javi)<input class="input" name="host"></label><label class="field">Grad / država (npr. Frankfurt / DE)<input class="input" name="loc"></label></div>
-        <div class="row2"><label class="field">VLESS port<input class="input" name="vless_port" value="443"></label><label class="field">WireGuard port<input class="input" name="wg_port" value="51820"></label></div></div></details>
+        <div class="row2"><label class="field">VLESS port<input class="input" name="vless_port" value="443"></label><label class="field">WireGuard port<input class="input" name="wg_port" value="51820"></label></div>
+        <label class="field">Shadowsocks port<input class="input" name="ss_port" value="8388"></label></div></details>
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Dodaj i prikaži komandu</button></div>`,
-    (d) => { const [city, cc] = String(d.loc || '').split('/').map((x) => x.trim()); return POST('servers', { name: d.name, capacity: Number(d.capacity), provider: d.provider, cost: Number(String(d.cost || 0).replace(',', '.')), host: d.host, city, country: cc, vless_port: Number(d.vless_port), wg_port: Number(d.wg_port) }); });
+    (d) => { const [city, cc] = String(d.loc || '').split('/').map((x) => x.trim()); return POST('servers', { name: d.name, capacity: Number(d.capacity), provider: d.provider, cost: Number(String(d.cost || 0).replace(',', '.')), host: d.host, city, country: cc, vless_port: Number(d.vless_port), wg_port: Number(d.wg_port), ss_port: Number(d.ss_port) }); });
     if (r) { showInstall(r.install, true); if (location.hash.startsWith('#/serveri')) pageServers(); }
   }
   async function showInstall(cmd, fresh) {
@@ -768,17 +821,19 @@
       <div class="row2"><label class="field">Maksimalno spojenih<input class="input" name="capacity" value="${s.capacity}"></label><label class="field">Mjesečni trošak €<input class="input" name="cost" value="${s.cost || 0}"></label></div>
       <div class="row2"><label class="field">Hoster<input class="input" name="provider" value="${esc(s.provider)}"></label><label class="field">Reality SNI<input class="input" name="sni" value="${esc(s.sni)}"></label></div>
       <div class="row2"><label class="field">VLESS port<input class="input" name="vless_port" value="${s.vless_port}"></label><label class="field">WireGuard port<input class="input" name="wg_port" value="${s.wg_port}"></label></div>
+      <label class="field">Shadowsocks port<input class="input" name="ss_port" value="${s.ss_port || 8388}"></label>
       <p class="dim" style="margin:0;font-size:12.5px">Promjena porta ili SNI-ja mijenja linkove kupaca: aplikacije ih same osvježe preko pretplate.</p>
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
-    (d) => PUT('servers/' + id, { ...d, capacity: Number(d.capacity), cost: Number(String(d.cost).replace(',', '.')), vless_port: Number(d.vless_port), wg_port: Number(d.wg_port) }));
+    (d) => PUT('servers/' + id, { ...d, capacity: Number(d.capacity), cost: Number(String(d.cost).replace(',', '.')), vless_port: Number(d.vless_port), wg_port: Number(d.wg_port), ss_port: Number(d.ss_port) }));
     if (r) { toast('Spremljeno.'); pageServers(); }
   }
   async function srvMore(id) {
     S.servers = await GET('servers');
     const s = S.servers.find((x) => x.id === Number(id));
     const r = await modal(`<h2>${esc(s.name)}</h2>
-      <div class="mini-grid"><div class="mini"><small>Agent</small><b>${esc(s.version || '—')}</b></div><div class="mini"><small>Uptime</small><b>${s.uptime ? Math.floor(s.uptime / 86400) + ' d ' + Math.floor(s.uptime % 86400 / 3600) + ' h' : '—'}</b></div>
-        <div class="mini"><small>Xray (VLESS)</small><b class="${s.xray_ok ? 'ok' : 'bad'}">${s.xray_ok ? 'radi' : !s.enabled ? 'ugašen' : 'ne radi'}</b></div><div class="mini"><small>WireGuard</small><b class="${s.wg_ok ? 'ok' : 'bad'}">${s.wg_ok ? 'radi' : !s.enabled ? 'ugašen' : 'ne radi'}</b></div></div>
+      ${s.last_error ? `<div class="tag t-bad" style="white-space:normal;padding:8px 10px;font-weight:500">${esc(s.last_error)}</div>` : ''}
+      <div class="mini-grid"><div class="mini"><small>Agent / Xray</small><b>${esc(s.version || '—')}</b>${s.xray_version ? ` <span class="muted" style="font-size:12px">· Xray ${esc(s.xray_version)}</span>` : ''}</div><div class="mini"><small>Uptime</small><b>${s.uptime ? Math.floor(s.uptime / 86400) + ' d ' + Math.floor(s.uptime % 86400 / 3600) + ' h' : '—'}</b></div>
+        <div class="mini"><small>Xray (VLESS / SS)</small><b class="${s.xray_ok ? 'ok' : 'bad'}">${s.xray_ok ? 'radi' : !s.enabled ? 'ugašen' : 'ne radi'}</b></div><div class="mini"><small>WireGuard</small><b class="${s.wg_ok ? 'ok' : 'bad'}">${s.wg_ok ? 'radi' : !s.enabled ? 'ugašen' : 'ne radi'}</b></div></div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <button class="btn" value="install">Prikaži komandu za instalaciju</button>
         <button class="btn" value="locate">Odredi lokaciju iz IP adrese</button>
@@ -818,7 +873,7 @@
             `<b>${esc(r.username)}</b><small>${esc(r.contact || r.brand || '')}</small>`, r.level ? `<span class="tag lvl-${esc(r.level)}">${esc(r.level)}</span>` : '<span class="muted">—</span>',
             `<b class="${r.credit < 10 ? 'warn' : ''}">${money(r.credit)}</b>`,
             `<div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12.5px">${r.users} / ${r.user_limit}</span><div class="bar"><i style="width:${Math.min(100, r.users / r.user_limit * 100)}%"></i></div></div>`,
-            money(r.month), r.disabled ? '<span class="tag t-bad">Blokiran</span>' : r.credit < 10 ? '<span class="tag t-warn">Malo kredita</span>' : '<span class="tag t-ok">Aktivan</span>',
+            money(r.month), r.pending ? '<span class="tag t-warn">Čeka odobrenje</span>' : r.disabled ? '<span class="tag t-bad">Blokiran</span>' : r.credit < 10 ? '<span class="tag t-warn">Malo kredita</span>' : '<span class="tag t-ok">Aktivan</span>',
           ].map((c, i) => `<div class="cell${i === 0 ? ' first' : ''}" data-l="${['', 'Nivo', 'Kredit', 'Korisnici', 'Mjesec', 'Status'][i]}">${c}</div>`).join('')}</div>`).join('') || '<div class="empty">Još nema resellera.</div>'}</div></section>
         ${wide ? `<section class="card p narrow" id="rDetail">${S.selRes ? '' : '<div class="empty">Klikni resellera za detalje i dodavanje kredita.</div>'}</section>` : ''}
       </div>`;
@@ -838,6 +893,8 @@
         <label class="field">Način plaćanja<select class="input" name="method">${methods.map((m) => `<option>${esc(m)}</option>`).join('')}</select></label></div>
         <label class="field">Bilješka (opcionalno)<input class="input" name="note"></label>
         <div style="display:flex;gap:8px"><button class="btn red" style="flex:1" type="submit" name="kind" value="topup">Dodaj na račun</button><button class="btn" type="submit" name="kind" value="adjust" title="Ispravka bez novca (npr. poklon ili greška)">Ispravka</button></div></form>` : ''}
+      ${r.pending ? `<div class="banner" style="margin-top:14px">${ic('res')}<span style="flex:1">Registrovao se sam i čeka odobrenje.${r.email ? ` E-mail: ${esc(r.email)}` : ''}</span><button class="btn sm red" data-a="approveRes" data-id="${r.id}">Odobri</button></div>` : ''}
+      ${r.email && !r.pending ? `<p class="muted" style="margin:10px 0 0;font-size:13px">E-mail za fakture: ${esc(r.email)}</p>` : ''}
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
         <button class="btn" data-a="impersonate" data-id="${r.id}">Uđi kao reseller</button>
         <button class="btn" data-a="editReseller" data-id="${r.id}">Uredi</button>
@@ -860,12 +917,13 @@
       <label class="field">${id ? 'Nova šifra (prazno = ne mijenja se)' : 'Šifra (bar 8 znakova)'}<input class="input" name="password" type="text" ${id ? '' : 'required minlength="8"'} autocomplete="new-password"></label>
       <div class="row2"><label class="field">Nivo<select class="input" name="level_id"><option value="">Bez nivoa (bez popusta)</option>${levels.map((l) => `<option value="${l.id}" ${l.id === r.level_id ? 'selected' : ''}>${esc(l.name)} · ${Math.round(l.discount * 100)}%</option>`).join('')}</select></label>
       <label class="field">Limit korisnika<input class="input" name="user_limit" value="${r.user_limit}" inputmode="numeric"></label></div>
-      <div class="row2"><label class="field">Kontakt<input class="input" name="contact" value="${esc(r.contact)}" placeholder="Telegram, e-mail"></label><label class="field">Njegov brend (opcionalno)<input class="input" name="brand" value="${esc(r.brand)}"></label></div>
+      <div class="row2"><label class="field">Kontakt<input class="input" name="contact" value="${esc(r.contact)}" placeholder="Telegram, WhatsApp"></label><label class="field">E-mail (za fakture)<input class="input" name="email" type="email" value="${esc(r.email || '')}"></label></div>
+      <label class="field">Njegov brend (opcionalno, za white-label)<input class="input" name="brand" value="${esc(r.brand)}"></label>
       <label class="field">Bilješka<input class="input" name="note" value="${esc(r.note)}"></label>
       <div class="dlg-actions">${id ? '<button class="btn danger" value="delete" formnovalidate>Obriši</button>' : ''}<span style="flex:1"></span><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
     async (d) => {
       if (d._btn === 'delete') { if (!confirm('Obrisati resellera?')) throw new Error('Odustao si.'); return DEL('resellers/' + id); }
-      const body = { level_id: d.level_id ? Number(d.level_id) : null, user_limit: Number(d.user_limit), contact: d.contact, brand: d.brand, note: d.note, password: d.password || undefined };
+      const body = { level_id: d.level_id ? Number(d.level_id) : null, user_limit: Number(d.user_limit), contact: d.contact, email: d.email, brand: d.brand, note: d.note, password: d.password || undefined };
       if (id) return PUT('resellers/' + id, body);
       const out = await POST('resellers', { ...body, username: d.username });
       return { ...out, _login: { username: d.username, password: d.password } };
@@ -957,7 +1015,8 @@
   }
 
   // ================================================================== RESELLER: KREDIT
-  async function pageCredit() {
+  async function pageCredit(params) {
+    if (params?.get('placeno')) { toast('Hvala! Kredit se doda čim Stripe potvrdi plaćanje (obično par sekundi).'); history.replaceState(null, '', '#/kredit'); setTimeout(() => route(), 4000); }
     const [tx, me] = await Promise.all([GET('res/transactions'), GET('me')]);
     S.me = me;
     const p = me.pay || {};
@@ -973,6 +1032,8 @@
           ${p.paypal ? `<div class="list-item"><span>PayPal ${esc(p.paypal)}</span><button class="btn sm" data-a="copy" data-v="${esc(p.paypal)}">${ic('copy')}</button></div>` : ''}
           ${p.min ? `<small class="dim">Minimalna uplata: ${money(p.min)}</small>` : ''}</section>
       </div>
+      ${me.stripe ? `<section class="card p"><h2 style="margin-bottom:6px">Dopuni karticom</h2><p class="muted" style="margin:0 0 12px">Plaćanje ide preko Stripea. Kredit se doda automatski čim plaćanje prođe.</p>
+        <form id="stripeForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end"><label class="field" style="flex:1;min-width:160px">Iznos (€)<input class="input" name="amount" inputmode="decimal" required value="${Math.max(Number(p.min) || 0, 10)}"></label><button class="btn red" type="submit">${ic('credit')}Plati karticom</button></form></section>` : ''}
       <section class="card" style="overflow:hidden"><div class="card-head"><h2>Historija</h2></div><div class="tbl">${trow(['Datum', 'Opis', 'Promjena', 'Faktura'], true, cols)}
         ${tx.map((t) => trow([fmtDT(t.ts), esc(t.note || (TXT[t.type]?.[0] || t.type)), `<b class="${t.credit_delta < 0 ? '' : 'ok'}">${t.credit_delta > 0 ? '+' : ''}${money(t.credit_delta)}</b>`, t.amount > 0 ? `<a href="api/invoice/${t.id}" target="_blank" rel="noopener">${esc(t.invoice_no || 'Faktura')}</a>` : '<span class="dim">—</span>'], false, cols, ['', 'Opis', 'Promjena', 'Faktura'])).join('') || '<div class="empty">Još nema uplata.</div>'}</div></section>`;
   }
@@ -1000,6 +1061,7 @@
       const v = values[r.key];
       if (r.type === 'toggle') return `<button type="button" class="switch" role="switch" aria-checked="${!!v}" aria-label="${esc(r.label)}" data-a="setToggle" data-k="${r.key}"></button>`;
       if (r.type === 'select') return `<select class="input" data-set="${r.key}" aria-label="${esc(r.label)}">${r.options.map((o, i) => `<option value="${esc(o)}" ${String(v) === o ? 'selected' : ''}>${esc(r.labels?.[i] || o)}</option>`).join('')}</select>`;
+      if (r.type === 'multi') { const on = String(v || '').split(','); return r.options.map((o, i) => `<button type="button" class="chip ${on.includes(o) ? 'on' : ''}" data-a="setMulti" data-k="${r.key}" data-v="${esc(o)}">${esc(r.labels?.[i] || o)}</button>`).join(''); }
       if (r.type === 'chips') return r.options.map((o) => `<button type="button" class="chip ${v === o ? 'on' : ''}" data-a="setChip" data-k="${r.key}" data-v="${esc(o)}">${esc(o[0].toUpperCase() + o.slice(1))}</button>`).join('');
       if (r.type === 'textarea') return `<textarea class="input" data-set="${r.key}" aria-label="${esc(r.label)}">${esc(v)}</textarea>`;
       return `<input class="input${r.mono ? ' mono' : ''}" data-set="${r.key}" value="${esc(v)}" ${r.type === 'number' ? 'inputmode="decimal"' : ''} ${r.type === 'secret' ? 'autocomplete="off"' : ''} aria-label="${esc(r.label)}" ${r.key === 'admin_path' && !owner ? 'disabled' : ''}>`;
@@ -1008,10 +1070,14 @@
       sigurnost: owner ? `<div class="set-row"><div class="lbl"><b>Admin nalozi i uloge</b><small>Podrška vidi korisnike bez finansija, finansije vide samo novac</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
           ${admins.map((a) => `<div class="list-item"><span><b>${esc(a.username)}</b> · ${({ owner: 'Vlasnik', admin: 'Admin', support: 'Podrška', finance: 'Finansije' })[a.role]}${a.totp_on ? ' · 2FA' : ''}${a.disabled ? ' · <span class="bad">blokiran</span>' : ''}</span><span class="dim">${ago(a.last_login)}</span>${a.role !== 'owner' ? `<button class="btn sm" data-a="editAdmin" data-id="${a.id}">Uredi</button>` : '<span class="tag t-ok">Ti</span>'}</div>`).join('')}
           <button class="btn sm" style="align-self:flex-start" data-a="editAdmin">${ic('plus')}Dodaj admina</button></div></div>` : '',
-      obavijesti: `<div class="set-row"><div class="lbl"><b>Probna poruka</b><small>Prvo spremi token i chat ID</small></div><div class="ctl"><button class="btn sm" data-a="testTg">${ic('send')}Pošalji probnu poruku</button></div></div>`,
+      obavijesti: `<div class="set-row"><div class="lbl"><b>Probe</b><small>Prvo spremi postavke, pa probaj</small></div><div class="ctl" style="flex-wrap:wrap;gap:8px">
+          <button class="btn sm" data-a="testTg">${ic('send')}Probna poruka meni</button>
+          <button class="btn sm" data-a="testCbot">${ic('send')}Provjeri bota za kupce</button>
+          <button class="btn sm" data-a="testMail">${ic('send')}Probni e-mail</button></div></div>`,
+      placanja: `<div class="set-row"><div class="lbl"><b>Stripe webhook adresa</b><small>U Stripeu: Developers → Webhooks → Add endpoint, događaj checkout.session.completed. Tajnu (whsec_…) zalijepi gore.</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch"><div class="list-item" style="flex:1"><span class="mono">${esc((values.panel_url || location.origin).replace(/\/+$/, ''))}/stripe/webhook</span><button class="btn sm" data-a="copy" data-v="${esc((values.panel_url || location.origin).replace(/\/+$/, ''))}/stripe/webhook">${ic('copy')}</button></div></div></div>`,
       backup: `<div class="set-row"><div class="lbl"><b>Backupi</b><small>Čuvaju se u folderu data/backups na serveru panela</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
           ${backups.slice(0, 6).map((b) => `<div class="list-item"><span>${fmtDT(b.ts)}</span><span class="dim">${bytes(b.size)}</span><a class="btn sm" href="api/backups/${encodeURIComponent(b.name)}">${ic('down')}Preuzmi</a></div>`).join('') || '<span class="muted">Još nema backupa.</span>'}
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-a="backupNow">Napravi backup sada</button>${owner ? '<button class="btn sm danger" data-a="restore">Vrati iz backupa…</button>' : ''}</div></div></div>`,
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-a="backupNow">Napravi backup sada</button><button class="btn sm" data-a="testS3">Probaj S3</button>${owner ? '<button class="btn sm danger" data-a="restore">Vrati iz backupa…</button>' : ''}</div></div></div>`,
       api: `<div class="set-row"><div class="lbl"><b>API ključevi</b><small>Za prodajnog bota ili sajt. Dokumentacija u README fajlu.</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
           ${keys.map((k) => `<div class="list-item"><span><b>${esc(k.name)}</b> <span class="mono dim">${esc(k.prefix)}…</span></span><span class="dim">${k.last_used ? 'korišten ' + ago(k.last_used) : 'nije korišten'}</span><button class="btn sm danger" data-a="delKey" data-id="${k.id}">Opozovi</button></div>`).join('')}
           <button class="btn sm" style="align-self:flex-start" data-a="newKey">${ic('key')}Novi API ključ</button></div></div>`,
@@ -1019,7 +1085,8 @@
           <div class="list-item"><span>Verzija panela</span><b>${esc(sys.version)}</b></div><div class="list-item"><span>Node.js</span><span>${esc(sys.node)}</span></div>
           <div class="list-item"><span>Baza</span><span>${bytes(sys.db_size)} · ${sys.users} korisnika · ${sys.servers} servera</span></div>
           <div class="list-item"><span>Radi bez prekida</span><span>${Math.floor(sys.uptime / 3600)} h ${Math.floor(sys.uptime % 3600 / 60)} min</span></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">${owner ? `<a class="btn sm" href="api/export.json">${ic('down')}Izvezi sve podatke</a><button class="btn sm danger" data-a="restart">Restartuj panel</button>` : ''}</div></div></div>` : '',
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${owner ? `<a class="btn sm" href="api/export.json">${ic('down')}Izvezi sve podatke</a><button class="btn sm danger" data-a="restart">Restartuj panel</button>` : ''}</div></div></div>
+        ${owner ? `<div class="set-row"><div class="lbl"><b>Ažuriranje panela</b><small>Skida najnoviju verziju sa GitHuba i instalira je. Podaci ostaju.</small></div><div class="ctl" id="updBox" style="flex-basis:100%;justify-content:stretch;flex-direction:column"><span class="muted">Provjeravam…</span></div></div>` : ''}` : '',
     };
     $('#view').innerHTML = `${top('Postavke', 'Sve postavke sistema · vidi ih samo admin', `<span class="warn" id="dirty" style="font-size:13px"></span><button class="btn" data-a="reload">Poništi</button><button class="btn red" data-a="saveSettings">Spremi sve</button>`)}
       <div class="split" style="align-items:flex-start">
@@ -1029,6 +1096,14 @@
           ${extra[s.id] || ''}</section>`).join('')}</div>
       </div>`;
     $$('[data-set]').forEach((el) => { el.oninput = el.onchange = () => markDirty(el.dataset.set, el.value); });
+    if ($('#updBox')) GET('system/update').then((u) => {
+      const newer = u.latest && u.latest !== u.current;
+      $('#updBox').innerHTML = `<div class="list-item"><span>Instalirana verzija</span><b>${esc(u.current)}</b></div>
+        <div class="list-item"><span>Najnovija na GitHubu</span><b class="${newer ? 'warn' : 'ok'}">${esc(u.latest || 'nepoznato')}</b></div>
+        ${u.pending ? '<span class="warn">Ažuriranje je u toku… osvježi stranicu za minut-dva.</span>' : u.ready
+          ? `<button class="btn sm ${newer ? 'red' : ''}" style="align-self:flex-start" data-a="updatePanel">${newer ? 'Ažuriraj na ' + esc(u.latest) : 'Ponovo instaliraj zadnju verziju'}</button>`
+          : '<span class="muted">Dugme radi nakon što jednom ažuriraš panel komandom iz README-a.</span>'}`;
+    }).catch(() => { $('#updBox').innerHTML = '<span class="muted">Ne mogu provjeriti verziju.</span>'; });
     const h = location.hash.split('#sec-')[1];
     if (h) $('#sec-' + h)?.scrollIntoView();
   }
@@ -1109,7 +1184,7 @@
         if (path === '' ) return await pageResDash();
         if (path === 'korisnici') return await pageUsers(params);
         if (path.startsWith('korisnik/')) return await pageUser(Number(path.split('/')[1]));
-        if (path === 'kredit') return await pageCredit();
+        if (path === 'kredit') { await pageCredit(params); const f = $('#stripeForm'); if (f) f.onsubmit = async (e) => { e.preventDefault(); try { const r = await POST('res/stripe', { amount: Number(String(new FormData(f).get('amount')).replace(',', '.')) }); location.href = r.url; } catch (err) { fail(err); } }; return; }
         if (path === 'profil') return await pageProfile();
         location.hash = '#/'; return;
       }
@@ -1160,6 +1235,18 @@
     uAct: (d) => userAction(d.id, d.act),
     links: () => showLinks(),
     sendCustomer: () => sendCustomer().catch(fail),
+    unblock: async (d) => { try { await PUT('users/' + d.id, { unblock: true }); toast('Odblokiran.'); refreshUser(); } catch (e) { fail(e); } },
+    autoRenew: async (d, el) => { try { await PUT(R('users/' + d.id), { auto_renew: el.checked }); toast(el.checked ? 'Automatsko produženje uključeno.' : 'Automatsko produženje isključeno.'); } catch (e) { el.checked = !el.checked; fail(e); } },
+    mailCustomer: async (d, el) => {
+      const to = $('#custMail').value.trim();
+      el.disabled = true;
+      try { await POST(R(`users/${d.id}/send-mail`), { to, text: $('#custMsg').value, subject: `${S.me.brand} · tvoj VPN pristup` }); toast('E-mail poslan na ' + to); }
+      catch (e) { fail(e); } finally { el.disabled = false; }
+    },
+    broadcast: () => broadcast().catch(fail),
+    approveRes: async (d) => { try { await POST(`resellers/${d.id}/approve`); toast('Reseller odobren. Sad se može prijaviti.'); pageResellers(); } catch (e) { fail(e); } },
+    showSignup: (d, el, e) => { e.preventDefault(); renderSignup(); },
+    showLogin: (d, el, e) => { e.preventDefault(); renderLogin(); },
     copyMsg: () => copy($('#custMsg').value),
     qrPng: () => qrPng(S.lastUser).catch(fail),
     sendVia: (d, el, e) => {
@@ -1204,6 +1291,17 @@
     setToggle: (d, el) => { const v = el.getAttribute('aria-checked') !== 'true'; el.setAttribute('aria-checked', String(v)); markDirty(d.k, v); },
     setChip: (d, el) => { $$(`[data-a="setChip"][data-k="${d.k}"]`).forEach((c) => c.classList.toggle('on', c === el)); markDirty(d.k, d.v); },
     saveSettings: () => saveSettings(),
+    setMulti: (d, el) => { el.classList.toggle('on'); const v = $$(`[data-a="setMulti"][data-k="${d.k}"].on`).map((c) => c.dataset.v).join(','); markDirty(d.k, v); },
+    testCbot: async () => { try { const r = await POST('settings/test-cbot'); toast(`Bot radi: @${r.username}`); } catch (e) { fail(e); } },
+    testMail: async () => {
+      const r = await formLoop('<h2>Probni e-mail</h2><label class="field">Pošalji na<input class="input" name="to" type="email" required></label><div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Pošalji</button></div>', (d) => POST('settings/test-mail', { to: d.to }));
+      if (r) toast('E-mail poslan na ' + r.to + '. Provjeri i spam.');
+    },
+    testS3: async () => { try { await POST('settings/test-s3'); toast('S3 radi: probni fajl je u bucketu (vpn-panel/).'); } catch (e) { fail(e); } },
+    updatePanel: async () => {
+      if (!(await ask('Ažuriraj panel', 'Panel skida novu verziju i restartuje se. Traje 1–3 minute. VPN serveri rade normalno.', 'Ažuriraj'))) return;
+      try { await POST('system/update'); toast('Ažuriranje pokrenuto. Stranica će se osvježiti za 90 sekundi.'); setTimeout(() => location.reload(), 90000); } catch (e) { fail(e); }
+    },
     testTg: async () => { try { await POST('settings/test-telegram'); toast('Poruka poslana. Provjeri Telegram.'); } catch (e) { fail(e); } },
     editAdmin: (d) => editAdmin(d.id).catch(fail),
     newKey: async () => {

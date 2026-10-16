@@ -6,6 +6,21 @@ const vpn = require('./vpn');
 const QR = require('../public/qr.js');
 const { send, esc, clientIp } = require('./http');
 const { geoIp } = require('./notify');
+const cbot = require('./cbot');
+
+// znak brenda (štit sa V) i neutralni štit za white-label
+const MARK = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M48 70h32l20 68v46z" fill="#E3172B"/><path d="M152 70h-32l-20 68v46z" fill="#9E0C1A"/><path d="M48 70h32l2 7H51z" fill="#FF4A5A"/><path d="M86 58h28l-14 38z" fill="#FF4A5A"/><path d="M100 58h14l-14 38z" fill="#E3172B"/>';
+const PLAIN = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="m62 112 28 28 52-58" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>';
+
+// aplikacije: ime, platforme, dubinski link za uvoz pretplate
+const APPS = {
+  hiddify: { name: 'Hiddify', os: 'Android, iPhone, Windows, Mac', href: (l, n) => `hiddify://import/${l}#${encodeURIComponent(n)}` },
+  v2rayng: { name: 'v2rayNG', os: 'Android', href: (l, n) => `v2rayng://install-sub?url=${encodeURIComponent(l)}&name=${encodeURIComponent(n)}` },
+  streisand: { name: 'Streisand', os: 'iPhone, Mac', href: (l, n) => `streisand://import/${l}#${encodeURIComponent(n)}` },
+  v2box: { name: 'V2Box', os: 'iPhone, Android', href: (l, n) => `v2box://install-sub?url=${encodeURIComponent(l)}&name=${encodeURIComponent(n)}` },
+  happ: { name: 'Happ', os: 'iPhone, Android, Windows', href: (l) => `happ://add/${l}` },
+  shadowrocket: { name: 'Shadowrocket', os: 'iPhone (plaćena)', href: (l) => `shadowrocket://add/sub://${Buffer.from(l).toString('base64')}` },
+};
 
 const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
 const APP_UA = /v2ray|hiddify|streisand|sing-box|singbox|clash|nekobox|nekoray|shadowrocket|quantumult|foxray|v2box|karing|happ|stash|surge|loon|mihomo|okhttp|dart/i;
@@ -23,16 +38,20 @@ async function countCountry(req) {
   if (g?.cc) run('INSERT INTO countries (day, cc, n) VALUES (?, ?, 1) ON CONFLICT(day, cc) DO UPDATE SET n = n + 1', dayKey(now(), settings.get('timezone')), g.cc);
 }
 
-function page(u, link, s) {
+function page(u, link, s, owner, botName) {
   const st = vpn.userStatus(u);
-  const label = { active: 'Aktivan', expiring: 'Ističe uskoro', grace: 'Istekao (grace period)', expired: 'Istekao', limited: 'Potrošen promet', disabled: 'Ugašen' }[st];
-  const color = { active: '#3ddc84', expiring: '#f5a524', grace: '#f5a524', expired: '#ff4d5e', limited: '#ff8a4d', disabled: '#9a9aa8' }[st];
+  const label = { active: 'Aktivan', expiring: 'Ističe uskoro', grace: 'Istekao (grace period)', expired: 'Istekao', limited: 'Potrošen promet', disabled: 'Ugašen', devices: 'Previše uređaja (privremeno)' }[st];
+  const color = { active: '#3ddc84', expiring: '#f5a524', grace: '#f5a524', expired: '#ff4d5e', limited: '#ff8a4d', disabled: '#9a9aa8', devices: '#ff8a4d' }[st];
+  const wl = s.res_whitelabel && owner?.brand;
+  const support = (wl ? owner.contact : s.support_contact) || '';
+  const apps = String(s.apps || 'hiddify').split(',').filter((k) => APPS[k]);
+  const pname = wl ? owner.brand : (s.sub_name || s.brand);
   const used = u.traffic_up + u.traffic_down, pct = u.traffic_limit ? Math.min(100, used / u.traffic_limit * 100) : 0;
   const days = Math.ceil((u.expires_at - now()) / vpn.DAY);
   const servers = vpn.serversForUser(u);
   const wg = s.proto_wg ? servers.filter((sv) => sv.wg_pub) : [];
   const enc = encodeURIComponent(link);
-  const brand = esc(s.brand);
+  const brand = esc(wl ? owner.brand : s.brand);
   return `<!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${brand} · moj nalog</title><meta name="robots" content="noindex">
 <style>
@@ -51,7 +70,7 @@ details{border-top:1px solid var(--line);padding:10px 0}details:first-of-type{bo
 .badge{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:14px}.dot{width:9px;height:9px;border-radius:50%}
 .note{background:#1d1810;border:1px solid #3d3216;color:#f5c46a;border-radius:12px;padding:12px;font-size:14px}
 </style></head><body><main>
-<div style="display:flex;align-items:center;gap:10px"><svg width="34" height="34" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3 35 9v10c0 9-6.5 15.5-15 18C11.5 34.5 5 28 5 19V9z" fill="#e5233a"/><path d="m13 19 5 5 9-10" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h1>${brand}</h1></div>
+<div style="display:flex;align-items:center;gap:10px"><svg width="34" height="38" viewBox="0 0 200 224" aria-hidden="true">${wl ? PLAIN : MARK}</svg><h1>${brand}</h1></div>
 ${s.sub_announce ? `<div class="note">${esc(s.sub_announce)}</div>` : ''}
 ${s.maintenance ? `<div class="note">${esc(s.maintenance_msg)}</div>` : ''}
 <section class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="muted">Nalog</div><div style="font-weight:700;font-size:18px">${esc(u.username)}</div></div>
@@ -64,18 +83,17 @@ ${u.traffic_limit ? `<div class="bar"><i style="width:${pct.toFixed(1)}%"></i></
 ${QR.svg(link).replace('<svg ', '<svg class="qr" role="img" aria-label="QR kod za uvoz u aplikaciju" ')}
 <div class="link">${esc(link)}</div>
 <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
-<a class="btn red" href="hiddify://import/${esc(link)}#${encodeURIComponent(s.sub_name || s.brand)}">Otvori u Hiddify</a>
-<div class="grid"><a class="btn" href="v2rayng://install-sub?url=${enc}&name=${encodeURIComponent(s.brand)}">v2rayNG</a><a class="btn" href="streisand://import/${esc(link)}">Streisand</a></div>
+${apps.map((k, n) => `<a class="btn${n === 0 ? ' red' : ''}" href="${esc(APPS[k].href(link, pname))}">Otvori u ${APPS[k].name}</a>`).join('')}
 <button class="btn" type="button" onclick="navigator.clipboard.writeText('${esc(link)}').then(()=>{this.textContent='Kopirano ✓'})">Kopiraj link</button>
 </div></section>
 <section class="card"><h2>Aplikacije</h2>
-<details open><summary>Android</summary><p class="muted">Hiddify ili v2rayNG iz Google Playa. Otvori aplikaciju, klikni + i izaberi "Uvezi iz QR koda" ili zalijepi link.</p></details>
-<details><summary>iPhone / iPad</summary><p class="muted">Streisand ili V2Box iz App Storea. Klikni + i zalijepi link ili skeniraj QR kod.</p></details>
-<details><summary>Windows / Mac</summary><p class="muted">Hiddify (hiddify.com). Klikni "Novi profil", zalijepi link i klikni Spoji.</p></details>
+${apps.map((k, n) => `<details${n === 0 ? ' open' : ''}><summary>${APPS[k].name} · <span class="muted">${APPS[k].os}</span></summary><p class="muted">Instaliraj ${APPS[k].name} iz App Storea, Google Playa ili sa njihove stranice. Zatim klikni "Otvori u ${APPS[k].name}" gore, ili u aplikaciji klikni + i skeniraj QR kod / zalijepi link.</p></details>`).join('')}
 </section>
+${botName ? `<section class="card"><h2>Podsjetnici na Telegram</h2><p class="muted" style="margin-top:0">${u.tg_chat ? 'Telegram je povezan ✓ Javit ćemo ti prije isteka.' : 'Poveži Telegram i javit ćemo ti prije nego nalog istekne. Možeš i pitati za stanje naloga.'}</p>
+<a class="btn" href="https://t.me/${esc(botName)}?start=${esc(u.sub_token)}">${u.tg_chat ? 'Otvori bota' : 'Poveži Telegram'}</a></section>` : ''}
 ${wg.length ? `<section class="card"><h2>WireGuard (rezervna opcija)</h2><p class="muted" style="margin-top:0">Za službenu WireGuard aplikaciju. Preuzmi fajl ili skeniraj QR u aplikaciji.</p>
 ${wg.map((sv) => `<div class="row"><span>${vpn.FLAGS(sv.country)} ${esc(sv.city || sv.name)}</span><span><a href="${esc(link)}/wg/${sv.id}" style="color:#ff5a6a">Preuzmi</a> · <a href="${esc(link)}/wg/${sv.id}?qr=1" style="color:#ff5a6a">QR</a></span></div>`).join('')}</section>` : ''}
-${s.support_contact ? `<p class="muted" style="text-align:center">Podrška: ${esc(s.support_contact)}</p>` : ''}
+${support ? `<p class="muted" style="text-align:center">Podrška: ${esc(support)}</p>` : ''}
 </main></body></html>`;
 }
 
@@ -101,17 +119,20 @@ async function handle(req, res, p) {
   const ua = String(req.headers['user-agent'] || '');
   const wantsHtml = /text\/html/.test(String(req.headers.accept || '')) && /Mozilla/.test(ua) && !APP_UA.test(ua);
   countCountry(req).catch(() => {});
-  if (wantsHtml && s.customer_page) return send(res, 200, page(u, link, s), { 'content-type': 'text/html; charset=utf-8' });
+  const owner = u.owner_id ? one('SELECT brand, contact FROM admins WHERE id = ?', u.owner_id) : null;
+  const wl = s.res_whitelabel && owner?.brand;
+  if (wantsHtml && s.customer_page) return send(res, 200, page(u, link, s, owner, await cbot.username().catch(() => null)), { 'content-type': 'text/html; charset=utf-8' });
 
   const links = vpn.CAN_CONNECT.has(vpn.userStatus(u)) ? vpn.subLinks(u) : [];
   const headers = {
     'content-type': 'text/plain; charset=utf-8',
-    'profile-title': 'base64:' + b64(s.sub_name || s.brand),
+    'profile-title': 'base64:' + b64(wl ? owner.brand : (s.sub_name || s.brand)),
     'profile-update-interval': String(s.sub_interval || 12),
     'subscription-userinfo': `upload=${u.traffic_up}; download=${u.traffic_down}; total=${u.traffic_limit}; expire=${Math.floor(u.expires_at / 1000)}`,
     'profile-web-page-url': link,
   };
-  if (s.support_contact) headers['support-url'] = s.support_contact.startsWith('http') ? s.support_contact : link;
+  const sup = (wl ? owner.contact : s.support_contact) || '';
+  if (sup) headers['support-url'] = sup.startsWith('http') ? sup : link;
   if (s.sub_announce) headers.announce = 'base64:' + b64(s.sub_announce);
   return send(res, 200, b64(links.join('\n')), headers);
 }

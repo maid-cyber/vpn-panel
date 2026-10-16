@@ -15,12 +15,14 @@ import tempfile
 import time
 import urllib.request
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
 WG_CONF = "/etc/wireguard/wg0.conf"
 STATE = "/var/lib/vpn-agent"
+ACCESS_LOG = "/dev/shm/vpn-access.log"   # samo u RAM-u, briše se nakon čitanja
+TAGS = ("vless", "ss")
 
 DRY = "--dry-run" in sys.argv
 
@@ -180,17 +182,19 @@ def write_if_changed(path, text):
 LAST_ERROR = ""
 
 
-def _clients(cfg):
+def _clients(cfg, tag=None):
+    out = {}
     for ib in (cfg or {}).get("inbounds", []):
-        if ib.get("tag") == "vless":
-            return {c["email"]: c for c in ib["settings"]["clients"]}
-    return {}
+        if ib.get("tag") in TAGS and (tag is None or ib.get("tag") == tag):
+            for c in ib["settings"].get("clients", []):
+                out[(ib["tag"], c["email"])] = c
+    return out
 
 
 def _without_clients(cfg):
     c = json.loads(json.dumps(cfg))
     for ib in c.get("inbounds", []):
-        if ib.get("tag") == "vless":
+        if ib.get("tag") in TAGS:
             ib["settings"]["clients"] = []
     return c
 
@@ -201,34 +205,101 @@ def _hot_update(old, new):
         return False
     if "HandlerService" not in (old.get("api") or {}).get("services", []):
         return False
-    a, b = _clients(old), _clients(new)
-    removed = [e for e in a if e not in b or a[e] != b[e]]
-    added = [b[e] for e in b if e not in a or a[e] != b[e]]
     try:
-        if removed:
-            r = subprocess.run([XRAY_BIN, "api", "rmu", "--server=127.0.0.1:10085", "-tag=vless"] + removed,
-                               capture_output=True, text=True, timeout=30)
-            if r.returncode != 0:
-                log("rmu nije uspio:", (r.stderr or r.stdout)[-300:])
-                return False
-        if added:
-            ib = next(i for i in new["inbounds"] if i.get("tag") == "vless")
-            part = {"inbounds": [{**ib, "settings": {**ib["settings"], "clients": added}}]}
-            with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-                json.dump(part, f)
-            try:
-                r = subprocess.run([XRAY_BIN, "api", "adu", "--server=127.0.0.1:10085", f.name],
+        total_add = total_rm = 0
+        for tag in TAGS:
+            a, b = _clients(old, tag), _clients(new, tag)
+            removed = [k[1] for k in a if k not in b or a[k] != b[k]]
+            added = [b[k] for k in b if k not in a or a[k] != b[k]]
+            if removed:
+                r = subprocess.run([XRAY_BIN, "api", "rmu", "--server=127.0.0.1:10085", "-tag=" + tag] + removed,
                                    capture_output=True, text=True, timeout=30)
-            finally:
-                os.unlink(f.name)
-            if r.returncode != 0:
-                log("adu nije uspio:", (r.stderr or r.stdout)[-300:])
-                return False
-        log(f"Korisnici ažurirani bez restarta: +{len(added)} −{len(removed)}")
+                if r.returncode != 0:
+                    log("rmu nije uspio:", (r.stderr or r.stdout)[-300:])
+                    return False
+            if added:
+                ib = next(i for i in new["inbounds"] if i.get("tag") == tag)
+                part = {"inbounds": [{**ib, "settings": {**ib["settings"], "clients": added}}]}
+                with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+                    json.dump(part, f)
+                try:
+                    r = subprocess.run([XRAY_BIN, "api", "adu", "--server=127.0.0.1:10085", f.name],
+                                       capture_output=True, text=True, timeout=30)
+                finally:
+                    os.unlink(f.name)
+                if r.returncode != 0:
+                    log("adu nije uspio:", (r.stderr or r.stdout)[-300:])
+                    return False
+            total_add += len(added)
+            total_rm += len(removed)
+        log(f"Korisnici ažurirani bez restarta: +{total_add} −{total_rm}")
         return True
     except Exception as e:  # noqa: BLE001
         log("Ažuriranje bez restarta nije uspjelo:", e)
         return False
+
+
+# ---------------------------------------------------------------- uređaji (IP adrese iz pristupnog loga, samo u memoriji)
+ACCESS_RE = re.compile(r"from (?:tcp:|udp:)?\[?([0-9a-fA-F:.]+?)\]?:\d+ accepted .*?email: u(\d+)")
+
+
+class Devices:
+    def __init__(self):
+        self.seen = {}   # (uid, ip) -> zadnji put viđen
+
+    def collect(self):
+        path = ACCESS_LOG if not DRY else os.path.join(tempfile.gettempdir(), "vpn-access.log")
+        now = time.time()
+        try:
+            with open(path, "r+", errors="ignore") as f:
+                data = f.read()
+                f.seek(0)
+                f.truncate()
+        except OSError:
+            data = ""
+        for m in ACCESS_RE.finditer(data):
+            self.seen[(m.group(2), m.group(1))] = now
+        self.seen = {k: v for k, v in self.seen.items() if now - v < 180}
+        counts, ips = {}, set()
+        for (uid, ip) in self.seen:
+            counts[uid] = counts.get(uid, 0) + 1
+            ips.add(ip)
+        return counts, list(ips)
+
+
+_xv = {"t": 0, "v": ""}
+
+
+def xray_version():
+    if DRY or not os.path.exists(XRAY_BIN):
+        return ""
+    if time.time() - _xv["t"] > 3600:
+        out = sh([XRAY_BIN, "version"]) or ""
+        _xv.update(t=time.time(), v=(out.splitlines() or [""])[0].replace("Xray ", "").split(" ")[0])
+    return _xv["v"]
+
+
+def maybe_update_xray():
+    """Jednom sedmično, noću (3–5 h), skine najnoviji Xray i restartuje ga."""
+    if DRY:
+        return
+    stamp = os.path.join(STATE, "xray-updated")
+    try:
+        last = os.path.getmtime(stamp)
+    except OSError:
+        last = 0
+    if time.time() - last < 7 * 86400 or not (3 <= time.localtime().tm_hour < 5):
+        return
+    open(stamp, "w").close()
+    log("Ažuriram Xray…")
+    r = subprocess.run('bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install',
+                       shell=True, capture_output=True, text=True, timeout=600)
+    if r.returncode == 0:
+        sh("systemctl restart xray")
+        _xv["t"] = 0
+        log("Xray ažuriran:", xray_version())
+    else:
+        log("Ažuriranje Xraya nije uspjelo:", (r.stderr or r.stdout)[-300:])
 
 
 def apply_xray(cfg):
@@ -340,7 +411,8 @@ def main():
     if not panel or not token:
         sys.exit("Fale panel adresa i token.")
     os.makedirs(STATE if not DRY else tempfile.gettempdir(), exist_ok=True)
-    meter, wgs = Meter(), WgStats()
+    meter, wgs, devs = Meter(), WgStats(), Devices()
+    want_devices = True
     iface = default_iface()
     applied, peer_ids, interval = "", {}, 15
     pending = {}            # promet koji nije poslan (panel nedostupan)
@@ -352,6 +424,8 @@ def main():
         try:
             users = xray_stats()
             wtraffic, wonline, ips = wgs.collect(peer_ids)
+            dcounts, vips = devs.collect() if want_devices else ({}, [])
+            ips = list(dict.fromkeys(ips + vips))
             for src in (users, wtraffic):
                 for uid, (up, down) in src.items():
                     pair = pending.setdefault(uid, [0, 0])
@@ -366,12 +440,15 @@ def main():
                 "version": VERSION, "cpu": meter.cpu(), "ram": meter.ram(), "net_mbps": meter.net_mbps(iface),
                 "uptime": meter.uptime(), "online": xonline + wonline, "users": pending, "ips": ips[:200],
                 "applied_hash": applied, "xray_ok": service_ok("xray"), "wg_ok": service_ok("wg-quick@wg0"),
-                "error": LAST_ERROR,
+                "error": LAST_ERROR, "devices": dcounts, "xray_version": xray_version(),
             }
             r = request(panel, token, "/agent/heartbeat", beat)
             pending = {}
             fails = 0
             interval = max(5, int(r.get("interval", 15)))
+            want_devices = bool(r.get("devices", True))
+            if r.get("xray_update"):
+                maybe_update_xray()
             if r.get("agent_version") and r["agent_version"] != VERSION and not DRY:
                 self_update(panel)
             if r.get("hash") != applied:

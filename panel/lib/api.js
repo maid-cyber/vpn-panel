@@ -14,6 +14,10 @@ const { fail, readBody, send, esc } = require('./http');
 const { telegram, notify, geoIp } = require('./notify');
 
 const VERSION = require('../package.json').version;
+const mail = require('./mail');
+const cbot = require('./cbot');
+const stripe = require('./stripe');
+const s3 = require('./s3');
 const routes = [];
 const route = (method, pattern, perm, fn) => {
   const keys = [];
@@ -37,7 +41,9 @@ const mask = (h) => h ? h.replace(/\.(\d+)\.(\d+)$/, '.xx.$2') : '';
 route('POST', 'login', 'public', async (c) => {
   const { username, password, code } = c.body;
   if (auth.isLocked(c.ip)) fail(429, 'Previše pogrešnih pokušaja. Pokušaj kasnije.');
-  const a = one('SELECT * FROM admins WHERE username = ? AND disabled = 0', String(username || ''));
+  const any = one('SELECT * FROM admins WHERE username = ?', String(username || ''));
+  if (any && any.pending && c.portal === 'reseller' && auth.checkPassword(password, any.pass_hash)) fail(403, 'Tvoj nalog čeka odobrenje administratora. Javit ćemo ti se.');
+  const a = any && !any.disabled ? any : null;
   // na ulazu za resellere prijavljuju se samo reselleri, a na admin ulazu samo admini (ako je poseban panel uključen)
   const wrongDoor = a && ((c.portal === 'reseller' && a.role !== 'reseller') || (c.portal === 'admin' && a.role === 'reseller' && settings.get('res_portal')));
   if (!a || wrongDoor || !auth.checkPassword(password, a.pass_hash)) { auth.addFail(c.ip); log(String(username || '?'), 'Neuspješna prijava', '', 'warn'); fail(401, 'Pogrešno korisničko ime ili šifra.'); }
@@ -59,6 +65,25 @@ route('POST', 'login', 'public', async (c) => {
   return { ok: true };
 });
 
+route('GET', 'portal', 'public', (c) => ({ portal: c.portal, signup: c.portal === 'reseller' && !!settings.get('res_signup') }));
+route('POST', 'signup', 'public', (c) => {
+  if (c.portal !== 'reseller' || !settings.get('res_signup')) fail(404, 'Registracija nije otvorena.');
+  if (auth.isLocked(c.ip)) fail(429, 'Previše pokušaja. Pokušaj kasnije.');
+  const b = c.body;
+  const username = String(b.username || '').trim();
+  if (!/^[a-zA-Z0-9._-]{3,30}$/.test(username)) fail(400, 'Korisničko ime: 3–30 znakova (slova, brojevi, . _ -).');
+  if (!auth.validPassword(b.password)) fail(400, 'Šifra mora imati bar 8 znakova.');
+  const contact = String(b.contact || '').trim().slice(0, 120);
+  if (contact.length < 3) fail(400, 'Upiši kontakt (Telegram, WhatsApp ili e-mail) da ti se možemo javiti.');
+  auth.addFail(c.ip);                                 // ograničava broj registracija sa iste adrese
+  if (one('SELECT id FROM admins WHERE username = ?', username)) fail(400, 'To ime je zauzeto.');
+  const lvl = one('SELECT * FROM levels ORDER BY discount LIMIT 1');
+  run(`INSERT INTO admins (username, pass_hash, role, level_id, user_limit, contact, email, note, disabled, pending, created_at) VALUES (?,?,?,?,?,?,?,?,1,1,?)`,
+    username, auth.hashPassword(b.password), 'reseller', lvl?.id || null, lvl?.max_users || 150, contact, core.cleanEmail(b.email), 'Registrovao se sam', now());
+  log(username, 'Reseller se registrovao', `čeka odobrenje · ${contact}`, 'warn');
+  notify('n_payment', `🆕 Novi reseller ${username} se registrovao i čeka odobrenje (${contact}).`);
+  return { ok: true };
+});
 route('POST', 'logout', null, (c) => { auth.deleteSession(c.auth.session.token); c.setCookie(''); return { ok: true }; });
 
 route('GET', 'me', null, (c) => {
@@ -71,6 +96,7 @@ route('GET', 'me', null, (c) => {
     credit: isRes(me) ? me.credit : null, perms, version: VERSION,
     res_path: !isRes(me) && s.res_portal ? s.reseller_path : null, portal: c.portal,
     msg_template: s.msg_template, support: s.support_contact,
+    mail_on: mail.configured(), stripe: !!(s.stripe_on && s.stripe_secret), cbot: !!(s.cbot_on && s.cbot_token), proto_ss: !!s.proto_ss,
     brand: s.brand, currency: s.currency, timezone: s.timezone, accent: s.accent, theme: s.theme, maintenance: !!s.maintenance,
     pay: isRes(me) ? { methods: s.pay_methods, usdt: s.pay_usdt, iban: s.pay_iban, paypal: s.pay_paypal, min: s.res_min_topup } : null,
   };
@@ -117,7 +143,8 @@ function serverView(sv, forReseller) {
     cpu: sv.cpu, ram: sv.ram, net: sv.net_mbps, online: sv.online || 0, capacity: sv.capacity,
     users: sv.users_count ?? null, traffic_month: sv.traffic_month, provider: forReseller ? '' : sv.provider, cost: forReseller ? 0 : sv.cost,
     enabled: !!sv.enabled, maintenance: !!sv.maintenance, last_seen: sv.last_seen, uptime: sv.uptime, version: sv.agent_version,
-    vless_port: sv.vless_port, wg_port: sv.wg_port, sni: sv.sni, xray_ok: sv.xray_ok, wg_ok: sv.wg_ok,
+    vless_port: sv.vless_port, wg_port: sv.wg_port, ss_port: sv.ss_port, sni: sv.sni, xray_ok: sv.xray_ok, wg_ok: sv.wg_ok,
+    xray_version: forReseller ? '' : sv.xray_version, last_error: forReseller ? '' : sv.last_error,
     synced: !!sv.applied_hash,
   };
 }
@@ -140,8 +167,8 @@ function revenueSeries(days) {
 
 route('GET', 'dash', 'dash', (c) => {
   const t = now();
-  const users = all('SELECT disabled, expires_at, traffic_limit, traffic_up, traffic_down, created_at, last_seen FROM users');
-  const counts = { all: users.length, active: 0, expiring: 0, grace: 0, expired: 0, limited: 0, disabled: 0 };
+  const users = all('SELECT disabled, blocked_until, expires_at, traffic_limit, traffic_up, traffic_down, created_at, last_seen FROM users');
+  const counts = { all: users.length, active: 0, expiring: 0, grace: 0, expired: 0, limited: 0, disabled: 0, devices: 0 };
   for (const u of users) counts[vpn.userStatus(u, t)]++;
   const tz = settings.get('timezone');
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
@@ -182,8 +209,8 @@ route('GET', 'dash', 'dash', (c) => {
 
 route('GET', 'res/dash', 'res', (c) => {
   const me = c.auth.me, t = now();
-  const users = all('SELECT disabled, expires_at, traffic_limit, traffic_up, traffic_down FROM users WHERE owner_id = ?', me.id);
-  const counts = { all: users.length, active: 0, expiring: 0, grace: 0, expired: 0, limited: 0, disabled: 0 };
+  const users = all('SELECT disabled, blocked_until, expires_at, traffic_limit, traffic_up, traffic_down FROM users WHERE owner_id = ?', me.id);
+  const counts = { all: users.length, active: 0, expiring: 0, grace: 0, expired: 0, limited: 0, disabled: 0, devices: 0 };
   for (const u of users) counts[vpn.userStatus(u, t)]++;
   const lvl = me.level_id ? one('SELECT * FROM levels WHERE id = ?', me.level_id) : null;
   const plans = all('SELECT * FROM plans WHERE active = 1 ORDER BY sort, id').map((p) => ({ id: p.id, name: p.name, days: p.days, traffic_gb: p.traffic_gb, trial: !!p.trial, price: p.trial ? 0 : core.resellerPrice(me, p) }));
@@ -205,7 +232,7 @@ function listUsers(c, me) {
   else if (q.owner) { where.push('u.owner_id = ?'); args.push(Number(q.owner)); }
   let rows = all(`${core.USER_SELECT} ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY u.id DESC`, ...args).map((u) => core.userRow(u, t));
   if (q.server) rows = rows.filter((u) => String(u.last_server) === q.server);
-  const counts = { all: rows.length, active: 0, expiring: 0, grace: 0, expired: 0, limited: 0, disabled: 0 };
+  const counts = { all: rows.length, active: 0, expiring: 0, grace: 0, expired: 0, limited: 0, disabled: 0, devices: 0 };
   for (const u of rows) counts[u.status]++;
   if (q.status && q.status !== 'all') rows = rows.filter((u) => (q.status === 'active' ? ['active', 'expiring', 'grace'].includes(u.status) : u.status === q.status));
   const per = 50, page = Math.max(1, Number(q.page) || 1);
@@ -225,6 +252,7 @@ function userDetail(c, me) {
   return {
     ...core.userRow(u), sub_link: link, uuid: u.uuid, qr: QR.svg(link),
     vless: settings.get('proto_vless') ? servers.filter((s) => s.reality_pub).map((s) => ({ server: s.name, link: vpn.vlessLink(u, s) })) : [],
+    ss: settings.get('proto_ss') ? servers.filter((s) => s.reality_pub).map((s) => ({ server: s.name, link: vpn.ssLink(u, s) })) : [],
     wg: settings.get('proto_wg') ? servers.filter((s) => s.wg_pub).map((s) => ({ id: s.id, server: s.name, url: `${link}/wg/${s.id}` })) : [],
     history: all('SELECT ts, text FROM user_history WHERE user_id = ? ORDER BY id DESC LIMIT 30', u.id),
   };
@@ -249,6 +277,9 @@ route('PUT', 'users/:id', 'users', (c) => {
   }
   if (b.note !== undefined) { fields.push('note = ?'); args.push(String(b.note).slice(0, 500)); }
   if (b.contact !== undefined) { fields.push('contact = ?'); args.push(String(b.contact).slice(0, 120)); }
+  if (b.email !== undefined) { fields.push('email = ?'); args.push(core.cleanEmail(b.email)); }
+  if (b.auto_renew !== undefined) { fields.push('auto_renew = ?'); args.push(b.auto_renew ? 1 : 0); }
+  if (b.unblock) { fields.push('blocked_until = 0'); }
   if (b.devices !== undefined) { fields.push('devices = ?'); args.push(Math.max(1, Number(b.devices) || 1)); }
   if (b.traffic_gb !== undefined) { fields.push('traffic_limit = ?'); args.push(Math.round(Number(b.traffic_gb || 0) * core.GB)); }
   if (b.expires_at !== undefined) { fields.push('expires_at = ?'); args.push(Number(b.expires_at)); }
@@ -263,6 +294,8 @@ route('PUT', 'res/users/:id', 'res', (c) => {
   const u = core.getUser(c.params.id, c.auth.me);
   if (c.body.note !== undefined) run('UPDATE users SET note = ? WHERE id = ?', String(c.body.note).slice(0, 500), u.id);
   if (c.body.contact !== undefined) run('UPDATE users SET contact = ? WHERE id = ?', String(c.body.contact).slice(0, 120), u.id);
+  if (c.body.email !== undefined) run('UPDATE users SET email = ? WHERE id = ?', core.cleanEmail(c.body.email), u.id);
+  if (c.body.auto_renew !== undefined) run('UPDATE users SET auto_renew = ? WHERE id = ?', c.body.auto_renew ? 1 : 0, u.id);
   return { ok: true };
 });
 
@@ -275,6 +308,34 @@ for (const pre of ['', 'res/']) {
   route('DELETE', `${pre}users/:id`, perm, (c) => { core.deleteUser(c.auth.me, c.params.id); return { ok: true }; });
 }
 
+route('POST', 'users/broadcast', 'users', async (c) => {
+  const b = c.body, s = settings.load();
+  const text = String(b.text || '').trim().slice(0, 3500);
+  if (text.length < 3) fail(400, 'Napiši poruku.');
+  if (b.announce) settings.set({ sub_announce: text.slice(0, 300) });
+  const t = now();
+  const rows = all('SELECT * FROM users').filter((u) => b.target === 'all' || vpn.CAN_CONNECT.has(vpn.userStatus(u, t)));
+  let tg = 0, em = 0;
+  const isMail = (v) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(String(v || '').trim());
+  for (const u of rows) {
+    if (b.tg !== false && u.tg_chat) { const r = await cbot.send(u.tg_chat, `📢 ${s.brand}\n\n${text}`); if (r.ok) tg++; await new Promise((x) => setTimeout(x, 40)); }
+    const to = u.email || (isMail(u.contact) ? u.contact.trim() : '');
+    if (b.email && to && mail.configured()) { try { await mail.sendMail({ to, subject: `${s.brand}: obavještenje`, text }); em++; } catch { /* nastavi */ } }
+  }
+  log(c.auth.me.username, 'Poruka svim kupcima', `Telegram ${tg} · e-mail ${em}${b.announce ? ' · u aplikaciji' : ''}`);
+  return { ok: true, tg, email: em, announce: !!b.announce };
+});
+for (const pre of ['', 'res/']) {
+  route('POST', `${pre}users/:id/send-mail`, pre ? 'res' : 'users', async (c) => {
+    const u = core.getUser(c.params.id, isRes(c.auth.me) ? c.auth.me : null);
+    const to = String(c.body.to || u.email || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(to)) fail(400, 'Upiši e-mail kupca.');
+    if (!u.email) run('UPDATE users SET email = ? WHERE id = ?', to, u.id);
+    await mail.sendMail({ to, subject: String(c.body.subject || `${settings.get('brand')} · pristup`).slice(0, 150), text: String(c.body.text || '').slice(0, 8000) });
+    core.history(u.id, `Pristup poslan na e-mail ${to} · ${c.auth.me.username}`);
+    return { ok: true };
+  });
+}
 route('POST', 'users/bulk', 'users', (c) => {
   const ids = (c.body.ids || []).map(Number).filter(Boolean);
   if (!ids.length) fail(400, 'Nisi izabrao korisnike.');
@@ -363,6 +424,7 @@ route('PUT', 'servers/:id', 'servers', (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
   if (!sv) fail(404, 'Server ne postoji.');
   const b = c.body;
+  run(`UPDATE servers SET ss_port = ? WHERE id = ?`, Number(b.ss_port ?? sv.ss_port) || 8388, sv.id);
   run(`UPDATE servers SET name=?, city=?, country=?, host=?, capacity=?, provider=?, cost=?, vless_port=?, wg_port=?, sni=?, lat=?, lon=? WHERE id = ?`,
     String(b.name ?? sv.name), String(b.city ?? sv.city), String(b.country ?? sv.country).toUpperCase().slice(0, 2), String(b.host ?? sv.host).trim(),
     Number(b.capacity ?? sv.capacity), String(b.provider ?? sv.provider), Number(b.cost ?? sv.cost), Number(b.vless_port ?? sv.vless_port),
@@ -418,10 +480,10 @@ route('DELETE', 'levels/:id', 'resellers', (c) => {
 
 route('GET', 'resellers', 'resellers', () => {
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-  return all(`SELECT a.id, a.username, a.credit, a.level_id, l.name AS level, l.discount, a.user_limit, a.contact, a.brand, a.note, a.disabled, a.created_at, a.last_login,
+  return all(`SELECT a.id, a.username, a.credit, a.level_id, l.name AS level, l.discount, a.user_limit, a.contact, a.email, a.brand, a.note, a.disabled, a.pending, a.created_at, a.last_login,
       (SELECT COUNT(*) FROM users u WHERE u.owner_id = a.id) AS users,
       (SELECT COALESCE(SUM(amount),0) FROM transactions x WHERE x.reseller_id = a.id AND x.type = 'topup' AND x.ts >= ?) AS month
-    FROM admins a LEFT JOIN levels l ON l.id = a.level_id WHERE a.role = 'reseller' ORDER BY month DESC, a.username`, monthStart);
+    FROM admins a LEFT JOIN levels l ON l.id = a.level_id WHERE a.role = 'reseller' ORDER BY a.pending DESC, month DESC, a.username`, monthStart);
 });
 route('POST', 'resellers', 'resellers', (c) => {
   const b = c.body;
@@ -430,8 +492,8 @@ route('POST', 'resellers', 'resellers', (c) => {
   if (one('SELECT id FROM admins WHERE username = ?', username)) fail(400, 'Ime je zauzeto.');
   if (!auth.validPassword(b.password)) fail(400, 'Šifra mora imati bar 8 znakova.');
   const lvl = b.level_id ? one('SELECT * FROM levels WHERE id = ?', Number(b.level_id)) : null;
-  const r = run(`INSERT INTO admins (username, pass_hash, role, level_id, user_limit, contact, brand, note, created_at) VALUES (?,?,?,?,?,?,?,?,?)`,
-    username, auth.hashPassword(b.password), 'reseller', lvl?.id || null, Number(b.user_limit) || lvl?.max_users || 150, String(b.contact || ''), String(b.brand || ''), String(b.note || ''), now());
+  const r = run(`INSERT INTO admins (username, pass_hash, role, level_id, user_limit, contact, email, brand, note, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    username, auth.hashPassword(b.password), 'reseller', lvl?.id || null, Number(b.user_limit) || lvl?.max_users || 150, String(b.contact || ''), core.cleanEmail(b.email), String(b.brand || ''), String(b.note || ''), now());
   log(c.auth.me.username, 'Novi reseller', username);
   return { id: Number(r.lastInsertRowid) };
 });
@@ -439,8 +501,8 @@ route('PUT', 'resellers/:id', 'resellers', (c) => {
   const r = one("SELECT * FROM admins WHERE id = ? AND role = 'reseller'", Number(c.params.id));
   if (!r) fail(404, 'Reseller ne postoji.');
   const b = c.body;
-  run('UPDATE admins SET level_id = ?, user_limit = ?, contact = ?, brand = ?, note = ? WHERE id = ?',
-    b.level_id ? Number(b.level_id) : null, Number(b.user_limit ?? r.user_limit), String(b.contact ?? r.contact), String(b.brand ?? r.brand), String(b.note ?? r.note), r.id);
+  run('UPDATE admins SET level_id = ?, user_limit = ?, contact = ?, email = ?, brand = ?, note = ? WHERE id = ?',
+    b.level_id ? Number(b.level_id) : null, Number(b.user_limit ?? r.user_limit), String(b.contact ?? r.contact), b.email !== undefined ? core.cleanEmail(b.email) : (r.email || ''), String(b.brand ?? r.brand), String(b.note ?? r.note), r.id);
   if (b.password) {
     if (!auth.validPassword(b.password)) fail(400, 'Šifra mora imati bar 8 znakova.');
     run('UPDATE admins SET pass_hash = ? WHERE id = ?', auth.hashPassword(b.password), r.id);
@@ -448,6 +510,23 @@ route('PUT', 'resellers/:id', 'resellers', (c) => {
   }
   log(c.auth.me.username, 'Reseller izmijenjen', r.username);
   return { ok: true };
+});
+route('POST', 'resellers/:id/approve', 'resellers', (c) => {
+  const r = one("SELECT * FROM admins WHERE id = ? AND role = 'reseller'", Number(c.params.id));
+  if (!r) fail(404, 'Reseller ne postoji.');
+  run('UPDATE admins SET pending = 0, disabled = 0 WHERE id = ?', r.id);
+  log(c.auth.me.username, 'Reseller odobren', r.username);
+  if (r.email && mail.configured()) {
+    const s = settings.load();
+    const url = `${(s.panel_url || `${c.proto}://${c.req.headers.host}`).replace(/\/+$/, '')}${s.reseller_path}/`;
+    mail.sendMail({ to: r.email, subject: `${s.brand}: nalog odobren`, text: `Zdravo ${r.username}, tvoj reseller nalog je odobren.\nPrijava: ${url}` }).catch(() => {});
+  }
+  return { ok: true };
+});
+route('POST', 'res/stripe', 'res', async (c) => {
+  const s = settings.load();
+  const base = `${(s.panel_url || `${c.proto}://${c.req.headers.host}`).replace(/\/+$/, '')}${c.portal === 'reseller' ? s.reseller_path : s.admin_path}/`;
+  return stripe.createCheckout(c.auth.me, c.body.amount, base);
 });
 route('POST', 'resellers/:id/credit', 'finance', (c) => ({ id: core.addCredit(c.auth.me, c.params.id, c.body) }));
 route('POST', 'resellers/:id/toggle', 'resellers', (c) => {
@@ -523,21 +602,9 @@ route('GET', 'reports', 'finance', (c) => {
   return { year, months, byReseller, direct: core.round2(direct), unusedCredit: core.round2(credit.s), unusedCreditCount: credit.n, serverCost };
 });
 route('GET', 'invoice/:id', 'any', (c) => {
-  const t = one('SELECT t.*, a.username AS reseller, a.contact, a.brand AS rbrand FROM transactions t LEFT JOIN admins a ON a.id = t.reseller_id WHERE t.id = ?', Number(c.params.id));
+  const t = one(core.INVOICE_SELECT, Number(c.params.id));
   if (!t || (isRes(c.auth.me) && t.reseller_id !== c.auth.me.id) || !(t.amount > 0)) fail(404, 'Faktura ne postoji.');
-  const s = settings.load();
-  const vat = Number(s.vat || 0), net = vat ? t.amount / (1 + vat / 100) : t.amount;
-  const cur = s.currency === 'EUR' ? '€' : s.currency + ' ';
-  const html = `<!doctype html><html lang="bs"><head><meta charset="utf-8"><title>Faktura ${esc(t.invoice_no || t.id)}</title>
-<style>body{font-family:Arial,sans-serif;max-width:720px;margin:40px auto;color:#111;padding:0 20px}h1{font-size:26px;margin:0}table{width:100%;border-collapse:collapse;margin-top:24px}td,th{border-bottom:1px solid #ddd;padding:10px;text-align:left}.r{text-align:right}.top{display:flex;justify-content:space-between;gap:20px}small{color:#555}@media print{button{display:none}}</style></head><body>
-<div class="top"><div><h1>${esc(s.inv_company || s.brand)}</h1><small style="white-space:pre-line">${esc(s.inv_address)}</small></div>
-<div class="r"><strong>Faktura ${esc(t.invoice_no || '#' + t.id)}</strong><br><small>${new Date(t.ts).toLocaleDateString('bs-BA')}</small></div></div>
-<p style="margin-top:28px"><strong>Kupac:</strong> ${esc(t.rbrand || t.reseller || t.note || '—')}${t.contact ? `<br><small>${esc(t.contact)}</small>` : ''}</p>
-<table><tr><th>Opis</th><th class="r">Iznos</th></tr>
-<tr><td>${t.type === 'topup' ? 'Kredit za VPN usluge' : esc(t.note || 'VPN usluga')}</td><td class="r">${cur}${net.toFixed(2)}</td></tr>
-${vat ? `<tr><td>PDV ${vat}%</td><td class="r">${cur}${(t.amount - net).toFixed(2)}</td></tr>` : ''}
-<tr><th>Ukupno</th><th class="r">${cur}${t.amount.toFixed(2)}</th></tr></table>
-<p><small>Način plaćanja: ${esc(t.method || '—')}</small></p><button onclick="print()">Štampaj / PDF</button></body></html>`;
+  const html = core.invoiceHtml(t);
   c.raw(200, html, { 'content-type': 'text/html; charset=utf-8' });
 });
 
@@ -638,6 +705,39 @@ route('POST', 'backups/restore', 'owner', async (c) => {
   setTimeout(() => process.exit(0), 500);
   return { ok: true };
 }, true);
+route('POST', 'settings/test-mail', 'settings', async (c) => {
+  const s = settings.load();
+  const to = String(c.body.to || '').trim() || (s.smtp_from.match(/<([^>]+)>/)?.[1] || s.smtp_from);
+  await mail.sendMail({ to, subject: `${s.brand}: probni e-mail`, text: 'Ako vidiš ovu poruku, e-mail iz panela radi. ✅' });
+  return { ok: true, to };
+});
+route('POST', 'settings/test-cbot', 'settings', async () => {
+  const r = await cbot.call('getMe');
+  if (!r.ok) fail(400, `Bot ne radi: ${r.description || 'provjeri token'}`);
+  return { ok: true, username: r.result.username };
+});
+route('POST', 'settings/test-s3', 'settings', async () => {
+  await s3.put(`vpn-panel/test-${Date.now()}.txt`, Buffer.from('Veltrix panel test'), 'text/plain');
+  return { ok: true };
+});
+route('GET', 'system/update', 'owner', async () => {
+  const repo = String(settings.get('update_repo') || '').trim();
+  let latest = null;
+  try {
+    const r = await fetch(`https://raw.githubusercontent.com/${repo}/main/panel/package.json`, { signal: AbortSignal.timeout(10000) });
+    if (r.ok) latest = (await r.json()).version;
+  } catch { /* nema veze */ }
+  const fsx = require('node:fs');
+  const ready = fsx.existsSync('/etc/systemd/system/vpn-panel-update.path');
+  return { current: VERSION, latest, repo, ready, pending: fsx.existsSync(require('node:path').join(require('./db').DATA_DIR, 'update.request')) };
+});
+route('POST', 'system/update', 'owner', (c) => {
+  const fsx = require('node:fs');
+  if (!fsx.existsSync('/etc/systemd/system/vpn-panel-update.path')) fail(400, 'Ažuriranje iz panela još nije podešeno. Jednom ažuriraj ručno komandom iz README-a.');
+  fsx.writeFileSync(require('node:path').join(require('./db').DATA_DIR, 'update.request'), String(settings.get('update_repo') || 'maid-cyber/vpn-panel'));
+  log(c.auth.admin.username, 'Pokrenuto ažuriranje panela', settings.get('update_repo'), 'warn');
+  return { ok: true };
+});
 route('GET', 'system', 'settings', () => {
   const st = fs.statSync(require('./db').DB_FILE);
   return {

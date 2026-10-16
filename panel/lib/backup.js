@@ -5,6 +5,7 @@ const path = require('node:path');
 const { db, log, DATA_DIR } = require('./db');
 const settings = require('./settings');
 const { telegramFile, notify } = require('./notify');
+const s3 = require('./s3');
 
 const DIR = path.join(DATA_DIR, 'backups');
 fs.mkdirSync(DIR, { recursive: true });
@@ -34,6 +35,10 @@ async function make(actor = 'sistem', manual = false) {
   if (settings.get('backup_tg') && settings.get('tg_token')) {
     const r = await telegramFile(f, `Backup baze · ${stamp}`);
     if (!r.ok) log('sistem', 'Backup nije poslan na Telegram', r.error, 'warn');
+  }
+  if (settings.get('s3_on')) {
+    try { await s3.put(`vpn-panel/${path.basename(f)}`, fs.readFileSync(f)); log('sistem', 'Backup poslan na S3', path.basename(f)); }
+    catch (e) { log('sistem', 'Backup nije poslan na S3', e.message, 'warn'); notify('n_backup', `Backup nije poslan na S3: ${e.message}`); }
   }
   return f;
 }

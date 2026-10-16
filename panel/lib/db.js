@@ -92,6 +92,24 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 `);
 
+// nove kolone za postojeće baze (ažuriranje bez gubitka podataka)
+function addCol(table, col, def) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!cols.includes(col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+}
+addCol('users', 'auto_renew', 'INTEGER DEFAULT 0');
+addCol('users', 'email', "TEXT DEFAULT ''");
+addCol('users', 'tg_chat', 'TEXT');
+addCol('users', 'blocked_until', 'INTEGER DEFAULT 0');
+addCol('users', 'devices_seen', 'INTEGER DEFAULT 0');
+addCol('users', 'reminded_at', 'INTEGER DEFAULT 0');
+addCol('admins', 'pending', 'INTEGER DEFAULT 0');
+addCol('admins', 'email', "TEXT DEFAULT ''");
+addCol('servers', 'ss_port', 'INTEGER DEFAULT 8388');
+addCol('servers', 'xray_version', "TEXT DEFAULT ''");
+addCol('servers', 'last_error', "TEXT DEFAULT ''");
+addCol('transactions', 'ext_id', 'TEXT');
+
 const now = () => Date.now();
 const one = (sql, ...a) => db.prepare(sql).get(...a);
 const all = (sql, ...a) => db.prepare(sql).all(...a);

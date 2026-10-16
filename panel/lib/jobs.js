@@ -5,6 +5,9 @@ const settings = require('./settings');
 const vpn = require('./vpn');
 const backup = require('./backup');
 const { notify } = require('./notify');
+const core = require('./core');
+const cbot = require('./cbot');
+const mail = require('./mail');
 
 function localParts(tz) {
   const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
@@ -46,6 +49,65 @@ async function dailyReport() {
   notify('n_daily', `📊 Dnevni izvještaj\nZarada (24 h): €${rev.toFixed(2)}\nNovi korisnici: ${d.new_users || 0} · produženja: ${d.renewals || 0}\nAktivni: ${active} · ističe uskoro: ${expiring}\nServeri: ${servers.length - offline}/${servers.length} online\nPromet juče: ${((d.traffic || 0) / 1024 ** 4).toFixed(2)} TB`);
 }
 
+// ---------- automatsko produženje sa kredita resellera ----------
+const renewTried = new Map();
+function autoRenew(s) {
+  if (!s.auto_renew_on) return;
+  const t = now();
+  for (const u of all('SELECT u.*, p.trial FROM users u LEFT JOIN plans p ON p.id = u.plan_id WHERE u.auto_renew = 1 AND u.owner_id IS NOT NULL AND u.disabled = 0 AND u.expires_at < ?', t + vpn.DAY)) {
+    if (u.trial || t - (renewTried.get(u.id) || 0) < 3600000) continue;
+    renewTried.set(u.id, t);
+    const r = one("SELECT * FROM admins WHERE id = ? AND role = 'reseller' AND disabled = 0", u.owner_id);
+    if (!r) continue;
+    try {
+      core.extendUser(r, u.id, { plan_id: u.plan_id });
+      core.history(u.id, 'Automatski produženo sa kredita resellera');
+    } catch (e) {
+      core.history(u.id, `Automatsko produženje nije uspjelo: ${e.message}`);
+      log('sistem', 'Auto-produženje nije uspjelo', `${u.username} (${r.username}): ${e.message}`, 'warn');
+    }
+  }
+}
+
+// ---------- podsjetnici kupcima (Telegram bot i e-mail) ----------
+const isMail = (v) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(String(v || '').trim());
+async function remindCustomers(s) {
+  if (!s.customer_reminders) return;
+  const t = now(), warn = Number(s.expiry_warn_days || 3) * vpn.DAY;
+  const rows = all(`SELECT u.*, a.brand AS rbrand, a.contact AS rcontact FROM users u LEFT JOIN admins a ON a.id = u.owner_id
+    WHERE u.disabled = 0 AND u.auto_renew = 0 AND u.expires_at > ? AND u.expires_at - ? <= ? AND (u.tg_chat IS NOT NULL OR u.email != '' OR u.contact LIKE '%@%.%')`, t - vpn.DAY, t, warn);
+  for (const u of rows) {
+    const stage1 = u.reminded_at < u.expires_at - warn;
+    const stage2 = t >= u.expires_at - vpn.DAY && u.reminded_at < u.expires_at - vpn.DAY;
+    if (!stage1 && !stage2) continue;
+    run('UPDATE users SET reminded_at = ? WHERE id = ?', t, u.id);
+    const wl = s.res_whitelabel && u.rbrand;
+    const brand = wl ? u.rbrand : s.brand, support = (wl ? u.rcontact : s.support_contact) || '';
+    const when = u.expires_at < t ? 'je istekao' : `ističe ${new Date(u.expires_at).toLocaleDateString('bs-BA')}`;
+    const text = `⏳ Tvoj ${brand} nalog (${u.username}) ${when}.\nDa ti VPN ne prestane raditi, produži na vrijeme.${support ? `\nZa produženje: ${support}` : ''}`;
+    if (u.tg_chat) cbot.send(u.tg_chat, text).catch(() => {});
+    const to = u.email || (isMail(u.contact) ? u.contact.trim() : '');
+    if (to && mail.configured()) mail.sendMail({ to, subject: `${brand}: nalog ${when}`, text }).catch((e) => log('sistem', 'Podsjetnik mailom nije poslan', e.message, 'warn'));
+    core.history(u.id, `Podsjetnik poslan (${[u.tg_chat && 'Telegram', to && 'e-mail'].filter(Boolean).join(', ')})`);
+  }
+}
+
+// ---------- automatsko podizanje nivoa resellera (1. u mjesecu) ----------
+function autoLevels() {
+  const d = new Date(), from = new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime(), to = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+  const levels = all('SELECT * FROM levels ORDER BY min_monthly DESC');
+  for (const r of all("SELECT * FROM admins WHERE role = 'reseller' AND disabled = 0")) {
+    const sum = one("SELECT COALESCE(SUM(amount),0) AS s FROM transactions WHERE reseller_id = ? AND type = 'topup' AND ts >= ? AND ts < ?", r.id, from, to).s;
+    const target = levels.find((l) => sum >= (l.min_monthly || 0));
+    const cur = levels.find((l) => l.id === r.level_id);
+    if (target && (!cur || target.discount > cur.discount)) {
+      run('UPDATE admins SET level_id = ? WHERE id = ?', target.id, r.id);
+      log('sistem', 'Reseller podignut na viši nivo', `${r.username}: ${cur?.name || 'bez nivoa'} → ${target.name} (prošli mjesec €${sum})`);
+      notify('n_payment', `⬆️ ${r.username} je prešao na nivo ${target.name} (kupio €${sum} prošli mjesec).`);
+    }
+  }
+}
+
 async function minute() {
   const s = settings.load();
   const lp = localParts(s.timezone);
@@ -58,6 +120,8 @@ async function minute() {
     const due = every === 6 ? now() - last >= 6 * 3600000 : (lp.hour >= 4 && now() - last >= (every === 168 ? 7 * 86400000 : 20 * 3600000));
     if (due) backup.make('sistem').catch(() => {});
   }
+  autoRenew(s);
+  if (lp.hour >= 10 && lp.hour < 21) remindCustomers(s).catch((e) => console.error(e));
   // jednom dnevno: čišćenje
   if (mark('cleanup') !== lp.date) {
     setMark('cleanup', lp.date);
@@ -80,6 +144,7 @@ async function minute() {
     setMark('monthly', lp.month);
     if (!first) {
       run('UPDATE servers SET traffic_month = 0');
+      if (s.res_auto_level) autoLevels();
       if (s.traffic_reset === 'svaki mjesec') { run('UPDATE users SET traffic_up = 0, traffic_down = 0'); log('sistem', 'Mjesečni reset prometa', 'svi korisnici'); }
     }
   }
@@ -89,6 +154,7 @@ function start() {
   setInterval(() => { try { checkServers(); } catch (e) { console.error(e); } }, 10000);
   setInterval(() => { minute().catch((e) => console.error(e)); }, 60000);
   setTimeout(() => minute().catch(() => {}), 5000);
+  cbot.loop().catch((e) => console.error('cbot', e));
 }
 
-module.exports = { start, dailyReport, checkServers };
+module.exports = { start, dailyReport, checkServers, autoRenew, remindCustomers, autoLevels };

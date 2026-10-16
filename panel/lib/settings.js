@@ -3,7 +3,7 @@
 const crypto = require('node:crypto');
 const { one, run, all } = require('./db');
 
-// type: toggle | text | number | select | chips | secret | textarea
+// type: toggle | text | number | select | chips | multi | secret | textarea
 // soon: true -> prikazuje se, ali još ne radi (označeno u panelu)
 const SCHEMA = [
   { id: 'opste', title: 'Općenito i brend', desc: 'Ime, izgled i osnovne informacije panela.', rows: [
@@ -28,26 +28,35 @@ const SCHEMA = [
     { key: 'grace_days', type: 'select', label: 'Grace period nakon isteka', sub: 'Korisnik još radi ovoliko dana poslije isteka', options: ['0', '1', '3', '7'], labels: ['Bez grace perioda', '1 dan', '3 dana', '7 dana'], def: '0' },
     { key: 'delete_expired_days', type: 'select', label: 'Obriši istekle naloge nakon', options: ['30', '60', '90', '0'], labels: ['30 dana', '60 dana', '90 dana', 'Nikad'], def: '0' },
     { key: 'traffic_reset', type: 'chips', label: 'Reset prometa', options: ['na produženje', 'svaki mjesec', 'nikad'], def: 'na produženje' },
-    { key: 'default_devices', type: 'number', label: 'Zadani limit uređaja', sub: 'Za nove korisnike, ako plan ne kaže drugačije (informativno)', def: 3 },
+    { key: 'default_devices', type: 'number', label: 'Zadani limit uređaja', sub: 'Za nove korisnike, ako plan ne kaže drugačije', def: 3 },
+    { key: 'device_limit', type: 'select', label: 'Kad korisnik pređe limit uređaja (VLESS i Shadowsocks)', sub: 'Server broji različite IP adrese u zadnje 3 minute, samo u memoriji, ništa se ne sprema', options: ['iskljuceno', 'prikazi', 'blokiraj'], labels: ['Ne provjeravaj', 'Samo prikaži u panelu', 'Blokiraj na 15 minuta'], def: 'prikazi' },
+    { key: 'auto_renew_on', type: 'toggle', label: 'Automatsko produženje sa kredita resellera', sub: 'Kod korisnika resellera može se uključiti "Produži sam": dan prije isteka plan se produži i skine kredit', def: true },
     { key: 'username_format', type: 'select', label: 'Prijedlog korisničkog imena', options: ['slobodno', 'auto'], labels: ['Slobodno upisivanje', 'Automatski (vpn_4821)'], def: 'slobodno' },
     { key: 'expiry_warn_days', type: 'select', label: '"Ističe uskoro" znači', options: ['3', '5', '7'], labels: ['3 dana ili manje', '5 dana ili manje', '7 dana ili manje'], def: '3' },
   ] },
   { id: 'serveri', title: 'Serveri i protokoli', desc: 'Kako rade VPN serveri i šta je dozvoljeno.', rows: [
     { key: 'proto_vless', type: 'toggle', label: 'VLESS + Reality', sub: 'Najteže ga je blokirati. Preporučeno.', def: true },
     { key: 'proto_wg', type: 'toggle', label: 'WireGuard', sub: 'Brz i jednostavan, ali ga je lakše blokirati', def: true },
+    { key: 'proto_ss', type: 'toggle', label: 'Shadowsocks 2022', sub: 'Treći protokol, rezerva kad su ostali blokirani. Port se podešava kod servera (zadano 8388).', def: false },
     { key: 'sni_list', type: 'text', label: 'SNI lista za Reality', sub: 'Novi server dobije jednu nasumično', def: 'www.microsoft.com, www.apple.com, dl.google.com, www.amazon.com', mono: true },
-    { key: 'block_torrent', type: 'toggle', label: 'Blokada torrenta', sub: 'Štiti servere od DMCA prijava (VLESS)', def: true },
-    { key: 'block_ads', type: 'toggle', label: 'Blokada reklama', sub: 'VLESS preko liste domena, WireGuard preko AdGuard DNS-a', def: false },
-    { key: 'block_adult', type: 'toggle', label: 'Blokada sadržaja za odrasle', sub: 'VLESS', def: false },
+    { key: 'block_torrent', type: 'toggle', label: 'Blokada torrenta', sub: 'Štiti servere od DMCA prijava (VLESS i Shadowsocks)', def: true },
+    { key: 'block_ads', type: 'toggle', label: 'Blokada reklama i praćenja', sub: 'AdGuard DNS na serveru, za sve protokole', def: false },
+    { key: 'block_adult', type: 'toggle', label: 'Blokada sadržaja za odrasle', sub: 'AdGuard Family DNS (blokira i reklame)', def: false },
+    { key: 'block_malware', type: 'toggle', label: 'Blokada malvera i phishinga', sub: 'Quad9 DNS (AdGuard već blokira i ovo)', def: true },
     { key: 'block_private', type: 'toggle', label: 'Zabrani pristup lokalnim mrežama servera', sub: 'Preporučeno uključeno', def: true },
-    { key: 'dns', type: 'select', label: 'DNS za korisnike', options: ['1.1.1.1', '8.8.8.8', '9.9.9.9', '94.140.14.14'], labels: ['Cloudflare 1.1.1.1', 'Google 8.8.8.8', 'Quad9 (blokira malver)', 'AdGuard (blokira reklame)'], def: '1.1.1.1' },
+    { key: 'dns', type: 'select', label: 'DNS kad nijedna blokada nije uključena', options: ['1.1.1.1', '8.8.8.8', '9.9.9.9'], labels: ['Cloudflare 1.1.1.1', 'Google 8.8.8.8', 'Quad9 9.9.9.9'], def: '1.1.1.1' },
     { key: 'heartbeat_sec', type: 'select', label: 'Server se javlja panelu svakih', options: ['10', '15', '30', '60'], labels: ['10 sekundi', '15 sekundi', '30 sekundi', '60 sekundi'], def: '15' },
     { key: 'offline_sec', type: 'select', label: 'Server je offline ako šuti', options: ['45', '90', '180'], labels: ['45 sekundi', '90 sekundi', '3 minute'], def: '45' },
     { key: 'capacity_warn', type: 'select', label: 'Upozori kad je server popunjen', options: ['70', '80', '90'], labels: ['70%', '80%', '90%'], def: '80' },
+    { key: 'sub_smart', type: 'toggle', label: 'Automatski skloni kupce sa servera koji ne radi ili je pun', sub: 'Pretplata ne nudi offline i popunjene servere, aplikacija se sama prebaci', def: true },
+    { key: 'xray_autoupdate', type: 'toggle', label: 'Automatsko ažuriranje Xraya na serverima', sub: 'Jednom sedmično, noću između 3 i 5 h', def: true },
   ] },
   { id: 'reselleri', title: 'Reselleri', desc: 'Pravila za preprodavače.', rows: [
     { key: 'res_portal', type: 'toggle', label: 'Poseban panel za resellere', sub: 'Reselleri se prijavljuju na svojoj adresi i nikad ne vide tvoju tajnu admin adresu. Na admin adresi se reseller ne može prijaviti.', def: true },
     { key: 'reseller_path', type: 'text', label: 'Adresa panela za resellere', sub: 'Ovu adresu šalješ resellerima, npr. /reseller ili /partner', def: '/reseller', mono: true },
+    { key: 'res_signup', type: 'toggle', label: 'Reselleri se mogu sami registrovati', sub: 'Na njihovoj adresi se pojavi "Registruj se". Ti odobravaš svaki nalog.', def: false },
+    { key: 'res_auto_level', type: 'toggle', label: 'Automatski podigni nivo resellera', sub: 'Svakog 1. u mjesecu prema kupljenom kreditu prošlog mjeseca (preporučena kupovina kod nivoa)', def: false },
+    { key: 'res_whitelabel', type: 'toggle', label: 'White-label: kupci resellera vide njegov brend', sub: 'Ime brenda i kontakt iz profila resellera, u aplikaciji i na stranici kupca', def: false },
     { key: 'res_trials_day', type: 'number', label: 'Reseller smije napraviti probnih naloga dnevno', def: 10 },
     { key: 'res_can_delete', type: 'toggle', label: 'Reseller smije brisati korisnike', sub: 'Ako ne, može ih samo ugasiti', def: false },
     { key: 'res_negative', type: 'number', label: 'Reseller smije u minus do (€)', sub: '0 = ne može praviti korisnike bez kredita', def: 0 },
@@ -59,10 +68,14 @@ const SCHEMA = [
     { key: 'pay_usdt', type: 'text', label: 'USDT adresa (TRC20)', def: '', mono: true },
     { key: 'pay_iban', type: 'text', label: 'IBAN', def: '', mono: true },
     { key: 'pay_paypal', type: 'text', label: 'PayPal e-mail', def: '' },
+    { key: 'stripe_on', type: 'toggle', label: 'Stripe: reselleri plaćaju kredit karticom', sub: 'Kredit se doda automatski čim plaćanje prođe', def: false },
+    { key: 'stripe_secret', type: 'secret', label: 'Stripe tajni ključ (sk_live_… ili sk_test_…)', def: '' },
+    { key: 'stripe_whsec', type: 'secret', label: 'Stripe webhook tajna (whsec_…)', sub: 'U Stripeu dodaj webhook na adresu ispod, događaj checkout.session.completed', def: '' },
     { key: 'inv_company', type: 'text', label: 'Ime firme na fakturi', def: '' },
     { key: 'inv_address', type: 'textarea', label: 'Adresa i porezni broj', def: '' },
     { key: 'inv_prefix', type: 'text', label: 'Prefiks broja fakture', def: 'F-', mono: true },
     { key: 'vat', type: 'select', label: 'PDV na fakturama', options: ['0', '17', '19', '20'], labels: ['Bez PDV-a', '17%', '19%', '20%'], def: '0' },
+    { key: 'mail_invoices', type: 'toggle', label: 'Šalji fakturu resellerima na e-mail', sub: 'Treba podešen e-mail (Obavještenja) i e-mail resellera u njegovom profilu', def: true },
   ] },
   { id: 'obavijesti', title: 'Obavještenja i Telegram bot', desc: 'Šta ti javlja panel.', rows: [
     { key: 'tg_token', type: 'secret', label: 'Telegram bot token', sub: 'Napravi bota kod @BotFather', def: '' },
@@ -73,7 +86,14 @@ const SCHEMA = [
     { key: 'n_lowcredit', type: 'toggle', label: 'Reselleru ponestaje kredita (ispod €10)', def: true },
     { key: 'n_backup', type: 'toggle', label: 'Backup nije uspio', def: true },
     { key: 'n_daily', type: 'toggle', label: 'Dnevni izvještaj u 09:00', sub: 'Zarada, novi korisnici, problemi', def: true },
-    { key: 'customer_reminders', type: 'toggle', label: 'Podsjetnik kupcima prije isteka', sub: 'Treba e-mail ili Telegram kupaca', def: false, soon: true },
+    { key: 'customer_reminders', type: 'toggle', label: 'Podsjetnik kupcima prije isteka', sub: 'Na Telegram (bot za kupce) i e-mail, kad je ostalo onoliko dana koliko piše kod "Ističe uskoro"', def: true },
+    { key: 'cbot_on', type: 'toggle', label: 'Telegram bot za kupce', sub: 'Kupac na svojoj stranici klikne "Poveži Telegram" i dobija podsjetnike, stanje naloga i tvoje poruke', def: false },
+    { key: 'cbot_token', type: 'secret', label: 'Token bota za kupce', sub: 'Napravi poseban bot kod @BotFather (ne onaj za tvoje obavijesti)', def: '' },
+    { key: 'smtp_host', type: 'text', label: 'E-mail: SMTP server', sub: 'npr. smtp-relay.brevo.com, smtp.gmail.com, smtp.zoho.eu', def: '', mono: true },
+    { key: 'smtp_port', type: 'select', label: 'E-mail: port', options: ['587', '465', '2525'], labels: ['587 (STARTTLS)', '465 (SSL)', '2525'], def: '587' },
+    { key: 'smtp_user', type: 'text', label: 'E-mail: korisničko ime', def: '', mono: true },
+    { key: 'smtp_pass', type: 'secret', label: 'E-mail: šifra ili API ključ', def: '' },
+    { key: 'smtp_from', type: 'text', label: 'E-mail: pošiljalac', sub: 'npr. Veltrix VPN <info@tvojadomena.com>', def: '' },
   ] },
   { id: 'pretplata', title: 'Pretplata i aplikacije', desc: 'Šta kupac vidi u aplikaciji i na svojoj stranici.', rows: [
     { key: 'sub_name', type: 'text', label: 'Ime profila u aplikaciji', sub: 'Prazno = ime brenda', def: '' },
@@ -81,6 +101,7 @@ const SCHEMA = [
     { key: 'sub_announce', type: 'text', label: 'Poruka u aplikaciji i na stranici za kupce', sub: 'Podržavaju je Hiddify i neke druge aplikacije', def: '' },
     { key: 'customer_page', type: 'toggle', label: 'Stranica za kupce', sub: 'Status, QR kod i uputstva kad kupac otvori link u browseru', def: true },
     { key: 'support_contact', type: 'text', label: 'Kontakt podrške za kupce', sub: 'npr. Telegram @tvojvpn', def: '' },
+    { key: 'apps', type: 'multi', label: 'Preporučene aplikacije na stranici kupca', options: ['hiddify', 'v2rayng', 'streisand', 'v2box', 'happ', 'shadowrocket'], labels: ['Hiddify', 'v2rayNG', 'Streisand', 'V2Box', 'Happ', 'Shadowrocket'], def: 'hiddify,v2rayng,streisand,v2box' },
     { key: 'msg_template', type: 'textarea', label: 'Poruka za kupca (dugme "Pošalji kupcu")', sub: 'Zamjene: {korisnik} {plan} {istice} {dana} {link} {brend} {podrska}', def: 'Zdravo! 👋\n\nTvoj {brend} je spreman ✅\nPlan: {plan}\nVrijedi do: {istice}\n\n1️⃣ Instaliraj aplikaciju Hiddify (iPhone, Android ili računar)\n2️⃣ Otvori ovaj link i klikni „Dodaj u Hiddify“, ili skeniraj QR kod:\n{link}\n3️⃣ Klikni dugme za spajanje i to je to.\n\nPomoć: {podrska}' },
   ] },
   { id: 'backup', title: 'Backup', desc: 'Da ništa ne izgubiš.', rows: [
@@ -88,6 +109,12 @@ const SCHEMA = [
     { key: 'backup_every_h', type: 'select', label: 'Kada', options: ['24', '6', '168'], labels: ['Svaki dan u 04:00', 'Svakih 6 sati', 'Svake sedmice'], def: '24' },
     { key: 'backup_keep', type: 'select', label: 'Čuvaj zadnjih', options: ['7', '14', '30'], labels: ['7 kopija', '14 kopija', '30 kopija'], def: '14' },
     { key: 'backup_tg', type: 'toggle', label: 'Pošalji svaki backup i na Telegram', def: true },
+    { key: 's3_on', type: 'toggle', label: 'Šalji backup i na S3 (Backblaze B2, Cloudflare R2, Wasabi, AWS)', def: false },
+    { key: 's3_endpoint', type: 'text', label: 'S3 endpoint', sub: 'npr. https://s3.eu-central-003.backblazeb2.com', def: '', mono: true },
+    { key: 's3_region', type: 'text', label: 'S3 regija', sub: 'npr. eu-central-003, auto (R2), us-east-1', def: 'us-east-1', mono: true },
+    { key: 's3_bucket', type: 'text', label: 'S3 bucket', def: '', mono: true },
+    { key: 's3_key', type: 'text', label: 'S3 access key', def: '', mono: true },
+    { key: 's3_secret', type: 'secret', label: 'S3 secret key', def: '' },
   ] },
   { id: 'api', title: 'API i integracije', desc: 'Za povezivanje sa prodajnim botom, sajtom ili drugim programima.', rows: [
     { key: 'api_on', type: 'toggle', label: 'API uključen', sub: 'Ključeve praviš ispod', def: false },
@@ -98,6 +125,7 @@ const SCHEMA = [
     { key: 'maintenance_msg', type: 'text', label: 'Poruka održavanja', def: 'Panel je trenutno na održavanju. VPN radi normalno.' },
     { key: 'log_days', type: 'select', label: 'Čuvaj logove aktivnosti', options: ['30', '90', '365'], labels: ['30 dana', '90 dana', '1 godinu'], def: '90' },
     { key: 'no_logs', type: 'toggle', label: 'Ne čuvaj IP adrese korisnika (no-logs)', sub: 'Bilježi se samo država i vrijeme', def: true },
+    { key: 'update_repo', type: 'text', label: 'GitHub repozitorij za ažuriranje panela', sub: 'Odakle dugme "Ažuriraj panel" skida novu verziju', def: 'maid-cyber/vpn-panel', mono: true },
   ] },
 ];
 
@@ -127,6 +155,7 @@ function clean(key, value) {
   if (!r) return undefined;
   if (r.type === 'toggle') return !!value;
   if (r.type === 'number') { const n = Number(value); return Number.isFinite(n) ? n : r.def; }
+  if (r.type === 'multi') return [].concat(Array.isArray(value) ? value : String(value ?? '').split(',')).map((x) => String(x).trim()).filter((x) => r.options.includes(x)).join(',');
   if (r.type === 'select' || r.type === 'chips') return r.options.includes(String(value)) ? String(value) : r.def;
   if (r.type === 'secret' && String(value ?? '').includes('••')) return undefined;   // nije mijenjano
   let v = String(value ?? '').slice(0, 2000);
@@ -163,7 +192,8 @@ function publicSchema() {
 
 function forClient() {
   const s = { ...load() };
-  if (s.tg_token) s.tg_token = s.tg_token.slice(0, 6) + '••••••••';
+  // tajne vrijednosti (tokeni, ključevi, šifre) nikad ne idu u browser u cijelosti
+  for (const r of Object.values(ROWS)) if (r.type === 'secret' && s[r.key]) s[r.key] = String(s[r.key]).slice(0, 6) + '••••••••';
   return s;
 }
 

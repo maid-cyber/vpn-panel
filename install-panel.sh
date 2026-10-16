@@ -25,7 +25,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 say "Osnovni paketi"
 apt-get update -qq
-apt-get install -y -qq curl ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https >/dev/null
+apt-get install -y -qq curl unzip ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https >/dev/null
 
 # ------------------------------------------------------------ Node.js 22
 need_node=1
@@ -96,6 +96,44 @@ EOF
 systemctl daemon-reload
 systemctl enable vpn-panel >/dev/null 2>&1
 systemctl restart vpn-panel
+
+# ------------------------------------------------------------ ažuriranje iz panela (dugme "Ažuriraj panel")
+# panel (bez root prava) samo napravi fajl update.request, a ovaj root servis skine novu verziju i pokrene instalaciju
+printf 'DOMAIN=%q\n' "$DOMAIN" > "$APP/install.env"
+cat > "$APP/update.sh" <<'UPD'
+#!/usr/bin/env bash
+set -euo pipefail
+REQ=/var/lib/vpn-panel/update.request
+REPO="$(tr -cd 'A-Za-z0-9._/-' < "$REQ" 2>/dev/null || true)"; REPO="${REPO:-maid-cyber/vpn-panel}"
+rm -f "$REQ"
+. /opt/vpn-panel/install.env
+T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+cd "$T"
+echo "=== $(date) · ažuriranje iz github.com/$REPO"
+curl -fsSL -o p.zip "https://github.com/$REPO/archive/refs/heads/main.zip"
+unzip -q p.zip
+cd "$(find . -maxdepth 1 -mindepth 1 -type d | head -1)"
+bash install-panel.sh ${DOMAIN:-}
+UPD
+chmod 700 "$APP/update.sh"
+cat > /etc/systemd/system/vpn-panel-update.service <<UNIT
+[Unit]
+Description=Ažuriranje VPN panela
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '$APP/update.sh >> /var/log/vpn-panel-update.log 2>&1'
+UNIT
+cat > /etc/systemd/system/vpn-panel-update.path <<UNIT
+[Unit]
+Description=Čeka zahtjev za ažuriranje VPN panela
+[Path]
+PathExists=$DATA/update.request
+Unit=vpn-panel-update.service
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now vpn-panel-update.path >/dev/null 2>&1
 
 # ------------------------------------------------------------ Caddy (HTTPS)
 if ! command -v caddy >/dev/null; then
