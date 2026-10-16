@@ -153,16 +153,19 @@ function serversList(forReseller) {
   return rows.map((sv) => serverView(sv, forReseller));
 }
 
+// početak dana (lokalno vrijeme servera) prije `back` dana
+function dayStart(t, back) { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - back); return d.getTime(); }
+
 function revenueSeries(days) {
   const tz = settings.get('timezone');
   const from = now() - days * 86400000;
   const map = new Map();
-  for (let i = days - 1; i >= 0; i--) map.set(dayKey(now() - i * 86400000, tz), { rev: 0, traffic: 0 });
+  for (let i = days - 1; i >= 0; i--) map.set(dayKey(now() - i * 86400000, tz), { rev: 0, traffic: 0, users: 0 });
   for (const t of all("SELECT ts, amount FROM transactions WHERE ts >= ? AND type IN ('topup','sale')", from)) {
     const d = map.get(dayKey(t.ts, tz)); if (d) d.rev += t.amount;
   }
-  for (const r of all('SELECT day, traffic FROM daily WHERE day >= ?', dayKey(from, tz))) { const d = map.get(r.day); if (d) d.traffic = r.traffic; }
-  return [...map.entries()].map(([day, v]) => ({ day, rev: core.round2(v.rev), traffic: v.traffic }));
+  for (const r of all('SELECT day, traffic, new_users FROM daily WHERE day >= ?', dayKey(from, tz))) { const d = map.get(r.day); if (d) { d.traffic = r.traffic; d.users = r.new_users || 0; } }
+  return [...map.entries()].map(([day, v]) => ({ day, rev: core.round2(v.rev), traffic: v.traffic, users: v.users }));
 }
 
 route('GET', 'dash', 'dash', (c) => {
@@ -197,7 +200,10 @@ route('GET', 'dash', 'dash', (c) => {
     online: servers.filter((s) => s.status === 'online').length, serversTotal: servers.filter((s) => s.enabled).length,
     connected: servers.reduce((s, x) => s + (x.status === 'online' ? x.online : 0), 0),
     servers, series, days,
-    countries: countries.slice(0, 5).map((r) => ({ cc: r.cc, pct: ctotal ? Math.round(r.n / ctotal * 100) : 0 })),
+    countries: countries.slice(0, 8).map((r) => ({ cc: r.cc, n: r.n, pct: ctotal ? Math.round(r.n / ctotal * 100) : 0 })),
+    revToday: core.round2(sum(dayStart(t, 0), t + 1)), revYesterday: core.round2(sum(dayStart(t, 1), dayStart(t, 0))),
+    protocols: { vless: !!settings.get('proto_vless'), ss: !!settings.get('proto_ss'), wg: !!settings.get('proto_wg') },
+    activePlans: one('SELECT COUNT(*) AS n FROM plans WHERE active = 1').n,
     top, warnings, activity: all('SELECT * FROM logs ORDER BY id DESC LIMIT 8'),
     totals: {
       rev: core.round2(series.reduce((s, d) => s + d.rev, 0)), traffic: series.reduce((s, d) => s + d.traffic, 0),

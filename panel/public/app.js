@@ -23,11 +23,18 @@
     copy: 'M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2', down: 'M12 3v12M7 10l5 5 5-5M4 20h16',
     refresh: 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5', more: 'M5 12h.01M12 12h.01M19 12h.01', back: 'M15 18l-6-6 6-6',
     key: 'M15 7a4 4 0 1 1-3.9 4.9L3 20v-3h3v-3h3l1.1-1.1A4 4 0 0 1 15 7z', credit: 'M3 6h18v12H3zM3 10h18M7 15h3',
+    clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2', bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',
+    globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
+    link: 'M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1',
+    pin: 'M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+    moon: 'M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z', sun: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
+    chart: 'M4 20V10M10 20V4M16 20v-7M4 20h18', act: 'M22 12h-4l-3 9L9 3l-3 9H2', check: 'M20 6 9 17l-5-5',
+    plug: 'M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4', x: 'M18 6 6 18M6 6l12 12',
     send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z', shield: 'M12 3 20 6v6c0 5-3.5 8.5-8 9.5C7.5 20.5 4 17 4 12V6z',
   };
   const ic = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n] || ''}"/></svg>`;
   // znak brenda (štit sa V)
-  const MARK = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M48 70h32l20 68v46z" fill="#E3172B"/><path d="M152 70h-32l-20 68v46z" fill="#9E0C1A"/><path d="M48 70h32l2 7H51z" fill="#FF4A5A"/><path d="M86 58h28l-14 38z" fill="#FF4A5A"/><path d="M100 58h14l-14 38z" fill="#E3172B"/>';
+  const MARK = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" style="fill:var(--lg1,#E3172B)"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" style="fill:var(--lg0,#121216)"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M48 70h32l20 68v46z" style="fill:var(--lg1,#E3172B)"/><path d="M152 70h-32l-20 68v46z" style="fill:var(--lg2,#9E0C1A)"/><path d="M48 70h32l2 7H51z" style="fill:var(--lg3,#FF4A5A)"/><path d="M86 58h28l-14 38z" style="fill:var(--lg3,#FF4A5A)"/><path d="M100 58h14l-14 38z" style="fill:var(--lg1,#E3172B)"/>';
   const logo = (w = 34) => `<svg width="${w}" height="${Math.round(w * 1.12)}" viewBox="0 0 200 224" aria-hidden="true">${MARK}</svg>`;
   const LOGO = logo(32);
   // ime brenda: zadnje slovo glavne riječi u boji, "VPN" ide ispod kao na logu
@@ -223,7 +230,8 @@
   function renderShell() {
     const me = S.me;
     document.documentElement.dataset.accent = me.accent || 'crvena';
-    document.documentElement.dataset.theme = me.theme || 'tamna';
+    let lt = null; try { lt = localStorage.getItem('vp-theme'); } catch { /* nema */ }
+    document.documentElement.dataset.theme = lt || me.theme || 'tamna';
     $('#app').innerHTML = `<div class="shell" id="shell">
       <aside class="side" id="side" aria-label="Meni">
         <div class="brand">${LOGO}<div><b>${wordHtml(wordParts(me.brand).main)}</b><small>${wordParts(me.brand).sub ? 'VPN · ' : ''}${isRes() ? 'Reseller panel' : 'Admin panel'}</small></div></div>
@@ -323,79 +331,161 @@
   }
 
   // ================================================================== DASHBOARD (admin)
+  // mala linija u kartici
+  function spark(vals, color) {
+    const v = vals.length > 1 ? vals : [0, ...vals, 0];
+    const max = Math.max(1e-9, ...v), W = 100, H = 40, step = W / (v.length - 1);
+    const pts = v.map((x, i) => [i * step, H - 4 - (x / max) * (H - 10)]);
+    const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
+    const id = 'sg' + Math.random().toString(36).slice(2, 7);
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+      <path d="${d}L${W} ${H}L0 ${H}Z" fill="url(#${id})"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+  }
+  // grafikon zarade (linija sa sjenom) i prometa
+  function areaChart(series, W = 520) {
+    const H = 250, L = 46, B = 24, T = 10, n = series.length;
+    const peak = Math.max(0, ...series.map((d) => d.rev)), mag = peak > 0 ? 10 ** Math.floor(Math.log10(peak)) : 1, nice = Math.max(4, Math.ceil(peak / mag) * mag);
+    const maxT = Math.max(1, ...series.map((d) => d.traffic || 0)) * 1.1;
+    const x = (i) => L + 6 + (n === 1 ? 0 : i * (W - L - 30) / (n - 1)), y = (v, m) => T + (H - B - T) * (1 - v / m);
+    const path = (key, m) => series.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(d[key] || 0, m).toFixed(1)}`).join('');
+    const rev = path('rev', nice), tr = path('traffic', maxT);
+    const grid = [0, .25, .5, .75, 1].map((f) => `<path d="M${L} ${y(nice * f, nice).toFixed(0)}H${W - 10}" stroke="var(--line)" stroke-dasharray="${f ? '3 4' : ''}"/><text x="${L - 8}" y="${(y(nice * f, nice) + 4).toFixed(0)}" text-anchor="end" fill="var(--dim)" font-size="12">${esc(money(Math.round(nice * f * 100) / 100))}</text>`).join('');
+    const step = Math.ceil(n / 7);
+    const lbl = series.map((d, i) => (i % step === 0 || i === n - 1) ? `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="var(--dim)" font-size="12">${esc(d.day.slice(8))}.${esc(d.day.slice(5, 7))}.</text>` : '').join('');
+    const dots = n <= 31 ? series.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(d.rev, nice).toFixed(1)}" r="3" fill="var(--bg)" stroke="var(--acc-hi)" stroke-width="2"><title>${esc(d.day)}: ${esc(money(d.rev))} · ${esc(bytes(d.traffic || 0))}</title></circle>`).join('') : '';
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="Grafikon zarade i prometa">
+      <defs><linearGradient id="ag1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--acc-hi)" stop-opacity=".35"/><stop offset="1" stop-color="var(--acc-hi)" stop-opacity="0"/></linearGradient>
+      <linearGradient id="ag2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".28"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs>
+      ${grid}<path d="${tr}L${x(n - 1)} ${H - B}L${L} ${H - B}Z" fill="url(#ag2)"/><path d="${tr}" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="${rev}L${x(n - 1)} ${H - B}L${L} ${H - B}Z" fill="url(#ag1)"/><path d="${rev}" fill="none" stroke="var(--acc-hi)" stroke-width="2.6" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px var(--acc))"/>${dots}${lbl}</svg>`;
+  }
+  const CONT = {
+    eu: 'AL AD AT BY BE BA BG HR CY CZ DK EE FI FR DE GR HU IS IE IT XK LV LI LT LU MT MD MC ME NL MK NO PL PT RO RU SM RS SK SI ES SE CH UA GB VA',
+    na: 'US CA MX GT HN SV NI CR PA CU DO HT JM BS PR', sa: 'BR AR CL CO PE VE EC BO PY UY GY SR',
+    as: 'CN JP KR IN ID TH VN MY SG PH PK BD TR IR IQ SA AE IL JO KW QA BH OM KZ UZ AZ GE AM HK TW LK NP MN AF SY LB YE KG TJ TM MM KH LA',
+    af: 'ZA EG NG KE MA DZ TN ET GH TZ UG SN CI CM AO ZW ZM MZ LY SD RW', oc: 'AU NZ FJ PG',
+  };
+  const contOf = (cc) => Object.keys(CONT).find((k) => CONT[k].split(' ').includes(String(cc || '').toUpperCase())) || 'eu';
+  const CONT_NAME = { eu: 'Evropa', na: 'Sjeverna Amerika', sa: 'Južna Amerika', as: 'Azija', af: 'Afrika', oc: 'Okeanija' };
+  let regionNames = null;
+  const ccName = (cc) => { try { regionNames = regionNames || new Intl.DisplayNames(['bs', 'hr', 'en'], { type: 'region' }); return regionNames.of(String(cc).toUpperCase()); } catch { return String(cc).toUpperCase(); } };
+  const uptimeStr = (sec) => sec ? `${Math.floor(sec / 86400)} d ${Math.floor(sec % 86400 / 3600)} h` : '—';
+  const actKind = (a) => /greš|error|ne odgovara|blok|obris/i.test(a.action + ' ' + a.kind) ? 'bad' : a.kind === 'warn' ? 'warn' : /uplat|kredit|transak|plat/i.test(a.action) ? 'info' : '';
+  const actIcon = (a) => /korisnik/i.test(a.action) ? 'user' : /server/i.test(a.action) ? 'server' : /uplat|kredit|plat|transak/i.test(a.action) ? 'money' : /prijav/i.test(a.action) ? 'key' : 'act';
+
   async function pageDash() {
     const d = await GET(`dash?days=${S.dashDays}`);
     S.servers = d.servers;
-    const pct = d.revPrev ? Math.round((d.revMonth - d.revPrev) / d.revPrev * 100) : null;
     const mon = MONTHS[new Date().getMonth()];
-    const stat = (l, v, s, cls, icon) => `<div class="stat"><div class="l"><span>${l}</span>${ic(icon)}</div><div class="v">${v}</div><div class="s ${cls}">${s}</div></div>`;
     const offline = d.servers.filter((s) => s.status === 'offline');
-    $('#view').innerHTML = `
-      ${top('Dashboard', `${longDate()} · ${offline.length ? `<span class="bad">${offline.length} server ne odgovara</span>` : 'sve radi normalno'}`,
-        `<label class="search hide-m" style="flex:0 1 320px">${ic('search')}<span class="sr">Pretraga korisnika</span><input id="dashSearch" placeholder="Traži korisnika…"></label>
-         ${can('users') ? `<button class="btn red" data-a="newUser">${ic('plus')}<span>Novi korisnik</span></button>` : ''}`)}
-      <section class="stats">
-        ${stat('Aktivni korisnici', d.counts.active + d.counts.expiring + d.counts.grace, `+${d.weekNew} ove sedmice`, 'ok', 'users')}
-        ${stat('Ističu uskoro', d.counts.expiring, d.counts.expiring ? '<a href="#/korisnici?status=expiring">Pogledaj listu →</a>' : 'nema', 'warn', 'bell')}
-        ${stat('Serveri online', `${d.online} / ${d.serversTotal}`, offline.length ? offline.map((s) => esc(s.name)).join(', ') + ' ne radi' : `${d.connected} spojenih sada`, offline.length ? 'bad' : 'ok', 'server')}
-        ${stat(`Zarada · ${mon}`, money(d.revMonth), pct === null ? 'prvi mjesec' : `${pct >= 0 ? '+' : ''}${pct}% u odnosu na prošli`, pct === null || pct >= 0 ? 'ok' : 'bad', 'money')}
+    const enabled = d.servers.filter((s) => s.enabled);
+    const active = d.counts.active + d.counts.expiring + d.counts.grace;
+    const todayNew = d.series.length ? d.series[d.series.length - 1].users : 0;
+    const revPct = d.revYesterday ? Math.round((d.revToday - d.revYesterday) / d.revYesterday * 100) : 0;
+    const avail = enabled.length ? Math.round(d.online / enabled.length * 100) : 0;
+    const kpi = (color, icon, label, value, sub, subCls, sparkVals, corner = '') => `<div class="kpi" style="--k:${color}">
+      <div class="ki">${ic(icon)}</div><div class="kl">${label}</div><div class="kv">${value}</div><div class="ks ${subCls}">${sub}</div>
+      ${sparkVals ? spark(sparkVals, color) : ''}${corner ? `<span class="kc">${ic(corner)}</span>` : ''}</div>`;
+    const cont = {}; for (const k of Object.keys(CONT_NAME)) cont[k] = 0;
+    for (const s of enabled) cont[contOf(s.country)]++;
+    const mainCont = Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0];
+    const det = d.servers.find((s) => s.status === 'online') || d.servers[0];
+    const warnCount = d.warnings.length;
+    $('#view').innerHTML = `<div class="dashv">
+      <header class="top">
+        <button class="iconbtn burger" data-a="menu" aria-label="Otvori meni">${ic('menu')}</button>
+        <div class="grow hello"><span class="hi-ic hide-m">${ic('user')}</span><div><h1>Dobrodošao, <em>${esc(S.me.username)}</em> 👋</h1>
+          <div class="sub">${longDate()} · ${offline.length ? `<span class="bad">${offline.length} server ne odgovara</span>` : 'sve radi normalno'}</div></div></div>
+        <label class="search hide-m" style="flex:0 1 340px">${ic('search')}<span class="sr">Pretraga korisnika</span><input id="dashSearch" placeholder="Pretraži korisnike…"><span class="kbd">Ctrl K</span></label>
+        <div style="position:relative"><button class="iconbtn" data-a="dashBell" aria-label="Obavijesti">${ic('bell')}${warnCount ? `<span class="cnt">${warnCount}</span>` : ''}</button>
+          <div class="pop" id="bellPop" hidden>${warnCount ? d.warnings.map((w) => `<div class="tag t-${w.kind === 'red' ? 'bad' : w.kind === 'amber' ? 'warn' : 'info'}" style="white-space:normal;padding:9px 11px;font-weight:500">${esc(w.text)}</div>`).join('') : '<span class="muted">Nema novih obavijesti.</span>'}</div></div>
+        <button class="iconbtn hide-m" data-a="toggleTheme" aria-label="Svijetla ili tamna tema" title="Tema">${ic(document.documentElement.dataset.theme === 'svijetla' ? 'moon' : 'sun')}</button>
+        ${can('settings') ? `<a class="iconbtn hide-m" href="#/postavke" aria-label="Postavke" title="Postavke">${ic('gear')}</a>` : ''}
+        ${can('users') ? `<button class="btn red" data-a="newUser">${ic('plus')}<span>Novi korisnik</span></button>` : ''}
+      </header>
+
+      <section class="kpis">
+        ${kpi('#3ddc84', 'users', 'Aktivni korisnici', active, `+${todayNew} danas`, 'ok', d.series.map((x) => x.users))}
+        ${kpi('#a855f7', 'clock', 'Ističu uskoro', d.counts.expiring, d.counts.expiring ? '<a href="#/korisnici?status=expiring">Pogledaj listu →</a>' : 'nema', 'warn', null, 'users')}
+        ${kpi('#3b82f6', 'server', 'Serveri online', `${d.online} / ${d.serversTotal}`, offline.length ? `<span class="bad">${offline.map((s) => esc(s.name)).join(', ')} ne radi</span>` : `${avail}% dostupnost`, 'ok', null, 'server')}
+        ${kpi('#f5a524', 'money', 'Zarada danas', money(d.revToday), `${revPct >= 0 ? '+' : ''}${revPct}% od jučer`, revPct >= 0 ? 'ok' : 'bad', d.series.map((x) => x.rev))}
+        ${kpi('#8b5cf6', 'shield', 'Aktivne sesije', d.connected, 'trenutno <b class="ok">online</b>', 'muted', d.series.map((x) => x.traffic))}
       </section>
-      <div class="grid2">
+
+      <div class="dgrid">
         <section class="card p" style="min-width:0">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:12px">
-            <h2 style="flex:1">Zarada i promet</h2>
-            <div class="legend"><span><i style="background:var(--acc);border-radius:2px"></i>Zarada</span><span><i style="background:#8fb4ff;height:3px;border-radius:0"></i>Promet</span></div>
-            <div class="seg" role="group" aria-label="Period">${[7, 30, 90].map((n) => `<button type="button" class="${S.dashDays === n ? 'on' : ''}" data-a="dashDays" data-n="${n}">${n} dana</button>`).join('')}</div>
-          </div>
-          ${barsChart(d.series, 'rev', 'traffic')}
-          <div style="display:flex;flex-wrap:wrap;gap:28px;margin-top:12px;padding-top:14px;border-top:1px solid var(--line)">
-            <div><div class="muted" style="font-size:13px">Zarada</div><div class="num" style="font-size:22px">${money(d.totals.rev)}</div></div>
-            <div><div class="muted" style="font-size:13px">Promet</div><div class="num" style="font-size:22px">${bytes(d.totals.traffic)}</div></div>
-            <div><div class="muted" style="font-size:13px">Novi korisnici</div><div class="num" style="font-size:22px">${d.totals.newUsers}</div></div>
-            <div><div class="muted" style="font-size:13px">Produženja</div><div class="num" style="font-size:22px">${d.totals.renewals}</div></div>
-          </div>
+          <div class="ch"><h2>${ic('chart')}Zarada i promet</h2>
+            <div class="legend"><span><i style="background:var(--acc-hi)"></i>Zarada</span><span><i style="background:#8b5cf6"></i>Promet</span></div>
+            <div class="seg" role="group" aria-label="Period">${[7, 30, 90].map((n) => `<button type="button" class="${S.dashDays === n ? 'on' : ''}" data-a="dashDays" data-n="${n}">${n === 7 ? 'Zadnjih 7 dana' : n + ' dana'}</button>`).join('')}</div></div>
+          <div class="chartwrap"><div style="min-width:0" id="chartBox"></div>
+            <div class="sumcol"><div><small>Ukupna zarada</small><b>${money(d.totals.rev)}</b></div><div><small>Ukupni promet</small><b>${bytes(d.totals.traffic)}</b></div>
+              <div><small>Novi korisnici</small><b>${d.totals.newUsers}</b></div><div><small>Produženja</small><b>${d.totals.renewals}</b></div><div><small>Aktivni planovi</small><b>${d.activePlans}</b></div></div></div>
         </section>
-        <section class="card p" style="display:flex;flex-direction:column;gap:10px">
-          <h2>Brze akcije</h2>
-          ${can('users') ? `<button class="btn red" style="justify-content:flex-start" data-a="newUser">${ic('plus')}Dodaj korisnika</button>` : ''}
-          ${can('resellers') ? `<a class="btn" style="justify-content:flex-start" href="#/reselleri">${ic('res')}Reselleri i kredit</a>` : ''}
-          ${can('servers') ? `<button class="btn" style="justify-content:flex-start" data-a="newServer">${ic('server')}Dodaj server</button>` : ''}
-          ${can('finance') ? `<button class="btn" style="justify-content:flex-start" data-a="newTx" data-type="expense">${ic('money')}Upiši trošak</button>` : ''}
-          ${d.warnings.length ? `<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">${d.warnings.map((w) => `<div class="tag t-${w.kind === 'red' ? 'bad' : w.kind === 'amber' ? 'warn' : 'info'}" style="white-space:normal;padding:8px 10px;font-weight:500">${esc(w.text)}</div>`).join('')}</div>` : ''}
-        </section>
-      </div>
-      <section class="card p" style="display:flex;flex-wrap:wrap;gap:22px">
-        <div style="flex:999 1 520px;min-width:0">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-bottom:12px"><h2 style="flex:1">Mapa servera · uživo</h2>
-            <div class="legend"><span><i style="background:#3ddc84"></i>Online</span><span><i style="background:#f5a524"></i>Skoro pun</span><span><i style="background:#ff4d5e"></i>Offline</span><span class="dim" id="liveTime"></span></div></div>
-          ${mapHtml(d.servers)}
-          ${d.servers.some((s) => s.lat == null) ? '<p class="dim" style="font-size:12px;margin:8px 0 0">Server se pojavi na mapi kad se prvi put javi panelu (lokacija se odredi iz IP adrese).</p>' : ''}
-        </div>
-        <div style="flex:1 1 250px;min-width:0;display:flex;flex-direction:column;gap:12px">
-          <div class="mini-grid"><div class="mini"><small>Spojeno sada</small><b class="num" style="font-size:22px">${d.connected}</b></div><div class="mini"><small>Lokacije</small><b class="num" style="font-size:22px">${new Set(d.servers.map((s) => s.city || s.name)).size}</b></div></div>
-          <b>Odakle se korisnici spajaju</b>
-          ${d.countries.length ? d.countries.map((c) => `<div style="display:grid;grid-template-columns:34px minmax(0,1fr) 42px;gap:10px;align-items:center"><b class="dim">${flag(c.cc)}</b><div class="bar"><i style="width:${c.pct}%"></i></div><span style="text-align:right">${c.pct}%</span></div>`).join('') : '<span class="muted" style="font-size:13px">Još nema podataka.</span>'}
-          <small class="dim" style="border-top:1px solid var(--line);padding-top:10px">Bilježi se samo država, IP adresa se ne čuva.</small>
-        </div>
-      </section>
-      <div class="grid2">
-        <section class="card" style="min-width:0">
-          <div class="card-head"><h2>Status servera</h2><a href="#/serveri" style="font-size:13px">Svi serveri →</a></div>
-          ${d.servers.length ? `<div class="tbl">${trow(['Server', 'Status', 'Spojeno', 'Popunjenost', 'CPU / RAM', 'Promet / mj.'], true, SRVCOLS)}
-            ${d.servers.map((s) => trow([`${s.name.toUpperCase().startsWith((s.country || '#').toUpperCase() + ' ') ? '' : `<b class="dim">${flag(s.country)}</b> `}${esc(s.name)}`, `<span data-live-srv="${s.id}">${srvStatus(s)}</span>`, s.online, `<div style="display:flex;gap:8px;align-items:center"><div class="bar" style="flex:1"><i class="${s.warn ? 'w' : ''}" style="width:${Math.min(100, s.online / s.capacity * 100)}%"></i></div><span class="dim">${Math.round(s.online / s.capacity * 100)}%</span></div>`, s.status === 'online' ? `${Math.round(s.cpu)}% / ${Math.round(s.ram)}%` : '—', bytes(s.traffic_month)], false, SRVCOLS, ['', 'Status', 'Spojeno', 'Popunjenost', 'CPU / RAM', 'Promet'])).join('')}</div>`
-          : `<div class="empty">Još nema servera. <button class="btn sm red" data-a="newServer">Dodaj prvi server</button></div>`}
+        <section class="card p" style="min-width:0">
+          <div class="ch"><h2>${ic('server')}Status servera</h2>${offline.length ? `<span class="pill bad">${offline.length} offline</span>` : d.online ? '<span class="pill">Online</span>' : '<span class="pill grey">Nema servera</span>'}</div>
+          ${d.servers.slice(0, 3).map((s) => `<div class="srvcard"><div style="display:flex;align-items:center;gap:12px"><span class="ccb">${s.country ? flag(s.country) : ic('server')}</span>
+              <div style="flex:1;min-width:0"><b>${esc(s.name)}</b><div class="dim mono" style="font-size:12px">${esc(s.host || '')}</div></div><span data-live-srv="${s.id}">${srvStatus(s)}</span></div>
+              <div style="display:flex;gap:16px;font-size:13px;color:var(--soft)"><span>${ic('users')} ${s.online} / ${s.capacity}</span><span>${ic('down')} ${bytes(s.traffic_month)} / mj.</span></div>
+              <div class="bar"><i class="${s.warn ? 'w' : ''}" style="width:${Math.min(100, s.online / (s.capacity || 1) * 100)}%"></i></div></div>`).join('') || '<div class="muted">Još nema servera.</div>'}
+          ${d.servers.length > 3 ? `<div class="dim" style="font-size:12.5px;margin-top:8px">+ još ${d.servers.length - 3}</div>` : ''}
+          <a class="btn red block" style="margin-top:14px" href="#/serveri">Upravljaj serverima</a>
         </section>
         <section class="card p">
-          <div style="display:flex;align-items:center;margin-bottom:6px"><h2 style="flex:1">Top reselleri · ${mon}</h2><a href="#/reselleri" style="font-size:13px">Svi →</a></div>
-          ${d.top.length ? d.top.map((r, i) => `<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--row)"><span class="tag t-grey">${i + 1}</span><div style="flex:1;min-width:0"><b>${esc(r.username)}</b><div class="muted" style="font-size:12px">${r.users} korisnika${r.level ? ' · ' + esc(r.level) : ''}</div></div><b class="num">${money(r.rev)}</b></div>`).join('') : '<div class="muted">Još nema resellera.</div>'}
+          <div class="ch"><h2>${ic('bolt')}Brze akcije</h2></div>
+          <div class="qa">
+            ${can('users') ? `<button class="btn red full" data-a="newUser">${ic('plus')}Dodaj korisnika</button>` : ''}
+            ${can('resellers') ? `<a class="btn" href="#/reselleri">${ic('credit')}Reselleri i kredit</a>` : ''}
+            ${can('servers') ? `<button class="btn" data-a="newServer">${ic('server')}Dodaj server</button>` : ''}
+            ${can('finance') ? `<button class="btn" data-a="newTx" data-type="expense">${ic('money')}Upiši trošak</button>` : ''}
+            ${can('users') ? `<a class="btn" href="#/korisnici?status=expiring">${ic('clock')}Ističu uskoro</a>` : ''}
+            ${can('plans') ? `<a class="btn" href="#/planovi">${ic('plans')}Planovi</a>` : ''}
+            ${can('finance') ? `<a class="btn" href="#/finansije/izvjestaji">${ic('report')}Izvještaji</a>` : ''}
+          </div>
+          ${d.warnings.length ? `<div class="warns">${d.warnings.map((w) => `<div class="tag t-${w.kind === 'red' ? 'bad' : w.kind === 'amber' ? 'warn' : 'info'}" style="white-space:normal;padding:8px 10px;font-weight:500">${esc(w.text)}</div>`).join('')}</div>` : ''}
         </section>
       </div>
-      <section class="card">
-        <div class="card-head"><h2>Zadnje aktivnosti</h2>${can('logs') ? '<a href="#/logovi" style="font-size:13px">Svi logovi →</a>' : ''}</div>
-        <div class="tbl">${d.activity.map((a) => trow([fmtDT(a.ts), esc(a.actor), `<span class="tag ${a.kind === 'error' ? 't-bad' : a.kind === 'warn' ? 't-warn' : 't-grey'}">${esc(a.action)}</span>`, `<span class="muted">${esc(a.detail)}</span>`], false, '110px 1fr 180px 2.5fr', ['Vrijeme', 'Ko', 'Akcija', 'Detalji'])).join('') || '<div class="empty">Nema aktivnosti.</div>'}</div>
-      </section>`;
+
+      <div class="dgrid2">
+        <section class="card p" style="min-width:0">
+          <div class="ch"><h2>${ic('globe')}Mapa servera · uživo</h2>
+            <div class="legend"><span><i style="background:#3ddc84"></i>Online</span><span><i style="background:#f5a524"></i>Skoro pun</span><span><i style="background:#ff4d5e"></i>Offline</span><span class="dim" id="liveTime"></span></div></div>
+          <div class="mapwrap">
+            <div class="regions">${Object.keys(CONT_NAME).map((k) => `<div class="${k === mainCont && cont[k] ? 'on' : ''}"><span>${CONT_NAME[k]}</span><b>${cont[k]}</b></div>`).join('')}
+              <span class="pill" style="margin-top:8px;align-self:flex-start">${d.online} ${d.online === 1 ? 'server' : 'servera'} online</span></div>
+            <div style="min-width:0">${mapHtml(d.servers)}</div>
+          </div>
+          <div class="protos"><span class="${d.protocols.vless ? 'on' : 'off'}">VLESS Reality</span><span class="${d.protocols.ss ? 'on' : 'off'}">Shadowsocks 2022</span><span class="${d.protocols.wg ? 'on' : 'off'}">WireGuard</span>
+            <span style="margin-left:auto" class="dim">${d.servers.some((s) => s.lat == null) ? 'Server se pojavi na mapi kad se prvi put javi panelu.' : 'Spojeno sada: ' + d.connected}</span></div>
+        </section>
+        <section class="card p" style="min-width:0">
+          <div class="ch"><h2>${ic('pin')}Korisnici po lokacijama</h2><span class="pill">Live</span></div>
+          ${d.countries.length ? d.countries.map((c) => `<div class="loc"><span class="ccb sm">${flag(c.cc)}</span><b style="font-weight:500">${esc(ccName(c.cc))}</b><span class="muted" style="font-size:12.5px">${c.pct}%</span><div class="bar"><i style="width:${c.pct}%"></i></div></div>`).join('')
+            : '<div class="muted" style="font-size:13px">Još nema podataka. Pojavi se čim se kupci spoje.</div>'}
+          <small class="dim" style="display:block;border-top:1px solid var(--line);padding-top:10px;margin-top:6px">Zadnjih 30 dana. Bilježi se samo država, IP adresa se ne čuva.</small>
+        </section>
+        <div class="col">
+          ${det ? `<section class="card p"><div class="ch" style="margin-bottom:10px"><h2>${ic('server')}Detalji servera</h2><a href="#/serveri" style="font-size:13px">Svi →</a></div>
+            <div class="kv2"><span>Naziv</span><b>${esc(det.name)}</b><span>Lokacija</span><b>${esc([det.city, det.country].filter(Boolean).join(', ') || '—')}</b>
+              <span>IP adresa</span><b class="mono">${esc(det.host || '—')}</b><span>Status</span><b><span data-live-srv="${det.id}">${srvStatus(det)}</span></b>
+              <span>Uptime</span><b>${uptimeStr(det.uptime)}</b><span>Verzija</span><b>${esc(det.version || '—')}</b>
+              <span>CPU</span><b style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span class="bar" style="width:90px"><i style="width:${Math.round(det.cpu || 0)}%"></i></span>${Math.round(det.cpu || 0)}%</b>
+              <span>RAM</span><b style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span class="bar" style="width:90px"><i style="width:${Math.round(det.ram || 0)}%"></i></span>${Math.round(det.ram || 0)}%</b></div></section>` : ''}
+          <section class="card p"><div class="ch" style="margin-bottom:6px"><h2>${ic('act')}Zadnje aktivnosti</h2>${can('logs') ? '<a href="#/logovi" style="font-size:13px">Sve →</a>' : ''}</div>
+            ${d.activity.slice(0, 6).map((a) => `<div class="act"><span class="ai ${actKind(a)}">${ic(actIcon(a))}</span><p>${esc(a.action)}<small>${esc(a.actor)}${a.detail ? ' · ' + esc(a.detail) : ''}</small></p><time title="${esc(fmtDT(a.ts))}">${ago(a.ts)}</time></div>`).join('') || '<div class="muted">Nema aktivnosti.</div>'}</section>
+        </div>
+      </div>
+
+      ${d.top.length ? `<section class="card p">
+        <div class="ch"><h2>${ic('res')}Top reselleri · ${mon}</h2><a href="#/reselleri" style="font-size:13px">Svi →</a></div>
+        <div class="grid-auto">${d.top.map((r, i) => `<div class="srvcard" style="margin:0;flex-direction:row;align-items:center"><span class="ccb sm">${i + 1}</span><div style="flex:1;min-width:0"><b>${esc(r.username)}</b><div class="muted" style="font-size:12px">${r.users} korisnika${r.level ? ' · ' + esc(r.level) : ''}</div></div><b class="num">${money(r.rev)}</b></div>`).join('')}</div>
+      </section>` : ''}</div>`;
     const sInp = $('#dashSearch');
     if (sInp) sInp.onkeydown = (e) => { if (e.key === 'Enter') { S.userQ = { ...S.userQ, q: sInp.value, status: 'all', page: 1 }; location.hash = '#/korisnici'; } };
+    // grafikon se crta u stvarnoj širini (tekst ostaje iste veličine na svakom ekranu)
+    const drawChart = () => { const box = $('#chartBox'); if (box) box.innerHTML = areaChart(d.series, Math.max(300, Math.round(box.clientWidth))); };
+    drawChart();
+    S.chartRO?.disconnect();
+    if (window.ResizeObserver && $('#chartBox')) { let w = 0; S.chartRO = new ResizeObserver((e) => { const nw = Math.round(e[0].contentRect.width); if (Math.abs(nw - w) > 8) { w = nw; drawChart(); } }); S.chartRO.observe($('#chartBox')); }
     startLive();
   }
   const SRVCOLS = '1.5fr 1fr .7fr 1.4fr 1fr 1fr';
@@ -1218,6 +1308,13 @@
     copy: (d) => copy(d.v),
     newUser: (d, el, e) => { e.preventDefault(); newUser().catch(fail); },
     dashDays: (d) => { S.dashDays = Number(d.n); pageDash().catch(fail); },
+    dashBell: () => { const p = $('#bellPop'); if (p) p.hidden = !p.hidden; },
+    toggleTheme: () => {
+      const t = document.documentElement.dataset.theme === 'svijetla' ? 'tamna' : 'svijetla';
+      document.documentElement.dataset.theme = t;
+      try { localStorage.setItem('vp-theme', t); } catch { /* bez pamćenja */ }
+      pageDash().catch(fail);
+    },
     uStatus: (d) => { S.userQ = { ...S.userQ, status: d.k, page: 1 }; history.replaceState(null, '', '#/korisnici'); pageUsers(new URLSearchParams()).catch(fail); },
     uPage: (d) => { S.userQ.page = Number(d.p); pageUsers(new URLSearchParams()).catch(fail); },
     selOne: (d, el, e) => { e.stopPropagation(); el.checked ? S.sel.add(Number(d.id)) : S.sel.delete(Number(d.id)); const b = $('[data-a="bulk"]'); if (b) { b.disabled = !S.sel.size; b.textContent = `Masovne akcije${S.sel.size ? ` (${S.sel.size})` : ''}`; } },
@@ -1339,6 +1436,14 @@
     if (el.tagName === 'A' && el.getAttribute('href')?.startsWith('javascript')) e.preventDefault();
     fn(el.dataset, el, e);
   });
+  // Ctrl+K: pretraga; klik van zvona zatvara obavijesti
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      const i = $('#dashSearch') || $('.search input');
+      if (i) { e.preventDefault(); i.focus(); i.select(); }
+    }
+  });
+  document.addEventListener('click', (e) => { const p = $('#bellPop'); if (p && !p.hidden && !e.target.closest('#bellPop, [data-a="dashBell"]')) p.hidden = true; }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.closest?.('.tr.click') && !e.target.matches('input')) e.target.closest('.tr.click').click(); });
 
   // ------------------------------------------------------------------ start
