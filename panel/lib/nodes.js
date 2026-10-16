@@ -73,6 +73,7 @@ echo "Ako ne: journalctl -u vpn-agent -n 50"
 const lastIps = new Map();   // privremeno, samo za brojanje država; ne sprema se nigdje
 
 const LAST_ERR = new Map();
+const XBAD = new Map(), XDOWN = new Set();
 // broj uređaja po korisniku (različite IP adrese u zadnje 3 minute) — samo u memoriji
 const DEV = new Map();        // server id -> { t, counts: { userId: n } }
 const OVER = new Map();       // user id -> koliko javljanja zaredom je preko limita
@@ -138,6 +139,21 @@ async function handle(req, res, p) {
     const err = String(b.error || '').slice(0, 500);
     if (err && LAST_ERR.get(sv.id) !== err) { log('sistem', 'Server odbio konfiguraciju', `${sv.name}: ${err}`, 'error'); notify('n_server', `⚠️ ${sv.name}: ${err}`); }
     LAST_ERR.set(sv.id, err);
+    // Xray (VLESS/Shadowsocks) ne radi iako je server online: javi poslije 3 uzastopna javljanja (restart nije greška)
+    const wantXray = sv.enabled && !sv.maintenance && sv.reality_priv && (settings.get('proto_vless') || settings.get('proto_ss'));
+    if (wantXray && sv.last_seen) {
+      const bad = b.xray_ok ? 0 : (XBAD.get(sv.id) || 0) + 1;
+      XBAD.set(sv.id, bad);
+      if (bad === 3) {
+        log('sistem', 'Xray ne radi', `${sv.name}${err ? ': ' + err : ''}`, 'error');
+        notify('n_server', `🔴 ${sv.name}: VPN (Xray) ne radi! Kupci se ne mogu spojiti.${err ? '\n' + err : ''}\nAgent pokušava sam popraviti.`);
+        XDOWN.add(sv.id);
+      } else if (b.xray_ok && XDOWN.has(sv.id)) {
+        XDOWN.delete(sv.id);
+        log('sistem', 'Xray ponovo radi', sv.name);
+        notify('n_server', `🟢 ${sv.name}: VPN (Xray) ponovo radi.`);
+      }
+    }
     if (!sv.last_seen) {
       log('sistem', 'Server se prvi put javio', `${sv.name} (${host})`);
       notify('n_server', `🟢 Novi server ${sv.name} je online (${host})`);

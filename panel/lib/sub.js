@@ -7,6 +7,7 @@ const QR = require('../public/qr.js');
 const { send, esc, clientIp } = require('./http');
 const { geoIp } = require('./notify');
 const cbot = require('./cbot');
+const growth = require('./growth');
 
 // znak brenda (štit sa V) i neutralni štit za white-label
 const MARK = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M48 70h32l20 68v46z" fill="#E3172B"/><path d="M152 70h-32l-20 68v46z" fill="#9E0C1A"/><path d="M48 70h32l2 7H51z" fill="#FF4A5A"/><path d="M86 58h28l-14 38z" fill="#FF4A5A"/><path d="M100 58h14l-14 38z" fill="#E3172B"/>';
@@ -38,7 +39,7 @@ async function countCountry(req) {
   if (g?.cc) run('INSERT INTO countries (day, cc, n) VALUES (?, ?, 1) ON CONFLICT(day, cc) DO UPDATE SET n = n + 1', dayKey(now(), settings.get('timezone')), g.cc);
 }
 
-function page(u, link, s, owner, botName) {
+function page(u, link, s, owner, botName, reqUrl) {
   const st = vpn.userStatus(u);
   const label = { active: 'Aktivan', expiring: 'Ističe uskoro', grace: 'Istekao (grace period)', expired: 'Istekao', limited: 'Potrošen promet', disabled: 'Ugašen', devices: 'Previše uređaja (privremeno)' }[st];
   const color = { active: '#3ddc84', expiring: '#f5a524', grace: '#f5a524', expired: '#ff4d5e', limited: '#ff8a4d', disabled: '#9a9aa8', devices: '#ff8a4d' }[st];
@@ -51,6 +52,9 @@ function page(u, link, s, owner, botName) {
   const servers = vpn.serversForUser(u);
   const wg = s.proto_wg ? servers.filter((sv) => sv.wg_pub) : [];
   const enc = encodeURIComponent(link);
+  const gi = growth.appInfo(u), renew = gi.renew, ref = gi.ref;
+  const cur = ({ EUR: '€', USD: '$', BAM: 'KM ', CHF: 'CHF ' })[s.currency] || '€';
+  const paid = /[?&]placeno=1/.test(reqUrl || '');
   const brand = esc(wl ? owner.brand : s.brand);
   return `<!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${brand} · moj nalog</title><meta name="robots" content="noindex">
@@ -78,6 +82,13 @@ ${s.maintenance ? `<div class="note">${esc(s.maintenance_msg)}</div>` : ''}
 <div style="margin-top:12px"><div class="row"><span class="muted">Ističe</span><span>${new Date(u.expires_at).toLocaleDateString('bs-BA')}${days > 0 ? ` · još ${days} ${days === 1 ? 'dan' : 'dana'}` : ''}</span></div>
 <div class="row"><span class="muted">Promet</span><span>${fmtBytes(used)}${u.traffic_limit ? ` od ${fmtBytes(u.traffic_limit)}` : ' · neograničeno'}</span></div>
 ${u.traffic_limit ? `<div class="bar"><i style="width:${pct.toFixed(1)}%"></i></div>` : ''}</div></section>
+${paid ? '<div class="note" style="background:#0f2419;border-color:#1b4a33;color:#5fe0a0">Hvala! Uplata je primljena, nalog se produžava za par sekundi. Osvježi stranicu.</div>' : ''}
+${renew.length ? `<section class="card"><h2>Produži pretplatu</h2><p class="muted" style="margin-top:0">Plaćanje karticom (Stripe). Dani se dodaju na trenutni datum isteka.</p>
+<div style="display:flex;flex-direction:column;gap:8px">${renew.map((pl) => `<button class="btn${pl === renew[0] ? ' red' : ''}" type="button" onclick="pay(${pl.id},this)">${esc(pl.name)} · ${pl.days} dana · ${esc(cur)}${pl.price}</button>`).join('')}</div>
+<script>function pay(id,b){b.disabled=true;b.textContent='Otvaram plaćanje…';fetch(location.pathname.replace(/\/$/,'')+'/renew',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({plan_id:id})}).then(r=>r.json()).then(j=>{if(j.url)location.href=j.url;else{b.textContent=j.error||'Greška';b.disabled=false}}).catch(()=>{b.textContent='Greška, pokušaj ponovo';b.disabled=false})}</script></section>` : ''}
+${ref ? `<section class="card"><h2>Pozovi prijatelja</h2><p class="muted" style="margin-top:0">Kad prijatelj instalira aplikaciju, upiše tvoj kod i prvi put plati, obojica dobijete ${ref.days} dana gratis.</p>
+<div style="text-align:center;font:700 26px ui-monospace,Consolas,monospace;letter-spacing:3px;margin:8px 0">${esc(ref.code)}</div>
+<div class="muted" style="text-align:center">Pozvano: ${ref.invited} · nagrađeno: ${ref.rewarded}</div></section>` : ''}
 <section class="card"><h2>Spoji se u 3 koraka</h2>
 <p class="muted" style="margin:0 0 6px">1. Instaliraj aplikaciju &nbsp; 2. Uvezi profil &nbsp; 3. Klikni Spoji</p>
 ${QR.svg(link).replace('<svg ', '<svg class="qr" role="img" aria-label="QR kod za uvoz u aplikaciju" ')}
@@ -144,7 +155,7 @@ function appJson(u, s, link) {
 }
 
 async function handle(req, res, p) {
-  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app))?$/);
+  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app)|\/(renew))?$/);
   if (!m) return send(res, 404, 'Not found');
   const u = one('SELECT * FROM users WHERE sub_token = ?', m[1]);
   if (!u) return send(res, 404, 'Link nije ispravan ili je zamijenjen novim.');
@@ -153,7 +164,8 @@ async function handle(req, res, p) {
   const base = (s.sub_url || s.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`).replace(/\/+$/, '');
   const link = `${base}/s/${u.sub_token}`;
 
-  if (m[3]) return send(res, 200, appJson(u, s, link), { 'cache-control': 'no-store' });
+  if (m[3]) return send(res, 200, { ...appJson(u, s, link), ...growth.appInfo(u) }, { 'cache-control': 'no-store' });
+  if (m[4] && req.method === 'POST') return growth.renew(req, res, u, link);
   if (m[2]) {
     const sv = one('SELECT * FROM servers WHERE id = ? AND enabled = 1', Number(m[2]));
     if (!sv || !s.proto_wg || !vpn.serversForUser(u).some((x) => x.id === sv.id)) return send(res, 404, 'Server nije dostupan.');
@@ -168,7 +180,7 @@ async function handle(req, res, p) {
   countCountry(req).catch(() => {});
   const owner = u.owner_id ? one('SELECT brand, contact FROM admins WHERE id = ?', u.owner_id) : null;
   const wl = s.res_whitelabel && owner?.brand;
-  if (wantsHtml && s.customer_page) return send(res, 200, page(u, link, s, owner, await cbot.username().catch(() => null)), { 'content-type': 'text/html; charset=utf-8' });
+  if (wantsHtml && s.customer_page) return send(res, 200, page(u, link, s, owner, await cbot.username().catch(() => null), req.url), { 'content-type': 'text/html; charset=utf-8' });
 
   const links = vpn.CAN_CONNECT.has(vpn.userStatus(u)) ? vpn.subLinks(u) : [];
   const headers = {

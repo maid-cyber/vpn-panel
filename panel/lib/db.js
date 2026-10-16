@@ -110,6 +110,14 @@ addCol('servers', 'xray_version', "TEXT DEFAULT ''");
 addCol('servers', 'last_error', "TEXT DEFAULT ''");
 addCol('transactions', 'ext_id', 'TEXT');
 addCol('servers', 'tags', "TEXT DEFAULT ''");
+// probni nalozi iz aplikacije i preporuke (referral)
+addCol('users', 'ref_code', 'TEXT');
+addCol('users', 'referred_by', 'INTEGER');
+addCol('users', 'paid_once', 'INTEGER DEFAULT 0');
+addCol('users', 'trial_device', 'TEXT');
+db.exec(`CREATE TABLE IF NOT EXISTS trials (id INTEGER PRIMARY KEY AUTOINCREMENT, device TEXT, ip TEXT, ts INTEGER, user_id INTEGER);
+CREATE INDEX IF NOT EXISTS trials_device ON trials(device); CREATE INDEX IF NOT EXISTS trials_ip ON trials(ip);
+CREATE UNIQUE INDEX IF NOT EXISTS users_ref ON users(ref_code);`);
 // Double VPN / Multihop: promet ide kroz više servera redom (hops = JSON lista ID-jeva, prvi je ulaz, zadnji izlaz)
 db.exec(`CREATE TABLE IF NOT EXISTS chains (
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, hops TEXT NOT NULL, port INTEGER NOT NULL,

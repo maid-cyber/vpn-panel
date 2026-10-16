@@ -70,6 +70,10 @@ async function onRequest(req, res) {
     if (p.startsWith('/agent/') || p.startsWith('/install/')) return await nodes.handle(req, res, p);
     if (p.startsWith('/api/v1/')) return await apiv1.handle(req, res, p);
     if (p === '/stripe/webhook' && req.method === 'POST') return await require('./lib/stripe').webhook(req, res);
+    if (p === '/trial' && req.method === 'POST') {
+      const s0 = settings.load();
+      return await require('./lib/growth').trial(req, res, (s0.sub_url || s0.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`).replace(/\/+$/, ''));
+    }
     if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
 
     // dva ulaza: tajna admin adresa i (ako je uključeno) posebna adresa za resellere

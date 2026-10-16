@@ -115,6 +115,11 @@ const SCHEMA = [
     { key: 'app_webrtc_def', type: 'toggle', label: 'WebRTC zaštita uključena za nove', def: true },
     { key: 'app_boot', type: 'toggle', label: 'Automatsko povezivanje pri paljenju telefona', def: true },
     { key: 'app_history', type: 'toggle', label: 'Povijest aktivnosti u aplikaciji', sub: 'Kupac vidi produženja, promjene plana i blokade sa svog naloga', def: true },
+    { key: 'app_trial', type: 'toggle', label: 'Probni nalog iz aplikacije', sub: 'Dugme "Probaj besplatno" na prijavi. Koristi prvi aktivni plan označen kao probni (Planovi). Jedan po uređaju, jedan po IP adresi sedmično.', def: false },
+    { key: 'app_trial_cap', type: 'number', label: 'Najviše probnih naloga iz aplikacije dnevno', sub: 'Zaštita od zloupotrebe', def: 20 },
+    { key: 'renew_on', type: 'toggle', label: 'Kupac sam produžava karticom (Stripe)', sub: 'Dugme "Produži" u aplikaciji i na stranici kupca. Samo za tvoje kupce, ne za kupce resellera. Treba uključen Stripe (Plaćanja).', def: true },
+    { key: 'ref_on', type: 'toggle', label: 'Pozovi prijatelja (referral)', sub: 'Kupac dijeli svoj kod; kad prijatelj prvi put plati, obojica dobiju gratis dane', def: false },
+    { key: 'ref_days', type: 'number', label: 'Gratis dana za preporuku', def: 7 },
   ] },
   { id: 'backup', title: 'Backup', desc: 'Da ništa ne izgubiš.', rows: [
     { key: 'backup_on', type: 'toggle', label: 'Automatski backup baze', def: true },
