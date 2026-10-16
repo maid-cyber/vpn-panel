@@ -15,7 +15,7 @@ import tempfile
 import time
 import urllib.request
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
@@ -321,7 +321,7 @@ def apply_xray(cfg):
         LAST_ERROR = ""
         return True
     if not DRY:
-        tmp = XRAY_CONF + ".test"
+        tmp = XRAY_CONF[:-5] + ".test.json"   # Xray prepoznaje format po nastavku .json
         with open(tmp, "w") as f:
             f.write(text)
         test = subprocess.run([XRAY_BIN, "run", "-test", "-c", tmp], capture_output=True, text=True, timeout=30)
