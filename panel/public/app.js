@@ -157,6 +157,107 @@
     setTimeout(() => { for (const [k, v] of Object.entries(data)) { const el = $(`#modalForm [name="${k}"]`); if (el && el.type !== 'checkbox' && typeof v === 'string') el.value = v; } }, 0);
   }
 
+
+  // ------------------------------------------------------------------ globus iza prijave (canvas, bez vanjskih fajlova)
+  function startGlobe(cv) {
+    const ctx = cv.getContext('2d');
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const css = getComputedStyle(document.documentElement);
+    const acc = (css.getPropertyValue('--acc-hi') || '#ff5a6a').trim();
+    const rgb = (h) => { const m = h.replace('#', '').match(/../g) || ['ff', '5a', '6a']; return m.map((x) => parseInt(x, 16)).join(','); };
+    const A = rgb(acc.length === 7 ? acc : '#ff5a6a'), B = '120,160,255';
+    const inPoly = (x, y, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+    const dots = [];
+    for (let lat = -56; lat <= 76; lat += 1.5) {
+      const step = 1.5 / Math.max(0.25, Math.cos(lat * Math.PI / 180));
+      for (let lon = -180; lon < 180; lon += step) if (LAND.some((p) => inPoly(lon, lat, p))) dots.push([lon * Math.PI / 180, lat * Math.PI / 180]);
+    }
+    const CITIES = [[18.4, 43.9], [8.7, 50.1], [4.9, 52.4], [-0.1, 51.5], [-74, 40.7], [-79.4, 43.7], [-46.6, -23.5], [55.3, 25.2], [103.8, 1.35], [139.7, 35.7], [151.2, -33.9], [28, -26.2], [29, 41], [8.5, 47.4], [-118.2, 34], [77.2, 28.6], [37.6, 55.8], [-58.4, -34.6]]
+      .map(([lo, la]) => [lo * Math.PI / 180, la * Math.PI / 180]);
+    const stars = Array.from({ length: 140 }, () => [Math.random(), Math.random(), Math.random() * 1.2 + .3, Math.random() * 6.28]);
+    const arcs = [];
+    const newArc = () => { const a = CITIES[Math.floor(Math.random() * CITIES.length)]; let b; do { b = CITIES[Math.floor(Math.random() * CITIES.length)]; } while (b === a); return { a, b, t: 0, sp: 0.004 + Math.random() * 0.004 }; };
+    for (let i = 0; i < 9; i++) { const x = newArc(); x.t = Math.random(); arcs.push(x); }
+    const vec = ([lo, la]) => [Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo)];
+    const slerp = (p, q, t) => { const d = Math.acos(Math.min(1, p[0] * q[0] + p[1] * q[1] + p[2] * q[2])) || 1e-6, s1 = Math.sin((1 - t) * d) / Math.sin(d), s2 = Math.sin(t * d) / Math.sin(d); return [p[0] * s1 + q[0] * s2, p[1] * s1 + q[1] * s2, p[2] * s1 + q[2] * s2]; };
+    let W = 0, H = 0, R = 0, cx = 0, cy = 0, rot = -0.3, last = 0;
+    const tilt = -0.32, ct = Math.cos(tilt), st = Math.sin(tilt);
+    const proj = (v, r = 1) => { // rotacija oko y, pa nagib oko x
+      const cr = Math.cos(rot), sr = Math.sin(rot);
+      const x = v[0] * cr + v[2] * sr, z0 = -v[0] * sr + v[2] * cr;
+      const y = v[1] * ct - z0 * st, z = v[1] * st + z0 * ct;
+      return [cx + x * R * r, cy - y * R * r, z];
+    };
+    const size = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      R = Math.min(W * 0.48, H * 0.6, 720); cx = W / 2; cy = H * 0.6;
+      if (W < 700) { R = W * 0.85; cy = H - R * 0.55; }   // telefon: velika Zemlja na dnu ekrana
+    };
+    size();
+    window.addEventListener('resize', size);
+    function frame(ts) {
+      if (!cv.isConnected) { window.removeEventListener('resize', size); return; }
+      const dt = last ? Math.min(50, ts - last) : 16; last = ts;
+      if (!document.hidden && !reduce) rot += dt * 0.00007;
+      ctx.clearRect(0, 0, W, H);
+      // zvijezde
+      for (const s of stars) { ctx.globalAlpha = 0.25 + 0.35 * Math.abs(Math.sin(ts / 1400 + s[3])); ctx.fillStyle = '#cfd8ff'; ctx.fillRect(s[0] * W, s[1] * H, s[2], s[2]); }
+      ctx.globalAlpha = 1;
+      // atmosfera i kugla
+      let g = ctx.createRadialGradient(cx, cy, R * 0.85, cx, cy, R * 1.35);
+      g.addColorStop(0, `rgba(${B},.28)`); g.addColorStop(0.4, `rgba(${B},.06)`); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.35, 0, 6.29); ctx.fill();
+      g = ctx.createRadialGradient(cx - R * .35, cy - R * .45, R * .1, cx, cy, R);
+      g.addColorStop(0, '#13204a'); g.addColorStop(1, '#050a1c');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.29); ctx.fill();
+      ctx.strokeStyle = `rgba(${B},.35)`; ctx.lineWidth = 1.2; ctx.stroke();
+      // kopno (tačke), svjetlije prema sredini
+      for (const d of dots) {
+        const p = proj(vec(d));
+        if (p[2] <= 0) continue;
+        ctx.globalAlpha = 0.25 + 0.75 * p[2];
+        ctx.fillStyle = '#7fa2ff';
+        const r = 1 + 1.6 * p[2];
+        ctx.fillRect(p[0] - r / 2, p[1] - r / 2, r, r);
+      }
+      ctx.globalAlpha = 1;
+      // gradovi
+      for (const c of CITIES) {
+        const p = proj(vec(c)); if (p[2] <= 0.05) continue;
+        const pulse = (((ts / 1600 + c[0]) % 1) + 1) % 1;
+        ctx.strokeStyle = `rgba(${A},${(1 - pulse) * 0.7 * p[2]})`; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(p[0], p[1], 3 + pulse * 12, 0, 6.29); ctx.stroke();
+        ctx.fillStyle = `rgba(${A},${0.9 * p[2] + 0.1})`; ctx.beginPath(); ctx.arc(p[0], p[1], 2.4, 0, 6.29); ctx.fill();
+      }
+      // lukovi veza sa svjetlom koje putuje
+      for (let i = 0; i < arcs.length; i++) {
+        const a = arcs[i];
+        if (!reduce && !document.hidden) a.t += a.sp * dt / 16;
+        if (a.t > 1.6) { arcs[i] = newArc(); continue; }
+        const pa = vec(a.a), pb = vec(a.b), N = 48, head = Math.min(1, a.t), tail = Math.max(0, a.t - 0.6);
+        let prev = null;
+        for (let k = 0; k <= N; k++) {
+          const t = tail + (head - tail) * k / N;
+          const lift = 1 + 0.1 * Math.sin(Math.PI * t);
+          const p = proj(slerp(pa, pb, t), lift);
+          if (prev && p[2] > -0.15 && prev[2] > -0.15) {
+            ctx.strokeStyle = `rgba(${A},${(k / N) * 0.9})`; ctx.lineWidth = 1.6;
+            ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(p[0], p[1]); ctx.stroke();
+          }
+          prev = p;
+        }
+        if (a.t <= 1 && prev && prev[2] > -0.15) {
+          ctx.shadowColor = `rgb(${A})`; ctx.shadowBlur = 14; ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.arc(prev[0], prev[1], 2.6, 0, 6.29); ctx.fill(); ctx.shadowBlur = 0;
+        }
+      }
+      if (!reduce) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  const GLOBE = '<canvas class="globe-bg" id="globeBg" aria-hidden="true"></canvas>';
+
   // ------------------------------------------------------------------ prijava
   let portalInfo = null;
   async function loadPortal() {
@@ -165,7 +266,7 @@
     if (box && portalInfo.signup) box.innerHTML = '<span class="muted">Nemaš nalog?</span> <a href="#" data-a="showSignup">Postani reseller</a>';
   }
   function renderSignup() {
-    $('#app').innerHTML = `<div class="login"><form class="card" id="signupForm">
+    $('#app').innerHTML = `<div class="login">${GLOBE}<form class="card" id="signupForm">
       <div class="login-logo">${logo(64)}<div class="wordmark" style="font-size:24px">${wordHtml(wordParts(document.title.split(' · ')[0]).main)}</div><div class="login-hint">Registracija za resellere</div></div>
       <label class="field">Korisničko ime<input class="input" name="username" required minlength="3" maxlength="30" autocomplete="username"></label>
       <label class="field">Šifra (bar 8 znakova)<input class="input" name="password" type="password" required minlength="8" autocomplete="new-password"></label>
@@ -174,6 +275,7 @@
       <button class="btn red block" type="submit">Pošalji zahtjev</button>
       <p class="muted" id="signupMsg" role="alert" style="margin:0;min-height:20px"></p>
       <div style="text-align:center"><a href="#" data-a="showLogin">Nazad na prijavu</a></div></form></div>`;
+    startGlobe($('#globeBg'));
     $('#signupForm').onsubmit = async (e) => {
       e.preventDefault();
       try {
@@ -184,7 +286,7 @@
   }
   function renderLogin(need2fa, saved) {
     stopLive();
-    $('#app').innerHTML = `<div class="login"><form class="card" id="loginForm" autocomplete="on">
+    $('#app').innerHTML = `<div class="login">${GLOBE}<form class="card" id="loginForm" autocomplete="on">
       ${(() => { const w = wordParts(document.title.split(' · ')[0]); return `<div class="login-logo">${logo(92)}<div><div class="wordmark">${wordHtml(w.main)}</div>${w.sub ? `<div class="wordsub" style="justify-content:center;margin-top:10px"><span>${w.sub}</span></div>` : ''}</div><div class="login-hint">${need2fa ? 'Unesi kod iz aplikacije' : document.documentElement.dataset.portal === 'reseller' ? 'Reseller panel · prijava' : 'Prijava u panel'}</div></div>`; })()}
       ${need2fa ? `<label class="field">Kod iz aplikacije (2FA)<input class="input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label>
         <input type="hidden" name="username" value="${esc(saved.username)}"><input type="hidden" name="password" value="${esc(saved.password)}">`
@@ -193,6 +295,7 @@
       <button class="btn red block" type="submit">Prijavi se</button>
       <p class="muted" id="loginErr" role="alert" style="margin:0;min-height:20px;color:var(--bad)"></p>
       <div id="signupBox" style="text-align:center;font-size:13.5px"></div></form></div>`;
+    startGlobe($('#globeBg'));
     if (document.documentElement.dataset.portal === 'reseller' && !need2fa) loadPortal();
     $('#loginForm').onsubmit = async (e) => {
       e.preventDefault();

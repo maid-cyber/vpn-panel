@@ -366,3 +366,9 @@ body { background: radial-gradient(900px 500px at 12% -10%, rgba(47, 107, 255, .
   .kpis > .kpi:last-child { grid-column: 1 / -1; }
   .qa { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* globus iza prijave */
+.login { position: relative; overflow: hidden; }
+.globe-bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; }
+.login form { position: relative; z-index: 1; background: rgba(8, 14, 34, .62); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); border-color: rgba(120, 160, 255, .18); box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .8); }
+[data-theme="svijetla"] .login form { background: rgba(255, 255, 255, .82); }
