@@ -101,7 +101,7 @@ const SCHEMA = [
     { key: 'sub_announce', type: 'text', label: 'Poruka u aplikaciji i na stranici za kupce', sub: 'Podržavaju je Hiddify i neke druge aplikacije', def: '' },
     { key: 'customer_page', type: 'toggle', label: 'Stranica za kupce', sub: 'Status, QR kod i uputstva kad kupac otvori link u browseru', def: true },
     { key: 'support_contact', type: 'text', label: 'Kontakt podrške za kupce', sub: 'npr. Telegram @tvojvpn', def: '' },
-    { key: 'apps', type: 'multi', label: 'Preporučene aplikacije na stranici kupca', options: ['hiddify', 'v2rayng', 'streisand', 'v2box', 'happ', 'shadowrocket'], labels: ['Hiddify', 'v2rayNG', 'Streisand', 'V2Box', 'Happ', 'Shadowrocket'], def: 'hiddify,v2rayng,streisand,v2box' },
+    { key: 'apps', type: 'multi', label: 'Preporučene aplikacije na stranici kupca', options: ['veltrix', 'hiddify', 'v2rayng', 'streisand', 'v2box', 'happ', 'shadowrocket'], labels: ['Veltrix VPN (naša)', 'Hiddify', 'v2rayNG', 'Streisand', 'V2Box', 'Happ', 'Shadowrocket'], def: 'veltrix,hiddify,v2rayng,streisand,v2box' },
     { key: 'msg_template', type: 'textarea', label: 'Poruka za kupca (dugme "Pošalji kupcu")', sub: 'Zamjene: {korisnik} {plan} {istice} {dana} {link} {brend} {podrska}', def: 'Zdravo! 👋\n\nTvoj {brend} je spreman ✅\nPlan: {plan}\nVrijedi do: {istice}\n\n1️⃣ Instaliraj aplikaciju Hiddify (iPhone, Android ili računar)\n2️⃣ Otvori ovaj link i klikni „Dodaj u Hiddify“, ili skeniraj QR kod:\n{link}\n3️⃣ Klikni dugme za spajanje i to je to.\n\nPomoć: {podrska}' },
   ] },
   { id: 'aplikacija', title: 'Veltrix aplikacija', desc: 'Funkcije u Android aplikaciji. Isključena funkcija se kupcu ne prikazuje; "Uključeno za nove" je početno stanje koje kupac može promijeniti.', rows: [

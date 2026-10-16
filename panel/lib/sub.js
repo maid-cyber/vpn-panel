@@ -15,6 +15,7 @@ const PLAIN = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38
 
 // aplikacije: ime, platforme, dubinski link za uvoz pretplate
 const APPS = {
+  veltrix: { name: 'Veltrix VPN', os: 'Android, Windows', href: (l) => `veltrix://import?url=${encodeURIComponent(l)}` },
   hiddify: { name: 'Hiddify', os: 'Android, iPhone, Windows, Mac', href: (l, n) => `hiddify://import/${l}#${encodeURIComponent(n)}` },
   v2rayng: { name: 'v2rayNG', os: 'Android', href: (l, n) => `v2rayng://install-sub?url=${encodeURIComponent(l)}&name=${encodeURIComponent(n)}` },
   streisand: { name: 'Streisand', os: 'iPhone, Mac', href: (l, n) => `streisand://import/${l}#${encodeURIComponent(n)}` },
@@ -98,7 +99,9 @@ ${apps.map((k, n) => `<a class="btn${n === 0 ? ' red' : ''}" href="${esc(APPS[k]
 <button class="btn" type="button" onclick="navigator.clipboard.writeText('${esc(link)}').then(()=>{this.textContent='Kopirano ✓'})">Kopiraj link</button>
 </div></section>
 <section class="card"><h2>Aplikacije</h2>
-${apps.map((k, n) => `<details${n === 0 ? ' open' : ''}><summary>${APPS[k].name} · <span class="muted">${APPS[k].os}</span></summary><p class="muted">Instaliraj ${APPS[k].name} iz App Storea, Google Playa ili sa njihove stranice. Zatim klikni "Otvori u ${APPS[k].name}" gore, ili u aplikaciji klikni + i skeniraj QR kod / zalijepi link.</p></details>`).join('')}
+${apps.map((k, n) => k === 'veltrix'
+    ? `<details${n === 0 ? ' open' : ''}><summary>Veltrix VPN · <span class="muted">Android, Windows</span></summary><p class="muted">Naša aplikacija. Preuzmi je, otvori i zalijepi link ili skeniraj QR kod.</p><a class="btn" href="https://github.com/maid-cyber/veltrix-app/releases">Preuzmi (Android .apk / Windows Setup)</a></details>`
+    : `<details${n === 0 ? ' open' : ''}><summary>${APPS[k].name} · <span class="muted">${APPS[k].os}</span></summary><p class="muted">Instaliraj ${APPS[k].name} iz App Storea, Google Playa ili sa njihove stranice. Zatim klikni "Otvori u ${APPS[k].name}" gore, ili u aplikaciji klikni + i skeniraj QR kod / zalijepi link.</p></details>`).join('')}
 </section>
 ${botName ? `<section class="card"><h2>Podsjetnici na Telegram</h2><p class="muted" style="margin-top:0">${u.tg_chat ? 'Telegram je povezan ✓ Javit ćemo ti prije isteka.' : 'Poveži Telegram i javit ćemo ti prije nego nalog istekne. Možeš i pitati za stanje naloga.'}</p>
 <a class="btn" href="https://t.me/${esc(botName)}?start=${esc(u.sub_token)}">${u.tg_chat ? 'Otvori bota' : 'Poveži Telegram'}</a></section>` : ''}

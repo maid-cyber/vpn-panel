@@ -242,8 +242,23 @@ Povezani kupci dobijaju podsjetnike pred istek i tvoje poruke, a sami mogu pitat
 - **S3:** upiši endpoint, regiju, bucket i ključeve u Postavke → Backup (Backblaze B2, Cloudflare R2, Wasabi ili AWS) i klikni **Probaj S3**. Svaki backup ode i tamo.
 - **Ažuriranje:** u Postavke → Sistem vidiš svoju i najnoviju verziju. Ažuriraš klikom na **Ažuriraj**, a dugme proradi nakon prvog ručnog ažuriranja na verziju 1.2.0. Log ažuriranja je u `/var/log/vpn-panel-update.log`.
 
+## 15. Veltrix aplikacija (Android i Windows)
+
+Izvorni kod i instalacije su u repozitoriju `maid-cyber/veltrix-app` (Releases). Aplikacija čita nalog sa `/s/TOKEN/app`.
+
+- **Postavke → Veltrix aplikacija:** koje funkcije kupac vidi (Kill Switch, DNS, split tunneling, IP leak, WebRTC, povijest) i šta je uključeno za nove.
+- **Oznake servera** (Serveri → Uredi): P2P, Streaming, Gaming, Specijalni. Na P2P serverima torrent radi i kad je blokada uključena.
+- **Double VPN i Multihop** (Serveri → Novi lanac): 2 do 4 servera redom. Port lanca mora biti otvoren na svim serverima osim zadnjeg (agent ga otvori u ufw-u; Hetzner Cloud Firewall otvori ručno).
+
+## 16. Probni nalog, plaćanje karticom i preporuke
+
+- **Probni nalog iz aplikacije:** Postavke → Veltrix aplikacija → "Probni nalog iz aplikacije". Koristi prvi aktivni plan označen kao probni. Jedan po uređaju, jedan po IP adresi sedmično i dnevni limit.
+- **Kupac sam produžava karticom:** treba uključen Stripe (Postavke → Plaćanja) i planovi sa cijenom. Dugme "Produži" se pojavi u aplikaciji i na stranici kupca. Uplata se vidi u Transakcijama, a nalog se produži sam. Samo za tvoje kupce, ne za kupce resellera.
+- **Pozovi prijatelja:** svaki kupac ima kod. Prijatelj ga upiše kod "Probaj besplatno"; kad prvi put plati, obojica dobiju gratis dane (Postavke → Veltrix aplikacija).
+- **Telegram:** ako Xray na serveru ne radi duže od 3 javljanja, stiže upozorenje, i ponovo kad proradi.
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.
 - **Panel na engleskom:** još ne postoji.
-- **Mobilne i desktop aplikacije pod tvojim brendom:** dolaze kasnije. Do tada kupci koriste Hiddify, v2rayNG, Streisand, V2Box, Happ ili Shadowrocket s pretplatnim linkom.
+- **iPhone aplikacija:** treba Apple Developer nalog. Do tada iPhone kupci koriste Hiddify ili Streisand.
