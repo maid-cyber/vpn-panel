@@ -72,6 +72,7 @@ echo "Ako ne: journalctl -u vpn-agent -n 50"
 
 const lastIps = new Map();   // privremeno, samo za brojanje država; ne sprema se nigdje
 
+const LAST_ERR = new Map();
 async function handle(req, res, p) {
   if (p === '/agent/agent.py' && req.method === 'GET') {
     return send(res, 200, fs.readFileSync(AGENT_FILE), { 'content-type': 'text/x-python; charset=utf-8' });
@@ -107,6 +108,10 @@ async function handle(req, res, p) {
       applied_hash = ?, xray_ok = ?, wg_ok = ?, host = ?, traffic_month = traffic_month + ? WHERE id = ?`,
     t, Number(b.cpu) || 0, Number(b.ram) || 0, Number(b.net_mbps) || 0, Number(b.online) || 0, Number(b.uptime) || 0, String(b.version || ''),
     String(b.applied_hash || ''), b.xray_ok ? 1 : 0, b.wg_ok ? 1 : 0, host, total, sv.id);
+    // greška pri primjeni konfiguracije na serveru: zapiši jednom u logove
+    const err = String(b.error || '').slice(0, 500);
+    if (err && LAST_ERR.get(sv.id) !== err) { log('sistem', 'Server odbio konfiguraciju', `${sv.name}: ${err}`, 'error'); notify('n_server', `⚠️ ${sv.name}: ${err}`); }
+    LAST_ERR.set(sv.id, err);
     if (!sv.last_seen) {
       log('sistem', 'Server se prvi put javio', `${sv.name} (${host})`);
       notify('n_server', `🟢 Novi server ${sv.name} je online (${host})`);

@@ -15,7 +15,7 @@ import tempfile
 import time
 import urllib.request
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
@@ -177,20 +177,93 @@ def write_if_changed(path, text):
     return True
 
 
+LAST_ERROR = ""
+
+
+def _clients(cfg):
+    for ib in (cfg or {}).get("inbounds", []):
+        if ib.get("tag") == "vless":
+            return {c["email"]: c for c in ib["settings"]["clients"]}
+    return {}
+
+
+def _without_clients(cfg):
+    c = json.loads(json.dumps(cfg))
+    for ib in c.get("inbounds", []):
+        if ib.get("tag") == "vless":
+            ib["settings"]["clients"] = []
+    return c
+
+
+def _hot_update(old, new):
+    """Dodaje i uklanja korisnike preko Xray API-ja, bez restarta (spojeni ostaju spojeni)."""
+    if not os.path.exists(XRAY_BIN) or not service_ok("xray"):
+        return False
+    if "HandlerService" not in (old.get("api") or {}).get("services", []):
+        return False
+    a, b = _clients(old), _clients(new)
+    removed = [e for e in a if e not in b or a[e] != b[e]]
+    added = [b[e] for e in b if e not in a or a[e] != b[e]]
+    try:
+        if removed:
+            r = subprocess.run([XRAY_BIN, "api", "rmu", "--server=127.0.0.1:10085", "-tag=vless"] + removed,
+                               capture_output=True, text=True, timeout=30)
+            if r.returncode != 0:
+                log("rmu nije uspio:", (r.stderr or r.stdout)[-300:])
+                return False
+        if added:
+            ib = next(i for i in new["inbounds"] if i.get("tag") == "vless")
+            part = {"inbounds": [{**ib, "settings": {**ib["settings"], "clients": added}}]}
+            with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+                json.dump(part, f)
+            try:
+                r = subprocess.run([XRAY_BIN, "api", "adu", "--server=127.0.0.1:10085", f.name],
+                                   capture_output=True, text=True, timeout=30)
+            finally:
+                os.unlink(f.name)
+            if r.returncode != 0:
+                log("adu nije uspio:", (r.stderr or r.stdout)[-300:])
+                return False
+        log(f"Korisnici ažurirani bez restarta: +{len(added)} −{len(removed)}")
+        return True
+    except Exception as e:  # noqa: BLE001
+        log("Ažuriranje bez restarta nije uspjelo:", e)
+        return False
+
+
 def apply_xray(cfg):
+    global LAST_ERROR
     if not cfg:
         sh("systemctl disable --now xray")
         return False
-    changed = write_if_changed(XRAY_CONF, json.dumps(cfg, indent=1))
-    if changed:
-        if not DRY:
-            test = subprocess.run([XRAY_BIN, "run", "-test", "-c", XRAY_CONF], capture_output=True, text=True, timeout=30)
-            if test.returncode != 0:
-                log("Xray konfiguracija nije ispravna:", test.stdout[-400:], test.stderr[-400:])
-                return False
-        sh("systemctl enable xray")
-        sh("systemctl restart xray")
-        log("Xray konfiguracija primijenjena,", len(cfg["inbounds"][1]["settings"]["clients"]), "korisnika")
+    text = json.dumps(cfg, indent=1)
+    try:
+        with open(XRAY_CONF) as f:
+            old = json.load(f)
+    except (OSError, ValueError):
+        old = None
+    if old == cfg and (DRY or service_ok("xray")):
+        return True
+    # samo promjena korisnika: bez restarta
+    if old and not DRY and _without_clients(old) == _without_clients(cfg) and _hot_update(old, cfg):
+        write_if_changed(XRAY_CONF, text)
+        LAST_ERROR = ""
+        return True
+    if not DRY:
+        tmp = XRAY_CONF + ".test"
+        with open(tmp, "w") as f:
+            f.write(text)
+        test = subprocess.run([XRAY_BIN, "run", "-test", "-c", tmp], capture_output=True, text=True, timeout=30)
+        os.unlink(tmp)
+        if test.returncode != 0:
+            LAST_ERROR = ("Xray odbio konfiguraciju: " + (test.stdout + test.stderr).strip()[-400:])
+            log(LAST_ERROR)
+            return False
+    write_if_changed(XRAY_CONF, text)
+    sh("systemctl enable xray")
+    sh("systemctl restart xray")
+    LAST_ERROR = ""
+    log("Xray konfiguracija primijenjena (restart),", len(_clients(cfg)), "korisnika")
     return True
 
 
@@ -293,6 +366,7 @@ def main():
                 "version": VERSION, "cpu": meter.cpu(), "ram": meter.ram(), "net_mbps": meter.net_mbps(iface),
                 "uptime": meter.uptime(), "online": xonline + wonline, "users": pending, "ips": ips[:200],
                 "applied_hash": applied, "xray_ok": service_ok("xray"), "wg_ok": service_ok("wg-quick@wg0"),
+                "error": LAST_ERROR,
             }
             r = request(panel, token, "/agent/heartbeat", beat)
             pending = {}

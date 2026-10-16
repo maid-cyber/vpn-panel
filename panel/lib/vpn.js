@@ -46,27 +46,34 @@ function serverAllowed(plan, serverId) {
 }
 
 // ---------- konfiguracija za jedan server ----------
+// AdGuard DNS: 94.140.14.14 blokira reklame i praćenje, 94.140.14.15 (Family) još i stranice za odrasle
+function filterDns(s) {
+  if (s.block_adult) return '94.140.14.15';
+  if (s.block_ads) return '94.140.14.14';
+  return s.dns || '1.1.1.1';
+}
+
 function nodeConfig(server) {
   const plans = Object.fromEntries(all('SELECT * FROM plans').map((p) => [p.id, p]));
   const t = now();
   const users = all('SELECT id, uuid, wg_pub, disabled, expires_at, traffic_limit, traffic_up, traffic_down, plan_id FROM users')
     .filter((u) => CAN_CONNECT.has(userStatus(u, t)) && serverAllowed(plans[u.plan_id], server.id));
   const s = settings.load();
-  const dns = s.dns || '1.1.1.1';
 
   let xray = null;
   if (s.proto_vless && server.reality_priv) {
-    const rules = [{ type: 'field', inboundTag: ['api'], outboundTag: 'api' }];
+    // DNS kupca (port 53) ide u Xray DNS: tako blokiranje radi i kad stranica sakrije ime (ECH, šifrovani SNI)
+    const rules = [{ type: 'field', inboundTag: ['api'], outboundTag: 'api' }, { type: 'field', inboundTag: ['vless'], port: '53', outboundTag: 'dns-out' }];
     if (s.block_private) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'block' });
     if (s.block_torrent) rules.push({ type: 'field', protocol: ['bittorrent'], outboundTag: 'block' });
     if (s.block_ads) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
     if (s.block_adult) rules.push({ type: 'field', domain: ['geosite:category-porn'], outboundTag: 'block' });
     xray = {
       log: { loglevel: 'warning', access: 'none' },
-      api: { tag: 'api', services: ['StatsService'] },
+      api: { tag: 'api', services: ['StatsService', 'HandlerService'] },
       stats: {},
       policy: { levels: { 0: { statsUserUplink: true, statsUserDownlink: true } } },
-      dns: { servers: [dns] },
+      dns: { servers: [filterDns(s)], queryStrategy: 'UseIPv4' },
       inbounds: [
         { tag: 'api', listen: '127.0.0.1', port: 10085, protocol: 'dokodemo-door', settings: { address: '127.0.0.1' } },
         {
@@ -79,7 +86,7 @@ function nodeConfig(server) {
           sniffing: { enabled: true, destOverride: ['http', 'tls', 'quic'] },
         },
       ],
-      outbounds: [{ protocol: 'freedom', tag: 'direct', settings: { domainStrategy: 'UseIPv4' } }, { protocol: 'blackhole', tag: 'block' }],
+      outbounds: [{ protocol: 'freedom', tag: 'direct', settings: { domainStrategy: 'UseIPv4' } }, { protocol: 'blackhole', tag: 'block' }, { protocol: 'dns', tag: 'dns-out' }],
       routing: { domainStrategy: 'IPIfNonMatch', rules },
     };
   }
@@ -110,7 +117,7 @@ function vlessLink(u, sv) {
   return `vless://${u.uuid}@${sv.host}:${sv.vless_port}?${q.toString()}#${encodeURIComponent(name)}`;
 }
 function wgConfig(u, sv) {
-  const dns = settings.get('block_ads') ? '94.140.14.14' : (settings.get('dns') || '1.1.1.1');
+  const dns = filterDns(settings.load());
   return `[Interface]\nPrivateKey = ${u.wg_priv}\nAddress = ${wgIp(u.id)}/32\nDNS = ${dns}\n\n[Peer]\nPublicKey = ${sv.wg_pub}\nEndpoint = ${sv.host}:${sv.wg_port}\nAllowedIPs = 0.0.0.0/0\nPersistentKeepalive = 25\n`;
 }
 function subLinks(u) {
