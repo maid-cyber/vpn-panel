@@ -50,6 +50,26 @@ function serverAllowed(plan, serverId) {
   return !l.length || l.includes(serverId);
 }
 
+// ---------- oznake servera i lanci (Double VPN / Multihop) ----------
+const TAGS = ['p2p', 'streaming', 'gaming', 'special'];
+const serverTags = (sv) => String(sv?.tags || '').split(',').map((x) => x.trim()).filter((x) => TAGS.includes(x));
+// UUID "prenosnika" između servera u lancu: izveden iz tajne lanca, isti na svim serverima
+function relayUuid(chain) {
+  const h = crypto.createHash('sha256').update('relay:' + chain.secret).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+const chainHops = (c) => { try { return JSON.parse(c.hops).map(Number); } catch { return []; } };
+function chainServers(c) {
+  const byId = Object.fromEntries(all('SELECT * FROM servers').map((sv) => [sv.id, sv]));
+  return chainHops(c).map((id) => byId[id]).filter(Boolean);
+}
+// lanac radi samo ako su svi serveri upaljeni, imaju Reality ključ i adresu
+function chainUsable(c, hops = chainServers(c)) {
+  return c.enabled && hops.length >= 2 && hops.length === chainHops(c).length && hops.every((sv) => sv.enabled && !sv.maintenance && sv.reality_pub && sv.host);
+}
+const chainKind = (c) => (chainHops(c).length > 2 ? 'multihop' : 'double');
+const realityClient = (sv) => ({ show: false, fingerprint: 'chrome', serverName: sv.sni, publicKey: sv.reality_pub, shortId: sv.short_id, spiderX: '/' });
+
 // ---------- konfiguracija za jedan server ----------
 // AdGuard DNS: 94.140.14.14 blokira reklame i praćenje, 94.140.14.15 (Family) još i stranice za odrasle
 function filterDns(s) {
@@ -72,7 +92,8 @@ function nodeConfig(server) {
     // DNS kupca (port 53) ide u Xray DNS: tako blokiranje radi i kad stranica sakrije ime (ECH, šifrovani SNI)
     const rules = [{ type: 'field', inboundTag: ['api'], outboundTag: 'api' }, { type: 'field', inboundTag: tags, port: '53', outboundTag: 'dns-out' }];
     if (s.block_private) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'block' });
-    if (s.block_torrent) rules.push({ type: 'field', protocol: ['bittorrent'], outboundTag: 'block' });
+    // P2P serveri dozvoljavaju torrent, ostali ga blokiraju (ako je blokada uključena)
+    if (s.block_torrent && !serverTags(server).includes('p2p')) rules.push({ type: 'field', protocol: ['bittorrent'], outboundTag: 'block' });
     if (s.block_ads) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
     if (s.block_adult) rules.push({ type: 'field', domain: ['geosite:category-porn'], outboundTag: 'block' });
     xray = {
@@ -102,6 +123,7 @@ function nodeConfig(server) {
       outbounds: [{ protocol: 'freedom', tag: 'direct', settings: { domainStrategy: 'UseIPv4' } }, { protocol: 'blackhole', tag: 'block' }, { protocol: 'dns', tag: 'dns-out' }],
       routing: { domainStrategy: 'IPIfNonMatch', rules },
     };
+    if (s.proto_vless) addChains(xray, server, users, plans, t);
   }
 
   let wg = null;
@@ -114,6 +136,44 @@ function nodeConfig(server) {
   const body = { xray, wg, user_ids: users.map((u) => u.id) };
   const hash = crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex').slice(0, 16);
   return { hash, ...body };
+}
+
+// Lanci: na ulaznom i srednjem serveru poseban inbound (port lanca) koji sav promet šalje dalje na sljedeći server.
+// Izlazni server prima promet kao običan VLESS korisnik ("relay"), pa tamo važe DNS filteri i blokade.
+function addChains(xray, server, users, plans) {
+  for (const c of all('SELECT * FROM chains WHERE enabled = 1')) {
+    const hops = chainServers(c);
+    const i = hops.findIndex((sv) => sv.id === server.id);
+    if (i < 0 || !chainUsable(c, hops)) continue;
+    const relay = { id: relayUuid(c), email: `relay${c.id}`, flow: 'xtls-rprx-vision' };
+    if (i === hops.length - 1) {
+      xray.inbounds.find((ib) => ib.tag === 'vless')?.settings.clients.push(relay);
+      continue;
+    }
+    const exit = hops[hops.length - 1], next = hops[i + 1];
+    const clients = i === 0
+      ? users.filter((u) => serverAllowed(plans[u.plan_id], exit.id)).map((u) => ({ id: u.uuid, email: `u${u.id}`, flow: 'xtls-rprx-vision' }))
+      : [relay];
+    const tag = `chain${c.id}`;
+    xray.inbounds.push({
+      tag, listen: '0.0.0.0', port: c.port, protocol: 'vless',
+      settings: { clients, decryption: 'none' },
+      streamSettings: { network: 'tcp', security: 'reality', realitySettings: { show: false, dest: `${server.sni}:443`, xver: 0, serverNames: [server.sni], privateKey: server.reality_priv, shortIds: [server.short_id] } },
+    });
+    xray.outbounds.push({
+      tag, protocol: 'vless',
+      settings: { vnext: [{ address: next.host, port: i + 1 === hops.length - 1 ? next.vless_port : c.port, users: [{ id: relay.id, encryption: 'none', flow: 'xtls-rprx-vision' }] }] },
+      streamSettings: { network: 'tcp', security: 'reality', realitySettings: realityClient(next) },
+    });
+    xray.routing.rules.splice(1, 0, { type: 'field', inboundTag: [tag], outboundTag: tag });
+  }
+}
+
+/** Lanci koje kupac smije koristiti (izlazni server mora biti u njegovom planu). */
+function chainsForUser(u) {
+  const plan = u.plan_id ? one('SELECT * FROM plans WHERE id = ?', u.plan_id) : null;
+  return all('SELECT * FROM chains WHERE enabled = 1 ORDER BY id').map((c) => ({ c, hops: chainServers(c) }))
+    .filter(({ c, hops }) => chainUsable(c, hops) && serverAllowed(plan, hops[hops.length - 1].id));
 }
 
 // ---------- linkovi za kupca ----------
@@ -154,5 +214,5 @@ function subLinks(u) {
 
 module.exports = {
   realityKeys, wgKeys, shortId, uuid, subToken, wgIp, pickSni, userStatus, CAN_CONNECT,
-  nodeConfig, serversForUser, vlessLink, ssLink, wgConfig, subLinks, filterDns, planServers, FLAGS, DAY,
+  nodeConfig, serversForUser, chainsForUser, chainKind, chainHops, chainServers, chainUsable, serverTags, TAGS, relayUuid, vlessLink, ssLink, wgConfig, subLinks, filterDns, planServers, FLAGS, DAY,
 };

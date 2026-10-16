@@ -847,8 +847,8 @@
 
   // ================================================================== SERVERI
   async function pageServers() {
-    const servers = await GET('servers');
-    S.servers = servers;
+    const [servers, chains] = await Promise.all([GET('servers'), GET('chains').catch(() => [])]);
+    S.servers = servers; S.chains = chains;
     const on = servers.filter((s) => s.status === 'online'), off = servers.filter((s) => s.status === 'offline');
     const cap = servers.filter((s) => s.enabled).reduce((a, s) => a + s.capacity, 0), conn = on.reduce((a, s) => a + s.online, 0);
     const tm = servers.reduce((a, s) => a + (s.traffic_month || 0), 0), cost = servers.filter((s) => s.enabled).reduce((a, s) => a + (s.cost || 0), 0);
@@ -860,11 +860,12 @@
         <div class="stat"><div class="l"><span>Promet ovaj mjesec</span>${ic('down')}</div><div class="v">${bytes(tm)}</div><div class="s muted">svi serveri</div></div>
         <div class="stat"><div class="l"><span>Trošak servera</span>${ic('money')}</div><div class="v">${money(cost)}</div><div class="s muted">mjesečno</div></div>
       </section>
+      ${chainsHtml(chains, servers)}
       ${servers.length ? `<section class="grid-auto">${servers.map((s) => `<article class="card srv ${s.status === 'offline' ? 'off' : ''}">
         <div style="display:flex;gap:12px;align-items:flex-start"><span class="cc">${flag(s.country)}</span>
           <div style="flex:1;min-width:0"><b style="font-size:15px">${esc(s.name)}</b><div class="muted" style="font-size:12.5px">${esc([s.city, s.provider, s.host].filter(Boolean).join(' · ')) || 'čeka prvo javljanje'}</div></div>
           <span data-live-srv="${s.id}">${srvStatus(s)}</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${S.me && s.xray_ok ? '<span class="tag t-grey">VLESS Reality</span>' : ''}${s.wg_ok ? '<span class="tag t-grey">WireGuard</span>' : ''}${s.status === 'pending' ? '<span class="tag t-warn">nije instaliran</span>' : ''}${s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${(s.tags || []).map((t) => `<span class="tag t-info">${esc(TAG_LABEL[t] || t)}</span>`).join('')}${S.me && s.xray_ok ? '<span class="tag t-grey">VLESS Reality</span>' : ''}${s.wg_ok ? '<span class="tag t-grey">WireGuard</span>' : ''}${s.status === 'pending' ? '<span class="tag t-warn">nije instaliran</span>' : ''}${s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}</div>
         <div class="meters">${meter('CPU', s.status === 'online' ? s.cpu : null)}${meter('RAM', s.status === 'online' ? s.ram : null)}${meter('Popunjeno', s.capacity ? s.online / s.capacity * 100 : 0)}</div>
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--soft);font-size:13px;padding-top:10px;border-top:1px solid var(--row)">
           <span><b>${s.online}</b> / ${s.capacity} spojeno</span><span>${bytes(s.traffic_month)} / mj.</span><span class="dim">${s.last_seen ? 'javio se ' + ago(s.last_seen) : 'nije se javio'}</span></div>
@@ -879,6 +880,40 @@
           <button class="btn red" data-a="newServer">${ic('plus')}Dodaj server</button></section>`}`;
     startLive();
   }
+  const TAG_LABEL = { p2p: 'P2P / Torrent', streaming: 'Streaming', gaming: 'Gaming', special: 'Specijalni' };
+  // ---------- Double VPN / Multihop
+  function chainsHtml(chains, servers) {
+    const flagName = (h) => { const sv = servers.find((x) => x.id === h); return sv ? `<span class="tag t-grey">${esc(sv.country || '')} ${esc(sv.name)}</span>` : '<span class="tag t-bad">obrisan</span>'; };
+    return `<section class="card p">
+      <div class="ch" style="margin-bottom:8px"><h2>${ic('link')}Double VPN i Multihop</h2>${can('servers') ? `<button class="btn sm red" data-a="editChain">${ic('plus')}Novi lanac</button>` : ''}</div>
+      <p class="muted" style="margin:0 0 12px;font-size:13px">Promet kupca ide kroz 2 servera (Double VPN) ili 3–4 servera (Multihop). Kupac vidi lanac kao posebnu lokaciju u aplikaciji. Sajtovi vide IP zadnjeg servera.</p>
+      ${chains.length ? chains.map((c) => `<div class="list-item" style="margin-bottom:8px;flex-wrap:wrap">
+          <span style="display:flex;flex-direction:column;gap:6px"><b>${esc(c.name)} <span class="tag ${c.kind === 'multihop' ? 't-info' : 't-ok'}">${c.kind === 'multihop' ? 'Multihop' : 'Double VPN'}</span>${c.enabled ? '' : ' <span class="tag t-grey">ugašen</span>'}${c.enabled && !c.usable ? ' <span class="tag t-warn">neki server ne radi ili nema adresu</span>' : ''}</b>
+            <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${c.hops.map(flagName).join('<span class="dim">→</span>')}<span class="dim mono" style="font-size:12px">port ${c.port}</span></span></span>
+          ${can('servers') ? `<button class="btn sm" data-a="editChain" data-id="${c.id}">Uredi</button><button class="btn sm warnb" data-a="toggleChain" data-id="${c.id}">${c.enabled ? 'Ugasi' : 'Upali'}</button><button class="btn sm danger" data-a="delChain" data-id="${c.id}">Obriši</button>` : ''}</div>`).join('')
+        : `<div class="muted" style="font-size:13px">${servers.length < 2 ? 'Za lanac trebaju bar 2 servera. Dodaj još jedan server, pa napravi lanac.' : 'Još nema lanaca.'}</div>`}
+    </section>`;
+  }
+  async function editChain(id) {
+    const c = id ? S.chains.find((x) => x.id === Number(id)) : null;
+    const servers = S.servers;
+    if (servers.length < 2) return toast('Za lanac trebaju bar 2 servera.', true);
+    const opts = (sel) => `<option value="">— nema —</option>${servers.map((s) => `<option value="${s.id}" ${sel === s.id ? 'selected' : ''}>${esc(s.country || '')} ${esc(s.name)}</option>`).join('')}`;
+    const h = c ? c.hops : [];
+    const usedPorts = new Set((S.chains || []).map((x) => x.port));
+    let port = 20001; while (usedPorts.has(port)) port++;
+    const r = await formLoop(`<h2>${c ? 'Uredi lanac' : 'Novi lanac servera'}</h2>
+      <p class="muted" style="margin:0">Kupac se spaja na prvi server, a internet vidi zadnji. 2 servera = Double VPN, 3 ili 4 = Multihop.</p>
+      <label class="field">Ime (kupac ga vidi)<input class="input" name="name" required value="${esc(c?.name || '')}" placeholder="npr. Njemačka → Švicarska"></label>
+      <div class="row2"><label class="field">1. ulazni server<select class="input" name="h0" required>${opts(h[0])}</select></label><label class="field">2. server<select class="input" name="h1" required>${opts(h[1])}</select></label></div>
+      <div class="row2"><label class="field">3. server (Multihop)<select class="input" name="h2">${opts(h[2])}</select></label><label class="field">4. server<select class="input" name="h3">${opts(h[3])}</select></label></div>
+      <label class="field">Port lanca (TCP)<input class="input" name="port" value="${c?.port || port}" inputmode="numeric"></label>
+      <p class="dim" style="margin:0;font-size:12.5px">Port mora biti otvoren na svim serverima osim zadnjeg. Agent ga sam otvori u ufw-u; ako koristiš Hetzner Cloud Firewall, dodaj ga i tamo.</p>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    (d) => { const body = { name: d.name, port: Number(d.port), hops: [d.h0, d.h1, d.h2, d.h3].filter(Boolean).map(Number) }; return c ? PUT('chains/' + c.id, body) : POST('chains', body); });
+    if (r) { toast('Lanac spremljen. Serveri ga preuzmu za par sekundi.'); pageServers(); }
+  }
+
   async function newServer() {
     const r = await formLoop(`<h2>Dodaj server</h2>
       <ol class="muted" style="margin:0;padding-left:20px;line-height:1.7"><li>Zakupi VPS sa Ubuntu 22.04 ili 24.04</li><li>Upiši ime i kapacitet ispod</li><li>Dobićeš komandu koju zalijepiš u server kao root</li></ol>
@@ -912,9 +947,11 @@
       <div class="row2"><label class="field">Hoster<input class="input" name="provider" value="${esc(s.provider)}"></label><label class="field">Reality SNI<input class="input" name="sni" value="${esc(s.sni)}"></label></div>
       <div class="row2"><label class="field">VLESS port<input class="input" name="vless_port" value="${s.vless_port}"></label><label class="field">WireGuard port<input class="input" name="wg_port" value="${s.wg_port}"></label></div>
       <label class="field">Shadowsocks port<input class="input" name="ss_port" value="${s.ss_port || 8388}"></label>
+      <div class="field">Oznake (kupac ih vidi kao kategorije u aplikaciji)<div class="chips">${Object.entries(TAG_LABEL).map(([k, l]) => `<label class="chip"><input type="checkbox" name="tag_${k}" ${(s.tags || []).includes(k) ? 'checked' : ''} style="accent-color:var(--acc)">${l}</label>`).join('')}</div>
+        <small class="dim">P2P: na ovom serveru torrent je dozvoljen čak i kad je "Blokada torrenta" uključena.</small></div>
       <p class="dim" style="margin:0;font-size:12.5px">Promjena porta ili SNI-ja mijenja linkove kupaca: aplikacije ih same osvježe preko pretplate.</p>
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
-    (d) => PUT('servers/' + id, { ...d, capacity: Number(d.capacity), cost: Number(String(d.cost).replace(',', '.')), vless_port: Number(d.vless_port), wg_port: Number(d.wg_port), ss_port: Number(d.ss_port) }));
+    (d) => PUT('servers/' + id, { ...d, tags: Object.keys(TAG_LABEL).filter((k) => d['tag_' + k]), capacity: Number(d.capacity), cost: Number(String(d.cost).replace(',', '.')), vless_port: Number(d.vless_port), wg_port: Number(d.wg_port), ss_port: Number(d.ss_port) }));
     if (r) { toast('Spremljeno.'); pageServers(); }
   }
   async function srvMore(id) {
@@ -1361,6 +1398,9 @@
     newServer: () => newServer().catch(fail),
     install: async (d) => showInstall((await GET(`servers/${d.id}/install`)).install),
     editServer: (d) => editServer(d.id).catch(fail),
+    editChain: (d) => editChain(d.id).catch(fail),
+    toggleChain: async (d) => { const c = S.chains.find((x) => x.id === Number(d.id)); try { await PUT('chains/' + d.id, { enabled: !c.enabled }); pageServers(); } catch (e) { fail(e); } },
+    delChain: async (d) => { if (!(await ask('Obrisati lanac?', 'Kupci koji ga koriste prebacit će se na drugi server.', 'Obriši', true))) return; try { await DEL('chains/' + d.id); toast('Lanac obrisan.'); pageServers(); } catch (e) { fail(e); } },
     srvAct: async (d) => { try { await POST(`servers/${d.id}/${d.act}`); pageServers(); } catch (e) { fail(e); } },
     srvMore: (d) => srvMore(d.id).catch(fail),
     openRes: (d, el) => {

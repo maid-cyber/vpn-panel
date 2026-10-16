@@ -1,6 +1,6 @@
 'use strict';
 // Pretplatni link za aplikacije (Hiddify, v2rayNG, Streisand…) i stranica za kupca u browseru.
-const { one, run, now, dayKey } = require('./db');
+const { one, all, run, now, dayKey } = require('./db');
 const settings = require('./settings');
 const vpn = require('./vpn');
 const QR = require('../public/qr.js');
@@ -113,12 +113,33 @@ function appJson(u, s, link) {
       const [method, ...pw] = decodeURIComponent(l.username).split(':');
       out.push({ type: 'shadowsocks', server: sv.host, server_port: sv.ss_port || 8388, method, password: pw.join(':') });
     }
-    return { id: sv.id, name: sv.name, city: sv.city || sv.name, country: (sv.country || '').toUpperCase(), host: sv.host, port: sv.vless_port, outbounds: out };
+    return { id: sv.id, kind: 'server', name: sv.name, city: sv.city || sv.name, country: (sv.country || '').toUpperCase(), host: sv.host, port: sv.vless_port, tags: vpn.serverTags(sv), outbounds: out };
   }).filter((x) => x.outbounds.length) : [];
+  // Double VPN / Multihop: kupac se spaja na ulazni server (port lanca), izlazi na zadnjem
+  if (ok && s.proto_vless) {
+    for (const { c, hops } of vpn.chainsForUser(u)) {
+      const entry = hops[0], exit = hops[hops.length - 1];
+      servers.push({
+        id: 100000 + c.id, kind: vpn.chainKind(c), name: c.name, city: exit.city || exit.name, country: (exit.country || '').toUpperCase(),
+        host: entry.host, port: c.port, tags: [vpn.chainKind(c)],
+        hops: hops.map((sv) => ({ name: sv.name, city: sv.city || sv.name, country: (sv.country || '').toUpperCase() })),
+        outbounds: [{ type: 'vless', server: entry.host, server_port: c.port, uuid: u.uuid, flow: 'xtls-rprx-vision',
+          tls: { enabled: true, server_name: entry.sni, utls: { enabled: true, fingerprint: 'chrome' }, reality: { enabled: true, public_key: entry.reality_pub, short_id: entry.short_id } } }],
+      });
+    }
+  }
+  const features = {
+    killswitch: !!s.app_killswitch, dns: !!s.app_dns, dns_default: !!s.app_dns_def, split: !!s.app_split,
+    ipleak: !!s.app_ipleak, ipleak_default: !!s.app_ipleak_def, webrtc: !!s.app_webrtc, webrtc_default: !!s.app_webrtc_def,
+    boot: !!s.app_boot, history: !!s.app_history,
+    dns_filters: [s.block_ads && 'ads', s.block_adult && 'adult', s.block_malware && 'malware'].filter(Boolean),
+  };
+  const history = s.app_history ? all('SELECT ts, text FROM user_history WHERE user_id = ? ORDER BY id DESC LIMIT 30', u.id) : [];
   return {
     brand: wl ? owner.brand : s.brand, support: (wl ? owner.contact : s.support_contact) || '', announce: s.sub_announce || '',
     username: u.username, plan: plan?.name || '', status: st, can_connect: ok, expires_at: u.expires_at, created_at: u.created_at,
-    traffic_used: u.traffic_up + u.traffic_down, traffic_limit: u.traffic_limit, devices: u.devices, link, servers,
+    traffic_used: u.traffic_up + u.traffic_down, traffic_limit: u.traffic_limit, devices: u.devices, devices_active: u.devices_seen || 0,
+    last_seen: u.last_seen || 0, link, servers, features, history,
   };
 }
 

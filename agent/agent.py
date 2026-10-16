@@ -9,13 +9,14 @@ Probni način bez Xraya i WireGuarda (za testiranje panela):
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
@@ -23,6 +24,11 @@ WG_CONF = "/etc/wireguard/wg0.conf"
 STATE = "/var/lib/vpn-agent"
 ACCESS_LOG = "/dev/shm/vpn-access.log"   # samo u RAM-u, briše se nakon čitanja
 TAGS = ("vless", "ss")
+
+
+def _hot(tag):
+    """Inbound čije korisnike mijenjamo bez restarta (glavni i lanci Double VPN / Multihop)."""
+    return bool(tag) and (tag in TAGS or tag.startswith("chain"))
 
 DRY = "--dry-run" in sys.argv
 
@@ -185,7 +191,7 @@ LAST_ERROR = ""
 def _clients(cfg, tag=None):
     out = {}
     for ib in (cfg or {}).get("inbounds", []):
-        if ib.get("tag") in TAGS and (tag is None or ib.get("tag") == tag):
+        if _hot(ib.get("tag")) and (tag is None or ib.get("tag") == tag):
             for c in ib["settings"].get("clients", []):
                 out[(ib["tag"], c["email"])] = c
     return out
@@ -194,7 +200,7 @@ def _clients(cfg, tag=None):
 def _without_clients(cfg):
     c = json.loads(json.dumps(cfg))
     for ib in c.get("inbounds", []):
-        if ib.get("tag") in TAGS:
+        if _hot(ib.get("tag")):
             ib["settings"]["clients"] = []
     return c
 
@@ -207,7 +213,7 @@ def _hot_update(old, new):
         return False
     try:
         total_add = total_rm = 0
-        for tag in TAGS:
+        for tag in [i.get("tag") for i in new.get("inbounds", []) if _hot(i.get("tag"))]:
             a, b = _clients(old, tag), _clients(new, tag)
             removed = [k[1] for k in a if k not in b or a[k] != b[k]]
             added = [b[k] for k in b if k not in a or a[k] != b[k]]
@@ -302,6 +308,18 @@ def maybe_update_xray():
         log("Ažuriranje Xraya nije uspjelo:", (r.stderr or r.stdout)[-300:])
 
 
+def open_ports(cfg):
+    """Ako je ufw upaljen, otvori portove inbounda (npr. port lanca Double VPN)."""
+    if DRY or not shutil.which("ufw"):
+        return
+    st = subprocess.run(["ufw", "status"], capture_output=True, text=True)
+    if "Status: active" not in st.stdout:
+        return
+    for ib in cfg.get("inbounds", []):
+        if ib.get("listen") == "0.0.0.0" and ib.get("port"):
+            subprocess.run(["ufw", "allow", f"{int(ib['port'])}/tcp"], capture_output=True)
+
+
 def apply_xray(cfg):
     global LAST_ERROR
     if not cfg:
@@ -331,6 +349,7 @@ def apply_xray(cfg):
             log(LAST_ERROR)
             return False
     write_if_changed(XRAY_CONF, text)
+    open_ports(cfg)
     sh("systemctl enable xray")
     sh("systemctl restart xray")
     LAST_ERROR = ""

@@ -109,6 +109,12 @@ addCol('servers', 'ss_port', 'INTEGER DEFAULT 8388');
 addCol('servers', 'xray_version', "TEXT DEFAULT ''");
 addCol('servers', 'last_error', "TEXT DEFAULT ''");
 addCol('transactions', 'ext_id', 'TEXT');
+addCol('servers', 'tags', "TEXT DEFAULT ''");
+// Double VPN / Multihop: promet ide kroz više servera redom (hops = JSON lista ID-jeva, prvi je ulaz, zadnji izlaz)
+db.exec(`CREATE TABLE IF NOT EXISTS chains (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, hops TEXT NOT NULL, port INTEGER NOT NULL,
+  secret TEXT NOT NULL, enabled INTEGER DEFAULT 1, created_at INTEGER
+)`);
 
 const now = () => Date.now();
 const one = (sql, ...a) => db.prepare(sql).get(...a);

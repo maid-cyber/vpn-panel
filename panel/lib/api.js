@@ -145,7 +145,7 @@ function serverView(sv, forReseller) {
     enabled: !!sv.enabled, maintenance: !!sv.maintenance, last_seen: sv.last_seen, uptime: sv.uptime, version: sv.agent_version,
     vless_port: sv.vless_port, wg_port: sv.wg_port, ss_port: sv.ss_port, sni: sv.sni, xray_ok: sv.xray_ok, wg_ok: sv.wg_ok,
     xray_version: forReseller ? '' : sv.xray_version, last_error: forReseller ? '' : sv.last_error,
-    synced: !!sv.applied_hash,
+    synced: !!sv.applied_hash, tags: vpn.serverTags(sv),
   };
 }
 function serversList(forReseller) {
@@ -431,6 +431,7 @@ route('PUT', 'servers/:id', 'servers', (c) => {
   if (!sv) fail(404, 'Server ne postoji.');
   const b = c.body;
   run(`UPDATE servers SET ss_port = ? WHERE id = ?`, Number(b.ss_port ?? sv.ss_port) || 8388, sv.id);
+  if (b.tags !== undefined) run('UPDATE servers SET tags = ? WHERE id = ?', (Array.isArray(b.tags) ? b.tags : String(b.tags).split(',')).filter((x) => vpn.TAGS.includes(x)).join(','), sv.id);
   run(`UPDATE servers SET name=?, city=?, country=?, host=?, capacity=?, provider=?, cost=?, vless_port=?, wg_port=?, sni=?, lat=?, lon=? WHERE id = ?`,
     String(b.name ?? sv.name), String(b.city ?? sv.city), String(b.country ?? sv.country).toUpperCase().slice(0, 2), String(b.host ?? sv.host).trim(),
     Number(b.capacity ?? sv.capacity), String(b.provider ?? sv.provider), Number(b.cost ?? sv.cost), Number(b.vless_port ?? sv.vless_port),
@@ -461,8 +462,62 @@ route('DELETE', 'servers/:id', 'servers', (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
   if (!sv) fail(404, 'Server ne postoji.');
   run('UPDATE users SET last_server = NULL WHERE last_server = ?', sv.id);
+  const used = all('SELECT * FROM chains').filter((c) => vpn.chainHops(c).includes(sv.id));
+  if (used.length) fail(400, `Server je dio lanca: ${used.map((c) => c.name).join(', ')}. Prvo obriši ili izmijeni lanac.`);
   run('DELETE FROM servers WHERE id = ?', sv.id);
   log(c.auth.me.username, 'Server obrisan', sv.name, 'warn');
+  return { ok: true };
+});
+
+// ============================== lanci (Double VPN / Multihop) ==============================
+function chainView(c) {
+  const hops = vpn.chainServers(c);
+  return { id: c.id, name: c.name, port: c.port, enabled: !!c.enabled, kind: vpn.chainKind(c), hops: vpn.chainHops(c),
+    servers: hops.map((sv) => ({ id: sv.id, name: sv.name, country: sv.country, city: sv.city })), usable: vpn.chainUsable(c, hops) };
+}
+function chainInput(b, id) {
+  const name = String(b.name || '').trim();
+  if (!name) fail(400, 'Upiši ime lanca.');
+  const hops = (Array.isArray(b.hops) ? b.hops : []).map(Number).filter(Boolean);
+  if (hops.length < 2 || hops.length > 4) fail(400, 'Lanac ima 2 do 4 servera (2 = Double VPN, 3 ili 4 = Multihop).');
+  if (new Set(hops).size !== hops.length) fail(400, 'Isti server ne može biti dva puta u lancu.');
+  const servers = Object.fromEntries(all('SELECT * FROM servers').map((sv) => [sv.id, sv]));
+  if (hops.some((h) => !servers[h])) fail(400, 'Izabrani server ne postoji.');
+  const port = Number(b.port) || 0;
+  if (port < 1024 || port > 65535) fail(400, 'Port lanca mora biti između 1024 i 65535.');
+  for (const h of hops.slice(0, -1)) {
+    const sv = servers[h];
+    if ([sv.vless_port, sv.ss_port || 8388, 10085].includes(port)) fail(400, `Port ${port} već koristi server ${sv.name}. Izaberi drugi.`);
+  }
+  for (const c of all('SELECT * FROM chains WHERE id != ?', id || 0)) {
+    if (c.port === port && vpn.chainHops(c).slice(0, -1).some((h) => hops.slice(0, -1).includes(h))) fail(400, `Port ${port} već koristi lanac ${c.name}.`);
+  }
+  return { name, hops: JSON.stringify(hops), port };
+}
+route('GET', 'chains', 'servers', () => all('SELECT * FROM chains ORDER BY id').map(chainView));
+route('POST', 'chains', 'servers', (c) => {
+  const v = chainInput(c.body);
+  const r = run('INSERT INTO chains (name, hops, port, secret, enabled, created_at) VALUES (?,?,?,?,1,?)', v.name, v.hops, v.port, crypto.randomBytes(24).toString('base64url'), now());
+  log(c.auth.me.username, 'Novi lanac servera', v.name);
+  return chainView(one('SELECT * FROM chains WHERE id = ?', Number(r.lastInsertRowid)));
+});
+route('PUT', 'chains/:id', 'servers', (c) => {
+  const ch = one('SELECT * FROM chains WHERE id = ?', Number(c.params.id));
+  if (!ch) fail(404, 'Lanac ne postoji.');
+  if (c.body.enabled !== undefined && Object.keys(c.body).length === 1) {
+    run('UPDATE chains SET enabled = ? WHERE id = ?', c.body.enabled ? 1 : 0, ch.id);
+  } else {
+    const v = chainInput(c.body, ch.id);
+    run('UPDATE chains SET name = ?, hops = ?, port = ? WHERE id = ?', v.name, v.hops, v.port, ch.id);
+  }
+  log(c.auth.me.username, 'Lanac izmijenjen', ch.name);
+  return chainView(one('SELECT * FROM chains WHERE id = ?', ch.id));
+});
+route('DELETE', 'chains/:id', 'servers', (c) => {
+  const ch = one('SELECT * FROM chains WHERE id = ?', Number(c.params.id));
+  if (!ch) fail(404, 'Lanac ne postoji.');
+  run('DELETE FROM chains WHERE id = ?', ch.id);
+  log(c.auth.me.username, 'Lanac obrisan', ch.name, 'warn');
   return { ok: true };
 });
 
