@@ -264,7 +264,7 @@
 
   // ------------------------------------------------------------------ grafikon
   function barsChart(series, valueKey, lineKey) {
-    const W = 700, H = 180, max = Math.max(1, ...series.map((d) => d[valueKey])) * 1.15, maxL = Math.max(1, ...series.map((d) => d[lineKey] || 0)) * 1.15;
+    const W = 700, H = 180, peak = Math.max(0, ...series.map((d) => d[valueKey])), mag = peak > 0 ? 10 ** Math.floor(Math.log10(peak)) : 1, nice = Math.max(4, Math.ceil(peak / mag) * mag), max = nice * 1.08, maxL = Math.max(1, ...series.map((d) => d[lineKey] || 0)) * 1.15;
     const n = series.length, slot = (W - 40) / n, bw = Math.max(3, Math.min(44, slot * 0.6));
     let bars = '', last = '', line = '';
     series.forEach((d, i) => {
@@ -273,7 +273,8 @@
       if (i === n - 1) last = r; else bars += r;
       if (lineKey) line += `${i ? 'L' : 'M'}${(40 + i * slot + slot / 2).toFixed(1)} ${(H - (d[lineKey] || 0) / maxL * (H - 20)).toFixed(1)}`;
     });
-    const grid = [0.25, 0.5, 0.75, 1].map((f) => `<path d="M40 ${(H - f * (H - 20)).toFixed(0)}H${W}" stroke="var(--line)"/><text x="0" y="${(H - f * (H - 20) + 4).toFixed(0)}" fill="var(--dim)" font-size="11">${esc(money(Math.round(max / 1.15 * f)))}</text>`).join('');
+    const gy = (f) => H - f * nice / max * (H - 20);
+    const grid = [0.25, 0.5, 0.75, 1].map((f) => `<path d="M40 ${gy(f).toFixed(0)}H${W}" stroke="var(--line)"/><text x="0" y="${(gy(f) + 4).toFixed(0)}" fill="var(--dim)" font-size="11">${esc(money(Math.round(nice * f * 100) / 100))}</text>`).join('');
     const step = Math.ceil(n / 10);
     const labels = series.map((d, i) => (i % step === 0 || i === n - 1) ? `<span>${esc(d.day.slice(8))}.${esc(d.day.slice(5, 7))}.</span>` : '<span></span>').join('');
     return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:200px;display:block" role="img" aria-label="Grafikon zarade i prometa">${grid}
