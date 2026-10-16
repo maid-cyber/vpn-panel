@@ -102,7 +102,8 @@
     if (first) setTimeout(() => first.focus(), 30);
     return new Promise((resolve) => {
       const done = (val) => { dlg.removeEventListener('close', onClose); form.onsubmit = null; resolve(val); };
-      const onClose = () => done(null);
+      // close() prethodnog prozora stiže sa zakašnjenjem: ignoriši ga ako je novi prozor već otvoren
+      const onClose = () => { if (!dlg.open) done(null); };
       dlg.addEventListener('close', onClose);
       form.onsubmit = (e) => {
         const btn = e.submitter;
