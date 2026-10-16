@@ -16,7 +16,7 @@ import tempfile
 import time
 import urllib.request
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
@@ -308,6 +308,43 @@ def maybe_update_xray():
         log("Ažuriranje Xraya nije uspjelo:", (r.stderr or r.stdout)[-300:])
 
 
+def xray_user():
+    """Korisnik pod kojim radi Xray servis (obično nobody)."""
+    out = (sh(["systemctl", "show", "-p", "User", "--value", "xray"]) or "").strip()
+    return out or "root"
+
+
+def fix_access_log():
+    """Pristupni log u /dev/shm mora pripadati korisniku Xraya.
+    Ako ga je napravio neko drugi (npr. root), Linux zaštita u /dev/shm ne da Xrayu da ga otvori i Xray se ne upali."""
+    if DRY or not os.path.exists(ACCESS_LOG):
+        return
+    try:
+        import pwd
+        want = pwd.getpwnam(xray_user()).pw_uid
+        if os.stat(ACCESS_LOG).st_uid != want:
+            os.remove(ACCESS_LOG)
+            log("Obrisan stari pristupni log (pogrešan vlasnik), Xray ga pravi ponovo")
+    except (KeyError, OSError) as e:  # noqa: PERF203
+        log("Provjera pristupnog loga:", e)
+
+
+_last_heal = {"t": 0}
+
+
+def heal_xray():
+    """Ako Xray ne radi a konfiguracija postoji: popravi poznate uzroke i pokušaj ponovo (najviše jednom u minuti)."""
+    if DRY or not os.path.exists(XRAY_CONF) or service_ok("xray"):
+        return
+    if time.time() - _last_heal["t"] < 60:
+        return
+    _last_heal["t"] = time.time()
+    fix_access_log()
+    sh("systemctl restart xray")
+    time.sleep(2)
+    log("Xray nije radio, ponovo pokrenut:", "radi" if service_ok("xray") else "i dalje ne radi")
+
+
 def open_ports(cfg):
     """Ako je ufw upaljen, otvori portove inbounda (npr. port lanca Double VPN)."""
     if DRY or not shutil.which("ufw"):
@@ -350,8 +387,20 @@ def apply_xray(cfg):
             return False
     write_if_changed(XRAY_CONF, text)
     open_ports(cfg)
+    fix_access_log()
     sh("systemctl enable xray")
     sh("systemctl restart xray")
+    time.sleep(2)
+    if not DRY and not service_ok("xray"):
+        # Xray je prihvatio konfiguraciju ali se nije upalio: razlog iz journala ide u panel
+        why = (sh(["journalctl", "-u", "xray", "-n", "5", "--no-pager", "-o", "cat"]) or "").strip()
+        LAST_ERROR = "Xray se ne pali: " + why[-400:]
+        log(LAST_ERROR)
+        fix_access_log()
+        sh("systemctl restart xray")
+        time.sleep(2)
+        if not service_ok("xray"):
+            return False
     LAST_ERROR = ""
     log("Xray konfiguracija primijenjena (restart),", len(_clients(cfg)), "korisnika")
     return True
@@ -478,6 +527,7 @@ def main():
                 if ok_x or not cfg.get("xray"):
                     applied = cfg["hash"]
                 log("Konfiguracija", applied, "·", len(cfg.get("user_ids", [])), "aktivnih korisnika")
+            heal_xray()
         except Exception as e:  # noqa: BLE001
             fails += 1
             log("Greška:", e)
