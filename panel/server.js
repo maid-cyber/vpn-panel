@@ -54,9 +54,11 @@ function serveStatic(res, file) {
   send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': /\.woff2?$/.test(f) ? 'public, max-age=2592000' : 'no-cache' });
 }
 
-function indexHtml() {
+function indexHtml(base, portal) {
   const html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
-  return html.replace('<base href="/">', `<base href="${settings.get('admin_path')}/">`).replace(/__BRAND__/g, settings.get('brand').replace(/[<>&"]/g, ''));
+  return html.replace('<base href="/">', `<base href="${base}/">`)
+    .replace('<html lang="bs">', `<html lang="bs" data-portal="${portal}">`)
+    .replace(/__BRAND__/g, settings.get('brand').replace(/[<>&"]/g, ''));
 }
 
 async function onRequest(req, res) {
@@ -69,13 +71,18 @@ async function onRequest(req, res) {
     if (p.startsWith('/api/v1/')) return await apiv1.handle(req, res, p);
     if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
 
-    const base = settings.get('admin_path');
-    if (p !== base && !p.startsWith(base + '/')) return send(res, 404, 'Not found');
-    if (!auth.ipAllowed(ip)) return send(res, 404, 'Not found');
+    // dva ulaza: tajna admin adresa i (ako je uključeno) posebna adresa za resellere
+    const s = settings.load();
+    const inPath = (b) => b && (p === b || p.startsWith(b + '/'));
+    let base, portal;
+    if (inPath(s.admin_path)) { base = s.admin_path; portal = 'admin'; }
+    else if (s.res_portal && inPath(s.reseller_path)) { base = s.reseller_path; portal = 'reseller'; }
+    else return send(res, 404, 'Not found');
+    if (portal === 'admin' && !auth.ipAllowed(ip)) return send(res, 404, 'Not found');
     const rest = p.slice(base.length) || '/';
     if (rest === '/' || rest === '') {
       if (p === base) { res.writeHead(302, { location: base + '/' }); return res.end(); }
-      return send(res, 200, indexHtml(), { 'content-type': 'text/html; charset=utf-8' });
+      return send(res, 200, indexHtml(base, portal), { 'content-type': 'text/html; charset=utf-8' });
     }
     if (rest.startsWith('/assets/')) return serveStatic(res, rest.slice(8));
     if (rest.startsWith('/api/')) {
@@ -84,7 +91,7 @@ async function onRequest(req, res) {
       const ck = cookies(req);
       const sess = auth.getSession(ck.sid);
       const c = {
-        req, res, ip, query: Object.fromEntries(url.searchParams), auth: sess, proto: isHttps(req) ? 'https' : 'http',
+        req, res, ip, portal, query: Object.fromEntries(url.searchParams), auth: sess, proto: isHttps(req) ? 'https' : 'http',
         setCookie: (token) => res.setHeader('set-cookie', `sid=${token}; Path=${base}/; HttpOnly; SameSite=Strict${isHttps(req) ? '; Secure' : ''}${token ? '' : '; Max-Age=0'}`),
         raw: (code, body, headers) => send(res, code, body, headers),
       };

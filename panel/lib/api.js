@@ -38,7 +38,9 @@ route('POST', 'login', 'public', async (c) => {
   const { username, password, code } = c.body;
   if (auth.isLocked(c.ip)) fail(429, 'Previše pogrešnih pokušaja. Pokušaj kasnije.');
   const a = one('SELECT * FROM admins WHERE username = ? AND disabled = 0', String(username || ''));
-  if (!a || !auth.checkPassword(password, a.pass_hash)) { auth.addFail(c.ip); log(String(username || '?'), 'Neuspješna prijava', '', 'warn'); fail(401, 'Pogrešno korisničko ime ili šifra.'); }
+  // na ulazu za resellere prijavljuju se samo reselleri, a na admin ulazu samo admini (ako je poseban panel uključen)
+  const wrongDoor = a && ((c.portal === 'reseller' && a.role !== 'reseller') || (c.portal === 'admin' && a.role === 'reseller' && settings.get('res_portal')));
+  if (!a || wrongDoor || !auth.checkPassword(password, a.pass_hash)) { auth.addFail(c.ip); log(String(username || '?'), 'Neuspješna prijava', '', 'warn'); fail(401, 'Pogrešno korisničko ime ili šifra.'); }
   if (a.totp_on) {
     if (!code) return { need2fa: true };
     if (!auth.checkTotp(a.totp_secret, code)) { auth.addFail(c.ip); fail(401, 'Pogrešan 2FA kod.'); }
@@ -67,6 +69,7 @@ route('GET', 'me', null, (c) => {
     id: me.id, username: me.username, role: me.role, impersonating, real: impersonating ? admin.username : null,
     totp_on: !!admin.totp_on, must2fa: !!s.require_2fa && !admin.totp_on && admin.role !== 'reseller',
     credit: isRes(me) ? me.credit : null, perms, version: VERSION,
+    res_path: !isRes(me) && s.res_portal ? s.reseller_path : null, portal: c.portal,
     brand: s.brand, currency: s.currency, timezone: s.timezone, accent: s.accent, theme: s.theme, maintenance: !!s.maintenance,
     pay: isRes(me) ? { methods: s.pay_methods, usdt: s.pay_usdt, iban: s.pay_iban, paypal: s.pay_paypal, min: s.res_min_topup } : null,
   };
@@ -685,6 +688,7 @@ async function handle(c, sub) {
       if (!c.auth) fail(401, 'Prijavi se.');
       const { admin, me } = c.auth;
       const s = settings.load();
+      if ((c.portal === 'reseller' && admin.role !== 'reseller') || (c.portal === 'admin' && admin.role === 'reseller' && s.res_portal)) fail(401, 'Prijavi se.');
       const must2fa = s.require_2fa && !admin.totp_on && admin.role !== 'reseller';
       if (must2fa && !['me', 'logout', '2fa/setup', '2fa/enable'].includes(sub)) fail(403, 'Prvo uključi 2FA (obavezno u postavkama).');
       if (s.maintenance && me.role === 'reseller' && !c.auth.impersonating) fail(503, s.maintenance_msg);

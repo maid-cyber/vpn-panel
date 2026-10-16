@@ -97,16 +97,20 @@ Svaki korisnik dobije **pretplatni link** (`https://…/s/xxxx`). Kupcu pošalje
 
 ## 5. Reselleri
 
-1. Reselleri → **Novi reseller**: korisničko ime, šifra, nivo (popust) i limit korisnika.
-2. Kad ti reseller pošalje novac, otvori ga i klikni **Dodaj kredit**. Uplata dobije broj fakture.
-3. Reseller se prijavljuje na istu adresu panela i vidi samo svoje: korisnike, kredit, cijene i podatke za uplatu. Svaki novi korisnik ili produženje skida mu cijenu plana umanjenu za popust nivoa.
-4. **Uđi kao reseller** ti pokaže tačno ono što on vidi.
+Reselleri imaju **svoj poseban panel**, na adresi `https://panel.tvojadomena.com/reseller/`. Tvoju tajnu admin adresu nikad ne vide. Na admin adresi se reseller ne može prijaviti, a ni admin na adresi za resellere.
 
-Pravila za resellere su u Postavke → Reselleri:
-- broj probnih naloga dnevno;
-- da li smije brisati korisnike;
-- povrat kredita ako obriše korisnika unutar 24 sata;
-- minimalna uplata.
+1. Otvori Reselleri → **Novi reseller** i upiši korisničko ime, šifru, nivo (popust) i limit korisnika.
+2. Panel prikaže gotovu poruku s adresom, imenom i šifrom. Klikni **Kopiraj poruku** i pošalji je reselleru, npr. na Telegram.
+3. Kad ti reseller pošalje novac, otvori ga i klikni **Dodaj kredit**. Uplata dobije broj fakture.
+4. U svom panelu reseller vidi samo svoje stvari: korisnike, kredit, cijene i podatke za uplatu. Svaki novi korisnik ili produženje skida mu s kredita cijenu plana, umanjenu za popust njegovog nivoa.
+5. **Uđi kao reseller** (u tvom panelu) ti pokaže tačno ono što on vidi.
+
+U Postavke → Reselleri podešavaš:
+- adresu panela za resellere (npr. `/partner`) ili da se poseban panel isključi;
+- koliko probnih naloga reseller smije napraviti dnevno;
+- smije li brisati korisnike;
+- vraća li mu se kredit za brisanje u prva 24 h;
+- minimalnu uplatu.
 
 ## 6. Telegram obavijesti
 

@@ -153,7 +153,7 @@
   function renderLogin(need2fa, saved) {
     stopLive();
     $('#app').innerHTML = `<div class="login"><form class="card" id="loginForm" autocomplete="on">
-      ${(() => { const w = wordParts(document.title.split(' · ')[0]); return `<div class="login-logo">${logo(92)}<div><div class="wordmark">${wordHtml(w.main)}</div>${w.sub ? `<div class="wordsub" style="justify-content:center;margin-top:10px"><span>${w.sub}</span></div>` : ''}</div><div class="login-hint">${need2fa ? 'Unesi kod iz aplikacije' : 'Prijava u panel'}</div></div>`; })()}
+      ${(() => { const w = wordParts(document.title.split(' · ')[0]); return `<div class="login-logo">${logo(92)}<div><div class="wordmark">${wordHtml(w.main)}</div>${w.sub ? `<div class="wordsub" style="justify-content:center;margin-top:10px"><span>${w.sub}</span></div>` : ''}</div><div class="login-hint">${need2fa ? 'Unesi kod iz aplikacije' : document.documentElement.dataset.portal === 'reseller' ? 'Reseller panel · prijava' : 'Prijava u panel'}</div></div>`; })()}
       ${need2fa ? `<label class="field">Kod iz aplikacije (2FA)<input class="input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label>
         <input type="hidden" name="username" value="${esc(saved.username)}"><input type="hidden" name="password" value="${esc(saved.password)}">`
       : `<label class="field">Korisničko ime<input class="input" name="username" autocomplete="username" required></label>
@@ -741,6 +741,7 @@
   }
 
   // ================================================================== RESELLERI
+  const resUrl = () => S.me?.res_path ? `${location.origin}${S.me.res_path}/` : '';
   async function pageResellers() {
     const [list, levels] = await Promise.all([GET('resellers'), GET('levels')]);
     S.resellers = list; S.levels = levels;
@@ -748,6 +749,8 @@
     const wide = innerWidth >= 960;
     const totalCredit = list.reduce((a, r) => a + Math.max(0, r.credit), 0), month = list.reduce((a, r) => a + r.month, 0);
     $('#view').innerHTML = `${top('Reselleri', `${list.length} resellera · ${money(month)} kredita prodano ovaj mjesec`, `<a class="btn hide-m" href="#/reselleri/nivoi">${ic('levels')}Nivoi</a><button class="btn red" data-a="newReseller">${ic('plus')}<span>Novi reseller</span></button>`)}
+      ${resUrl() ? `<div class="banner" style="background:var(--card);border-color:var(--line)">${ic('res')}<span style="flex:1;min-width:0">Panel za resellere: <b class="mono" style="font-size:13px">${esc(resUrl())}</b><br><small class="muted">Ovu adresu šalješ resellerima. Tvoju admin adresu nikad ne vide.</small></span><button class="btn sm" data-a="copy" data-v="${esc(resUrl())}">${ic('copy')}Kopiraj</button></div>`
+        : `<div class="banner">${ic('res')}<span style="flex:1">Reselleri se sada prijavljuju na tvoju admin adresu. Uključi poseban panel za resellere u Postavke → Reselleri.</span><a class="btn sm" href="#/postavke">Postavke</a></div>`}
       <section class="stats">
         <div class="stat"><div class="l"><span>Reselleri</span>${ic('res')}</div><div class="v">${list.filter((r) => !r.disabled).length}</div><div class="s muted">${list.filter((r) => r.disabled).length} blokiranih</div></div>
         <div class="stat"><div class="l"><span>Njihovi korisnici</span>${ic('users')}</div><div class="v">${list.reduce((a, r) => a + r.users, 0)}</div><div class="s muted">ukupno</div></div>
@@ -808,9 +811,21 @@
     async (d) => {
       if (d._btn === 'delete') { if (!confirm('Obrisati resellera?')) throw new Error('Odustao si.'); return DEL('resellers/' + id); }
       const body = { level_id: d.level_id ? Number(d.level_id) : null, user_limit: Number(d.user_limit), contact: d.contact, brand: d.brand, note: d.note, password: d.password || undefined };
-      return id ? PUT('resellers/' + id, body) : POST('resellers', { ...body, username: d.username });
+      if (id) return PUT('resellers/' + id, body);
+      const out = await POST('resellers', { ...body, username: d.username });
+      return { ...out, _login: { username: d.username, password: d.password } };
     });
-    if (ok) { toast('Spremljeno.'); if (ok.id) S.selRes = ok.id; pageResellers(); }
+    if (!ok) return;
+    if (ok.id) S.selRes = ok.id;
+    if (ok._login) {
+      const url = resUrl() || `${location.origin}${location.pathname}`;
+      const msg = `Tvoj ${S.me.brand} reseller panel:\n${url}\nKorisničko ime: ${ok._login.username}\nŠifra: ${ok._login.password}\n\nNakon prve prijave promijeni šifru (Profil).`;
+      const m = await modal(`<h2>Reseller napravljen</h2><p class="muted" style="margin:0">Pošalji mu ove podatke (npr. na Telegram). Šifru panel više neće prikazati.</p>
+        <div class="code" style="white-space:pre-wrap;color:var(--text)">${esc(msg)}</div>
+        <div class="dlg-actions"><button class="btn" type="button" data-a="copy" data-v="${esc(msg)}">${ic('copy')}Kopiraj poruku</button><button class="btn red" value="cancel">Gotovo</button></div>`);
+      if (m) m.close();
+    } else toast('Spremljeno.');
+    pageResellers();
   }
   async function pageLevels() {
     const levels = await GET('levels');

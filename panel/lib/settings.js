@@ -46,6 +46,8 @@ const SCHEMA = [
     { key: 'capacity_warn', type: 'select', label: 'Upozori kad je server popunjen', options: ['70', '80', '90'], labels: ['70%', '80%', '90%'], def: '80' },
   ] },
   { id: 'reselleri', title: 'Reselleri', desc: 'Pravila za preprodavače.', rows: [
+    { key: 'res_portal', type: 'toggle', label: 'Poseban panel za resellere', sub: 'Reselleri se prijavljuju na svojoj adresi i nikad ne vide tvoju tajnu admin adresu. Na admin adresi se reseller ne može prijaviti.', def: true },
+    { key: 'reseller_path', type: 'text', label: 'Adresa panela za resellere', sub: 'Ovu adresu šalješ resellerima, npr. /reseller ili /partner', def: '/reseller', mono: true },
     { key: 'res_trials_day', type: 'number', label: 'Reseller smije napraviti probnih naloga dnevno', def: 10 },
     { key: 'res_can_delete', type: 'toggle', label: 'Reseller smije brisati korisnike', sub: 'Ako ne, može ih samo ugasiti', def: false },
     { key: 'res_negative', type: 'number', label: 'Reseller smije u minus do (€)', sub: '0 = ne može praviti korisnike bez kredita', def: 0 },
@@ -131,6 +133,13 @@ function clean(key, value) {
     v = '/' + v.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
     if (v.length < 5) throw new Error('Tajna putanja mora imati bar 4 znaka (slova, brojevi, - i _).');
   }
+  if (key === 'reseller_path') {
+    v = '/' + v.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+    if (v.length < 3) throw new Error('Adresa za resellere mora imati bar 2 znaka (slova, brojevi, - i _).');
+    if (['/s', '/agent', '/install', '/api'].includes(v.toLowerCase())) throw new Error('Ta adresa je rezervisana, izaberi drugu.');
+    if (v === load().admin_path) throw new Error('Adresa za resellere ne smije biti ista kao tajna admin adresa.');
+  }
+  if (key === 'admin_path' && v === load().reseller_path) throw new Error('Tajna admin adresa ne smije biti ista kao adresa za resellere.');
   if (key === 'panel_url' || key === 'sub_url') v = v.trim().replace(/\/+$/, '');
   return v;
 }
