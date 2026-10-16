@@ -7,7 +7,7 @@ const { one, run, all } = require('./db');
 // soon: true -> prikazuje se, ali još ne radi (označeno u panelu)
 const SCHEMA = [
   { id: 'opste', title: 'Općenito i brend', desc: 'Ime, izgled i osnovne informacije panela.', rows: [
-    { key: 'brand', type: 'text', label: 'Ime brenda', sub: 'Prikazuje se u panelu, aplikacijama, stranici za kupce i fakturama', def: 'VPN Nexus' },
+    { key: 'brand', type: 'text', label: 'Ime brenda', sub: 'Prikazuje se u panelu, aplikacijama, stranici za kupce i fakturama', def: 'Veltrix VPN' },
     { key: 'accent', type: 'chips', label: 'Boja akcenta', options: ['crvena', 'plava', 'zelena', 'ljubičasta'], def: 'crvena' },
     { key: 'panel_url', type: 'text', label: 'Adresa panela', sub: 'npr. https://panel.tvojvpn.com — koristi se u komandi za instalaciju servera', def: '', mono: true },
     { key: 'sub_url', type: 'text', label: 'Adresa za pretplatne linkove', sub: 'Odvojena domena, da kupci ne vide adresu panela. Prazno = ista kao panel.', def: '', mono: true },

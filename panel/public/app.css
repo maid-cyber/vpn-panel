@@ -1,4 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+/* Inter (SIL OFL), uključen u panel: radi i bez interneta */
+@font-face { font-family: 'Inter'; src: url('fonts/Inter-Regular.woff') format('woff'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('fonts/Inter-Medium.woff') format('woff'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('fonts/Inter-SemiBold.woff') format('woff'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('fonts/Inter-Bold.woff') format('woff'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter Display'; src: url('fonts/InterDisplay-SemiBold.woff') format('woff'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter Display'; src: url('fonts/InterDisplay-Bold.woff') format('woff'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter Display'; src: url('fonts/InterDisplay-ExtraBold.woff') format('woff'); font-weight: 800; font-style: normal; font-display: swap; }
 
 :root {
   --bg: #0a0a0d; --side: #0e0e12; --card: #121218; --card2: #0e0e12; --line: #22222b; --line2: #2c2c37; --row: #1a1a21;
@@ -6,8 +13,8 @@
   --acc: #d81f35; --acc-hi: #ff5a6a; --acc-soft: #2a1216; --acc-line: #4a1b22; --acc-txt: #ff8a96;
   --ok: #5fe0a0; --ok-bg: #0f2419; --warn: #f5c46a; --warn-bg: #2a2210; --bad: #ff8a96; --bad-bg: #2a1216; --info: #9dbcff; --info-bg: #121c33;
   --map-dot: #3a3a48;
-  --display: 'Chakra Petch', 'Bahnschrift', 'Segoe UI', sans-serif;
-  --body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --display: 'Inter Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
   color-scheme: dark;
 }
 [data-accent="plava"] { --acc: #2f6fe4; --acc-hi: #5c95ff; --acc-soft: #121c33; --acc-line: #213a6b; --acc-txt: #9dbcff; }
@@ -22,7 +29,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
-body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--body); letter-spacing: -.003em; -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss01'; }
 a { color: var(--acc-hi); text-decoration: none; } a:hover { text-decoration: underline; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -32,13 +39,14 @@ svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-widt
 .boot { display: grid; place-items: center; height: 100vh; }
 .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; word-break: break-all; }
 .muted { color: var(--muted); } .dim { color: var(--dim); } .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
-.num { font-family: var(--display); font-weight: 600; letter-spacing: .3px; }
+.num { font-family: var(--display); font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 
 /* ---------- raspored ---------- */
 .shell { display: flex; min-height: 100vh; }
 .side { width: 248px; flex: none; background: var(--side); border-right: 1px solid var(--line); padding: 20px 12px; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px; }
-.brand b { display: block; font: 700 19px/1.1 var(--display); }
+.brand b { display: block; font: 800 18px/1.1 var(--display); letter-spacing: .06em; text-transform: uppercase; }
+.brand b em { font-style: normal; color: var(--acc-hi); }
 .brand small { color: var(--muted); font-size: 12px; }
 .nav { display: flex; flex-direction: column; gap: 12px; }
 .nav .grp { display: flex; flex-direction: column; gap: 2px; }
@@ -53,7 +61,7 @@ svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-widt
 .me div { flex: 1; min-width: 0; } .me b { display: block; font-weight: 600; } .me small { color: var(--muted); font-size: 12px; }
 .main { flex: 1; min-width: 0; padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 18px; }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.top h1 { margin: 0; font: 600 27px/1.15 var(--display); }
+.top h1 { margin: 0; font: 700 27px/1.15 var(--display); letter-spacing: -.02em; }
 .top .sub { color: var(--muted); margin-top: 2px; }
 .top .grow { flex: 1 1 260px; }
 .burger, .iconbtn.burger { display: none; }
@@ -63,13 +71,13 @@ svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-widt
 /* ---------- kartice ---------- */
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 .card.p { padding: 18px; }
-.card h2, .h2 { margin: 0; font: 600 18px/1.2 var(--display); }
+.card h2, .h2 { margin: 0; font: 700 17px/1.25 var(--display); letter-spacing: -.01em; }
 .card-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px 10px; flex-wrap: wrap; }
 .card-head h2 { flex: 1; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
 .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
 .stat .l { display: flex; justify-content: space-between; color: var(--muted); }
-.stat .v { font: 600 30px/1.1 var(--display); letter-spacing: .3px; }
+.stat .v { font: 700 30px/1.1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .stat .s { font-size: 13px; }
 .grid2 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); gap: 14px; align-items: start; }
 .grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
@@ -143,7 +151,7 @@ textarea.input { padding: 10px 12px; min-height: 80px; resize: vertical; }
 /* ---------- serveri ---------- */
 .srv { padding: 16px; display: flex; flex-direction: column; gap: 13px; }
 .srv.off { border-color: var(--acc-line); }
-.cc { width: 40px; height: 40px; border-radius: 10px; background: var(--row); display: grid; place-items: center; font: 700 15px var(--display); flex: none; }
+.cc { width: 40px; height: 40px; border-radius: 10px; background: var(--row); display: grid; place-items: center; font: 800 14px var(--display); letter-spacing: .04em; flex: none; }
 .meters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .meters small { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
@@ -168,14 +176,22 @@ textarea.input { padding: 10px 12px; min-height: 80px; resize: vertical; }
 
 /* ---------- prijava ---------- */
 .login { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: radial-gradient(600px 300px at 50% 0%, var(--acc-soft), transparent 70%), var(--bg); }
-.login form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; padding: 28px; }
-.login h1 { margin: 0; font: 700 24px var(--display); }
+.login { background: radial-gradient(700px 380px at 50% -5%, rgba(227, 23, 43, .22), transparent 70%), var(--bg); }
+.login form { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; padding: 30px 28px 26px; }
+.login-logo { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-bottom: 8px; text-align: center; }
+.login-logo svg { width: 92px; height: auto; filter: drop-shadow(0 10px 30px rgba(227, 23, 43, .35)); }
+.wordmark { font: 800 32px/1 var(--display); letter-spacing: .07em; text-transform: uppercase; }
+.wordmark em { font-style: normal; color: #E3172B; }
+.wordsub { display: flex; align-items: center; gap: 12px; color: #ff4a5a; font: 600 13px var(--body); letter-spacing: .5em; text-transform: uppercase; margin-top: -4px; }
+.wordsub::before, .wordsub::after { content: ''; width: 34px; height: 2px; background: currentColor; }
+.wordsub span { margin-right: -.5em; }
+.login-hint { color: var(--muted); font-size: 13px; }
 
 /* ---------- dijalog, obavijesti ---------- */
 dialog { border: 1px solid var(--line2); border-radius: 14px; background: var(--card); color: var(--text); padding: 0; width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 40px); }
 dialog::backdrop { background: rgba(0, 0, 0, .65); }
 dialog form { display: flex; flex-direction: column; gap: 14px; padding: 22px; }
-dialog h2 { margin: 0; font: 600 20px var(--display); }
+dialog h2 { margin: 0; font: 700 20px var(--display); letter-spacing: -.01em; }
 .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 4px; }
 .row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 #toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 50; width: min(440px, calc(100vw - 24px)); }

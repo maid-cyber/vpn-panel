@@ -30,7 +30,7 @@ const jobs = require('./lib/jobs');
 const { HttpError, send, clientIp, cookies, isHttps } = require('./lib/http');
 
 const PUBLIC = path.join(__dirname, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff' };
 
 // ---------- prvo pokretanje: vlasnički nalog ----------
 function firstRun() {
@@ -51,7 +51,7 @@ function firstRun() {
 function serveStatic(res, file) {
   const f = path.normalize(path.join(PUBLIC, file));
   if (!f.startsWith(PUBLIC) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return send(res, 404, 'Not found');
-  send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache' });
+  send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': /\.woff2?$/.test(f) ? 'public, max-age=2592000' : 'no-cache' });
 }
 
 function indexHtml() {

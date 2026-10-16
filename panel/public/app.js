@@ -26,7 +26,18 @@
     send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z', shield: 'M12 3 20 6v6c0 5-3.5 8.5-8 9.5C7.5 20.5 4 17 4 12V6z',
   };
   const ic = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n] || ''}"/></svg>`;
-  const LOGO = '<svg width="36" height="36" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3 35 9v10c0 9-6.5 15.5-15 18C11.5 34.5 5 28 5 19V9z" fill="var(--acc)"/><path d="m13 19 5 5 9-10" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  // znak brenda (štit sa V)
+  const MARK = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M48 70h32l20 68v46z" fill="#E3172B"/><path d="M152 70h-32l-20 68v46z" fill="#9E0C1A"/><path d="M48 70h32l2 7H51z" fill="#FF4A5A"/><path d="M86 58h28l-14 38z" fill="#FF4A5A"/><path d="M100 58h14l-14 38z" fill="#E3172B"/>';
+  const logo = (w = 34) => `<svg width="${w}" height="${Math.round(w * 1.12)}" viewBox="0 0 200 224" aria-hidden="true">${MARK}</svg>`;
+  const LOGO = logo(32);
+  // ime brenda: zadnje slovo glavne riječi u boji, "VPN" ide ispod kao na logu
+  function wordParts(brand) {
+    const b = String(brand || '').trim();
+    const m = b.match(/^(.*?)\s+vpn$/i) || b.match(/^vpn\s+(.*)$/i);
+    const main = (m ? m[1] : b) || b;
+    return { main, sub: m ? 'VPN' : '' };
+  }
+  const wordHtml = (main) => `${esc(main.slice(0, -1))}<em>${esc(main.slice(-1))}</em>`;
 
   // ------------------------------------------------------------------ pomoćne
   const S = { me: null, live: null, servers: [], selUser: null, selRes: null, userQ: { status: 'all', q: '', plan: '', owner: '', page: 1 }, sel: new Set(), dashDays: 7 };
@@ -142,7 +153,7 @@
   function renderLogin(need2fa, saved) {
     stopLive();
     $('#app').innerHTML = `<div class="login"><form class="card" id="loginForm" autocomplete="on">
-      <div style="display:flex;align-items:center;gap:12px">${LOGO}<div><h1>${esc(document.title.split(' · ')[0])}</h1><div class="muted">Prijava u panel</div></div></div>
+      ${(() => { const w = wordParts(document.title.split(' · ')[0]); return `<div class="login-logo">${logo(92)}<div><div class="wordmark">${wordHtml(w.main)}</div>${w.sub ? `<div class="wordsub" style="justify-content:center;margin-top:10px"><span>${w.sub}</span></div>` : ''}</div><div class="login-hint">${need2fa ? 'Unesi kod iz aplikacije' : 'Prijava u panel'}</div></div>`; })()}
       ${need2fa ? `<label class="field">Kod iz aplikacije (2FA)<input class="input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label>
         <input type="hidden" name="username" value="${esc(saved.username)}"><input type="hidden" name="password" value="${esc(saved.password)}">`
       : `<label class="field">Korisničko ime<input class="input" name="username" autocomplete="username" required></label>
@@ -188,7 +199,7 @@
     document.documentElement.dataset.theme = me.theme || 'tamna';
     $('#app').innerHTML = `<div class="shell" id="shell">
       <aside class="side" id="side" aria-label="Meni">
-        <div class="brand">${LOGO}<div><b>${esc(me.brand)}</b><small>${isRes() ? 'Reseller panel' : 'Admin panel'}</small></div></div>
+        <div class="brand">${LOGO}<div><b>${wordHtml(wordParts(me.brand).main)}</b><small>${wordParts(me.brand).sub ? 'VPN · ' : ''}${isRes() ? 'Reseller panel' : 'Admin panel'}</small></div></div>
         <nav class="nav" id="nav"></nav>
         <div class="me"><span class="avatar">${esc(me.username[0])}</span><div><b>${esc(me.username)}</b><small>${isRes() ? `Kredit ${money(me.credit)}` : ({ owner: 'Vlasnik', admin: 'Admin', support: 'Podrška', finance: 'Finansije' }[me.role] || me.role) + (me.totp_on ? ' · 2FA' : '')}</small></div>
           <button class="iconbtn" data-a="logout" aria-label="Odjava" title="Odjava">${ic('logout')}</button></div>
