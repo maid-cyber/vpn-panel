@@ -1,0 +1,108 @@
+'use strict';
+// VPN admin panel — glavni server. Pokretanje: node server.js
+// Promjenljive okruženja: PORT (zadano 8080), HOST (zadano 127.0.0.1), VPN_DATA_DIR, VPN_ADMIN_PATH,
+// VPN_ADMIN_USER, VPN_ADMIN_PASS (samo prvo pokretanje), VPN_PANEL_URL (adresa panela, samo prvo pokretanje)
+process.removeAllListeners('warning');
+const fs = require('node:fs');
+const path = require('node:path');
+const http = require('node:http');
+const crypto = require('node:crypto');
+
+// vraćanje iz backupa: zamijeni bazu prije nego je otvorimo
+const DATA_DIR = process.env.VPN_DATA_DIR || path.join(__dirname, 'data');
+const restore = path.join(DATA_DIR, 'restore.db');
+if (fs.existsSync(restore)) {
+  const dbf = path.join(DATA_DIR, 'panel.db');
+  for (const ext of ['-wal', '-shm']) fs.rmSync(dbf + ext, { force: true });
+  if (fs.existsSync(dbf)) fs.renameSync(dbf, path.join(DATA_DIR, `panel-prije-vracanja-${Date.now()}.db`));
+  fs.renameSync(restore, dbf);
+  console.log('Baza vraćena iz backupa.');
+}
+
+const { one, run, now, log } = require('./lib/db');
+const settings = require('./lib/settings');
+const auth = require('./lib/auth');
+const api = require('./lib/api');
+const apiv1 = require('./lib/apiv1');
+const nodes = require('./lib/nodes');
+const sub = require('./lib/sub');
+const jobs = require('./lib/jobs');
+const { HttpError, send, clientIp, cookies, isHttps } = require('./lib/http');
+
+const PUBLIC = path.join(__dirname, 'public');
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+
+// ---------- prvo pokretanje: vlasnički nalog ----------
+function firstRun() {
+  if (one('SELECT id FROM admins LIMIT 1')) return;
+  const user = process.env.VPN_ADMIN_USER || 'admin';
+  const pass = process.env.VPN_ADMIN_PASS || crypto.randomBytes(9).toString('base64url');
+  run('INSERT INTO admins (username, pass_hash, role, created_at) VALUES (?,?,?,?)', user, auth.hashPassword(pass), 'owner', now());
+  run("INSERT INTO levels (name, discount, min_monthly, max_users, sort) VALUES ('Bronze', 0.10, 0, 150, 1), ('Silver', 0.20, 200, 300, 2), ('Gold', 0.30, 500, 600, 3)");
+  run(`INSERT INTO plans (name, days, traffic_gb, devices, price, trial, sort) VALUES
+    ('Probni 1 dan', 1, 2, 1, 0, 1, 0), ('Standard 30 dana', 30, 100, 2, 4, 0, 1), ('Premium 30 dana', 30, 0, 3, 5, 0, 2), ('Pro 90 dana', 90, 0, 5, 12, 0, 3)`);
+  if (process.env.VPN_PANEL_URL) settings.set({ panel_url: process.env.VPN_PANEL_URL });
+  const info = `Panel: ${(process.env.VPN_PANEL_URL || 'http://IP_SERVERA').replace(/\/+$/, '')}${settings.get('admin_path')}/\nKorisnik: ${user}\nŠifra: ${pass}\n`;
+  fs.writeFileSync(path.join(DATA_DIR, 'prva-prijava.txt'), info, { mode: 0o600 });
+  log('sistem', 'Panel instaliran', `vlasnik: ${user}`);
+  console.log('\n=== PRVA PRIJAVA ===\n' + info + '(sačuvano i u data/prva-prijava.txt)\n');
+}
+
+function serveStatic(res, file) {
+  const f = path.normalize(path.join(PUBLIC, file));
+  if (!f.startsWith(PUBLIC) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return send(res, 404, 'Not found');
+  send(res, 200, fs.readFileSync(f), { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache' });
+}
+
+function indexHtml() {
+  const html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
+  return html.replace('<base href="/">', `<base href="${settings.get('admin_path')}/">`).replace(/__BRAND__/g, settings.get('brand').replace(/[<>&"]/g, ''));
+}
+
+async function onRequest(req, res) {
+  const url = new URL(req.url, 'http://x');
+  const p = url.pathname;
+  const ip = clientIp(req);
+  try {
+    if (p.startsWith('/s/')) return await sub.handle(req, res, p);
+    if (p.startsWith('/agent/') || p.startsWith('/install/')) return await nodes.handle(req, res, p);
+    if (p.startsWith('/api/v1/')) return await apiv1.handle(req, res, p);
+    if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
+
+    const base = settings.get('admin_path');
+    if (p !== base && !p.startsWith(base + '/')) return send(res, 404, 'Not found');
+    if (!auth.ipAllowed(ip)) return send(res, 404, 'Not found');
+    const rest = p.slice(base.length) || '/';
+    if (rest === '/' || rest === '') {
+      if (p === base) { res.writeHead(302, { location: base + '/' }); return res.end(); }
+      return send(res, 200, indexHtml(), { 'content-type': 'text/html; charset=utf-8' });
+    }
+    if (rest.startsWith('/assets/')) return serveStatic(res, rest.slice(8));
+    if (rest.startsWith('/api/')) {
+      const sub = rest.slice(5);
+      if (req.method !== 'GET' && req.headers['x-requested-with'] !== 'panel') throw new HttpError(403, 'Zahtjev odbijen.');
+      const ck = cookies(req);
+      const sess = auth.getSession(ck.sid);
+      const c = {
+        req, res, ip, query: Object.fromEntries(url.searchParams), auth: sess, proto: isHttps(req) ? 'https' : 'http',
+        setCookie: (token) => res.setHeader('set-cookie', `sid=${token}; Path=${base}/; HttpOnly; SameSite=Strict${isHttps(req) ? '; Secure' : ''}${token ? '' : '; Max-Age=0'}`),
+        raw: (code, body, headers) => send(res, code, body, headers),
+      };
+      return await api.handle(c, sub);
+    }
+    return send(res, 404, 'Not found');
+  } catch (e) {
+    if (res.headersSent) { res.end(); return; }
+    if (e instanceof HttpError) return send(res, e.code, { error: e.message });
+    console.error(e);
+    return send(res, 500, { error: 'Greška na serveru: ' + e.message });
+  }
+}
+
+firstRun();
+jobs.start();
+const PORT = Number(process.env.PORT || 8080);
+const HOST = process.env.HOST || '127.0.0.1';
+http.createServer(onRequest).listen(PORT, HOST, () => {
+  console.log(`Panel radi na http://${HOST}:${PORT}${settings.get('admin_path')}/  (verzija ${api.VERSION})`);
+});

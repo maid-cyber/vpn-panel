@@ -1,0 +1,1163 @@
+/* VPN panel — interfejs (bez okvira i biblioteka). */
+(() => {
+  'use strict';
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ------------------------------------------------------------------ ikone
+  const ICON = {
+    dash: 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z',
+    users: 'M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM21 19v-1a4 4 0 0 0-3-3.87M16 3.13a3.5 3.5 0 0 1 0 6.75',
+    plans: 'M12 3 2 8l10 5 10-5zM2 13l10 5 10-5M2 17.5 12 22.5 22 17.5',
+    res: 'M3 21h18M5 21V8l7-5 7 5v13M10 21v-6h4v6',
+    levels: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+    server: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
+    money: 'M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+    report: 'M4 20V4M4 20h16M8 16l4-5 3 3 5-7',
+    logs: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+    gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1',
+    user: 'M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+    plus: 'M12 5v14M5 12h14', search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5',
+    menu: 'M4 7h16M4 12h16M4 17h16', bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4', logout: 'M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3',
+    copy: 'M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2', down: 'M12 3v12M7 10l5 5 5-5M4 20h16',
+    refresh: 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5', more: 'M5 12h.01M12 12h.01M19 12h.01', back: 'M15 18l-6-6 6-6',
+    key: 'M15 7a4 4 0 1 1-3.9 4.9L3 20v-3h3v-3h3l1.1-1.1A4 4 0 0 1 15 7z', credit: 'M3 6h18v12H3zM3 10h18M7 15h3',
+    send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z', shield: 'M12 3 20 6v6c0 5-3.5 8.5-8 9.5C7.5 20.5 4 17 4 12V6z',
+  };
+  const ic = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n] || ''}"/></svg>`;
+  const LOGO = '<svg width="36" height="36" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3 35 9v10c0 9-6.5 15.5-15 18C11.5 34.5 5 28 5 19V9z" fill="var(--acc)"/><path d="m13 19 5 5 9-10" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  // ------------------------------------------------------------------ pomoćne
+  const S = { me: null, live: null, servers: [], selUser: null, selRes: null, userQ: { status: 'all', q: '', plan: '', owner: '', page: 1 }, sel: new Set(), dashDays: 7 };
+  const isRes = () => S.me?.role === 'reseller';
+  const can = (p) => !isRes() && (S.me?.role === 'owner' || (S.me?.perms || []).includes(p));
+
+  async function api(method, path, body) {
+    const opt = { method, headers: { 'x-requested-with': 'panel' }, credentials: 'same-origin' };
+    if (body !== undefined && !(body instanceof Blob)) { opt.headers['content-type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    else if (body instanceof Blob) opt.body = body;
+    const r = await fetch('api/' + path, opt);
+    let j = null;
+    try { j = await r.json(); } catch { /* prazno */ }
+    if (r.status === 401 && path !== 'login' && path !== 'me') { S.me = null; renderLogin(); throw new Error('Sesija je istekla. Prijavi se ponovo.'); }
+    if (!r.ok) throw new Error(j?.error || `Greška ${r.status}`);
+    return j;
+  }
+  const GET = (p) => api('GET', p), POST = (p, b) => api('POST', p, b ?? {}), PUT = (p, b) => api('PUT', p, b), DEL = (p) => api('DELETE', p, {});
+  const R = (p) => (isRes() ? 'res/' : '') + p;   // reseller ima svoje putanje
+
+  function toast(msg, err) {
+    const el = document.createElement('div');
+    el.className = 'toast' + (err ? ' err' : '');
+    el.textContent = msg;
+    $('#toasts').append(el);
+    setTimeout(() => el.remove(), err ? 6000 : 3500);
+  }
+  const fail = (e) => toast(e.message || String(e), true);
+  const cur = () => ({ EUR: '€', USD: '$', BAM: 'KM ', CHF: 'CHF ' }[S.me?.currency] || '€');
+  const money = (n) => { n = Number(n || 0); const neg = n < 0; n = Math.abs(n); const [i, f] = (n % 1 ? n.toFixed(2) : String(Math.round(n))).split('.'); return `${neg ? '−' : ''}${cur()}${i.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}${f ? ',' + f : ''}`; };
+  function bytes(n) {
+    n = Number(n || 0);
+    if (n >= 1024 ** 4) return (n / 1024 ** 4).toFixed(2) + ' TB';
+    if (n >= 1024 ** 3) return (n / 1024 ** 3).toFixed(n >= 100 * 1024 ** 3 ? 0 : 1) + ' GB';
+    if (n >= 1024 ** 2) return (n / 1024 ** 2).toFixed(0) + ' MB';
+    return n ? (n / 1024).toFixed(0) + ' KB' : '0';
+  }
+  const p2 = (n) => String(n).padStart(2, '0');
+  const MONTHS = ['januar', 'februar', 'mart', 'april', 'maj', 'juni', 'juli', 'august', 'septembar', 'oktobar', 'novembar', 'decembar'];
+  const DAYS = ['nedjelja', 'ponedjeljak', 'utorak', 'srijeda', 'četvrtak', 'petak', 'subota'];
+  const fmtDate = (ts) => { if (!ts) return '—'; const d = new Date(ts); return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()}.`; };
+  const fmtTime = (ts) => { const d = new Date(ts); return `${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+  const fmtDT = (ts) => { if (!ts) return '—'; const d = new Date(ts); return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}. ${fmtTime(ts)}`; };
+  const longDate = (d = new Date()) => `${DAYS[d.getDay()][0].toUpperCase() + DAYS[d.getDay()].slice(1)}, ${d.getDate()}. ${MONTHS[d.getMonth()]} ${d.getFullYear()}.`;
+  function ago(ts) {
+    if (!ts) return 'nikad';
+    const s = Math.round((Date.now() - ts) / 1000);
+    if (s < 60) return 'sada';
+    if (s < 3600) return `prije ${Math.floor(s / 60)} min`;
+    if (s < 86400) return `prije ${Math.floor(s / 3600)} h`;
+    return `prije ${Math.floor(s / 86400)} d`;
+  }
+  const ST = {
+    active: ['Aktivan', 't-ok'], expiring: ['Ističe uskoro', 't-warn'], grace: ['Grace period', 't-warn'],
+    expired: ['Istekao', 't-bad'], limited: ['Potrošen promet', 't-orange'], disabled: ['Ugašen', 't-grey'],
+  };
+  const stTag = (s) => `<span class="tag ${ST[s]?.[1] || 't-grey'}">${ST[s]?.[0] || s}</span>`;
+  const SRV = { online: 'Online', offline: 'Offline', pending: 'Čeka instalaciju', disabled: 'Ugašen', maintenance: 'Održavanje' };
+  const srvStatus = (s) => `<span class="status s-${s.warn ? 'warn' : s.status}">${s.warn ? 'Skoro pun' : SRV[s.status] || s.status}</span>`;
+  const flag = (cc) => esc((cc || '—').toUpperCase());
+  const daysTxt = (d) => d > 1 ? `za ${d} dana` : d === 1 ? 'sutra' : d === 0 ? 'danas' : `prije ${-d} d`;
+  const copy = (text) => navigator.clipboard.writeText(text).then(() => toast('Kopirano.'), () => {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Kopirano.');
+  });
+
+  // ------------------------------------------------------------------ dijalog
+  function modal(html, { wide } = {}) {
+    const dlg = $('#modal'), form = $('#modalForm');
+    form.innerHTML = html;
+    dlg.style.width = wide ? 'min(760px, calc(100vw - 24px))' : '';
+    if (!dlg.open) dlg.showModal();
+    const first = form.querySelector('input:not([type=hidden]), select, textarea');
+    if (first) setTimeout(() => first.focus(), 30);
+    return new Promise((resolve) => {
+      const done = (val) => { dlg.removeEventListener('close', onClose); form.onsubmit = null; resolve(val); };
+      const onClose = () => done(null);
+      dlg.addEventListener('close', onClose);
+      form.onsubmit = (e) => {
+        const btn = e.submitter;
+        if (!btn || btn.value === 'cancel') return;
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(form).entries());
+        $$('input[type=checkbox]', form).forEach((c) => { if (c.name && !c.name.endsWith('[]')) data[c.name] = c.checked; });
+        data._many = {};
+        $$('input[type=checkbox]', form).filter((c) => c.name.endsWith('[]') && c.checked).forEach((c) => (data._many[c.name.slice(0, -2)] ||= []).push(c.value));
+        data._btn = btn.value;
+        dlg.removeEventListener('close', onClose);
+        form.onsubmit = null;
+        resolve({ data, close: () => dlg.close(), keep: () => {} });
+      };
+    });
+  }
+  async function ask(title, text, okText = 'Potvrdi', danger) {
+    const r = await modal(`<h2>${esc(title)}</h2><p class="muted" style="margin:0">${esc(text)}</p>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn ${danger ? 'danger' : 'red'}" value="ok">${esc(okText)}</button></div>`);
+    if (r) r.close();
+    return !!r;
+  }
+  // forma koja se ne zatvara dok API ne uspije
+  async function formLoop(html, handler, opts) {
+    for (;;) {
+      const r = await modal(html, opts);
+      if (!r) return null;
+      try { const out = await handler(r.data); r.close(); return out ?? true; } catch (e) { fail(e); html = $('#modalForm').innerHTML; restoreValues(r.data); }
+    }
+  }
+  function restoreValues(data) {
+    setTimeout(() => { for (const [k, v] of Object.entries(data)) { const el = $(`#modalForm [name="${k}"]`); if (el && el.type !== 'checkbox' && typeof v === 'string') el.value = v; } }, 0);
+  }
+
+  // ------------------------------------------------------------------ prijava
+  function renderLogin(need2fa, saved) {
+    stopLive();
+    $('#app').innerHTML = `<div class="login"><form class="card" id="loginForm" autocomplete="on">
+      <div style="display:flex;align-items:center;gap:12px">${LOGO}<div><h1>${esc(document.title.split(' · ')[0])}</h1><div class="muted">Prijava u panel</div></div></div>
+      ${need2fa ? `<label class="field">Kod iz aplikacije (2FA)<input class="input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label>
+        <input type="hidden" name="username" value="${esc(saved.username)}"><input type="hidden" name="password" value="${esc(saved.password)}">`
+      : `<label class="field">Korisničko ime<input class="input" name="username" autocomplete="username" required></label>
+        <label class="field">Šifra<input class="input" name="password" type="password" autocomplete="current-password" required></label>`}
+      <button class="btn red block" type="submit">Prijavi se</button>
+      <p class="muted" id="loginErr" role="alert" style="margin:0;min-height:20px;color:var(--bad)"></p></form></div>`;
+    $('#loginForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(e.target).entries());
+      try {
+        const r = await POST('login', d);
+        if (r.need2fa) return renderLogin(true, d);
+        await boot();
+      } catch (err) { $('#loginErr').textContent = err.message; }
+    };
+  }
+
+  // ------------------------------------------------------------------ okvir
+  function navItems() {
+    if (isRes()) return [{ label: 'Moj panel', items: [['dash', 'Pregled', ''], ['users', 'Moji korisnici', 'korisnici'], ['credit', 'Kredit i uplate', 'kredit']] }];
+    const g = [{ label: 'Pregled', items: [['dash', 'Dashboard', '']] }];
+    const u = [];
+    if (can('users')) u.push(['users', 'Korisnici', 'korisnici', S.badges?.users]);
+    if (can('plans')) u.push(['plans', 'Planovi', 'planovi']);
+    if (u.length) g.push({ label: 'Korisnici', items: u });
+    if (can('resellers')) g.push({ label: 'Reselleri', items: [['res', 'Reselleri', 'reselleri', S.badges?.res], ['levels', 'Nivoi i popusti', 'reselleri/nivoi']] });
+    if (can('servers')) g.push({ label: 'Serveri', items: [['server', 'Serveri', 'serveri', S.badges?.servers]] });
+    if (can('finance')) g.push({ label: 'Finansije', items: [['money', 'Transakcije', 'finansije'], ['report', 'Izvještaji', 'finansije/izvjestaji']] });
+    const s = [];
+    if (can('logs')) s.push(['logs', 'Logovi', 'logovi']);
+    if (can('settings')) s.push(['gear', 'Postavke', 'postavke']);
+    s.push(['user', 'Moj profil', 'profil']);
+    g.push({ label: 'Sistem', items: s });
+    return g;
+  }
+  function bottomItems() {
+    if (isRes()) return [['dash', 'Pregled', ''], ['users', 'Korisnici', 'korisnici'], ['plus', 'Novi', '#new'], ['credit', 'Kredit', 'kredit'], ['user', 'Profil', 'profil']];
+    return [['dash', 'Početna', ''], ['users', 'Korisnici', 'korisnici'], ['server', 'Serveri', 'serveri'], ['res', 'Reselleri', 'reselleri'], ['more', 'Više', 'vise']];
+  }
+  function renderShell() {
+    const me = S.me;
+    document.documentElement.dataset.accent = me.accent || 'crvena';
+    document.documentElement.dataset.theme = me.theme || 'tamna';
+    $('#app').innerHTML = `<div class="shell" id="shell">
+      <aside class="side" id="side" aria-label="Meni">
+        <div class="brand">${LOGO}<div><b>${esc(me.brand)}</b><small>${isRes() ? 'Reseller panel' : 'Admin panel'}</small></div></div>
+        <nav class="nav" id="nav"></nav>
+        <div class="me"><span class="avatar">${esc(me.username[0])}</span><div><b>${esc(me.username)}</b><small>${isRes() ? `Kredit ${money(me.credit)}` : ({ owner: 'Vlasnik', admin: 'Admin', support: 'Podrška', finance: 'Finansije' }[me.role] || me.role) + (me.totp_on ? ' · 2FA' : '')}</small></div>
+          <button class="iconbtn" data-a="logout" aria-label="Odjava" title="Odjava">${ic('logout')}</button></div>
+      </aside>
+      <div class="scrim" data-a="menu"></div>
+      <main class="main" id="main">
+        ${me.impersonating ? `<div class="banner">${ic('user')}<span style="flex:1">Gledaš panel kao reseller <b>${esc(me.username)}</b>.</span><button class="btn sm" data-a="stopImp">Vrati se na svoj nalog</button></div>` : ''}
+        ${me.maintenance && !isRes() ? `<div class="banner">${ic('gear')}<span style="flex:1">Uključen je režim održavanja. Reselleri i kupci vide poruku, VPN radi.</span><a class="btn sm" href="#/postavke">Postavke</a></div>` : ''}
+        <div id="view"></div>
+      </main>
+      <nav class="bottomnav" id="bottomnav" aria-label="Donji meni"></nav>
+    </div>`;
+    paintNav();
+  }
+  function paintNav() {
+    const page = location.hash.replace(/^#\/?/, '').split('?')[0];
+    const on = (href) => href === page || (href && page.startsWith(href + '/') && !navItems().some((g) => g.items.some((i) => i[2] === page)));
+    $('#nav').innerHTML = navItems().map((g) => `<div class="grp"><span>${esc(g.label)}</span>${g.items.map(([i, l, h, b]) =>
+      `<a href="#/${h}" class="${on(h) || (!h && !page) ? 'on' : ''}">${ic(i)}<span>${esc(l)}</span>${b ? `<em>${esc(b)}</em>` : ''}</a>`).join('')}</div>`).join('');
+    $('#bottomnav').innerHTML = bottomItems().map(([i, l, h]) => h === '#new'
+      ? `<a href="#/korisnici" data-a="newUser">${ic(i)}<span>${l}</span></a>`
+      : `<a href="#/${h}" class="${on(h) || (!h && !page) ? 'on' : ''}">${ic(i)}<span>${l}</span></a>`).join('');
+  }
+  const top = (title, sub, actions = '') => `<header class="top">
+    <button class="iconbtn burger" data-a="menu" aria-label="Otvori meni">${ic('menu')}</button>
+    <div class="grow"><h1>${esc(title)}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>${actions}</header>`;
+
+  // ------------------------------------------------------------------ uživo (SSE)
+  function startLive() {
+    if (S.live) return;
+    try {
+      S.live = new EventSource('api/live');
+      S.live.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        S.servers = d.servers;
+        const off = d.servers.filter((s) => s.status === 'offline').length;
+        const badge = `${d.servers.filter((s) => s.status === 'online').length}/${d.servers.filter((s) => s.status !== 'disabled').length}`;
+        if (S.badges && S.badges.servers !== badge) { S.badges.servers = badge; paintNav(); }
+        updateMap(d.servers);
+        $$('[data-live-srv]').forEach((el) => { const s = d.servers.find((x) => x.id === Number(el.dataset.liveSrv)); if (s) el.outerHTML = `<span data-live-srv="${s.id}">${srvStatus(s)}</span>`; });
+        const lt = $('#liveTime'); if (lt) lt.textContent = 'osvježeno ' + fmtTime(d.t);
+        void off;
+      };
+    } catch { /* bez uživo prikaza */ }
+  }
+  function stopLive() { if (S.live) { S.live.close(); S.live = null; } }
+
+  // ------------------------------------------------------------------ mapa
+  const P = (lon, lat) => [(lon + 180) / 360 * 720, (75 - lat) / 130 * 360];
+  const LAND = [
+    [[-168, 65], [-140, 70], [-95, 72], [-75, 62], [-60, 52], [-66, 44], [-75, 35], [-81, 25], [-97, 26], [-97, 18], [-88, 15], [-83, 9], [-79, 8], [-92, 15], [-105, 20], [-112, 30], [-118, 34], [-124, 40], [-125, 49], [-133, 56], [-150, 60], [-165, 60]],
+    [[-55, 60], [-42, 60], [-20, 70], [-25, 75], [-60, 75], [-55, 68]],
+    [[-80, 8], [-62, 10], [-50, 0], [-35, -6], [-40, -20], [-48, -26], [-58, -38], [-65, -45], [-70, -54], [-74, -45], [-71, -30], [-70, -18], [-76, -12], [-81, -5]],
+    [[-10, 36], [-9, 43], [-2, 44], [-5, 48], [2, 51], [8, 54], [10, 58], [5, 62], [15, 69], [28, 71], [40, 67], [45, 60], [40, 45], [28, 41], [22, 37], [15, 38], [12, 44], [5, 43], [-2, 37]],
+    [[-5, 50], [1, 51], [0, 54], [-2, 58], [-6, 58], [-5, 54]],
+    [[-17, 21], [-10, 30], [-6, 35], [10, 37], [20, 32], [32, 31], [35, 28], [43, 12], [51, 12], [40, -2], [40, -15], [35, -25], [28, -33], [19, -35], [13, -20], [12, -5], [9, 4], [-8, 5], [-17, 14]],
+    [[28, 41], [40, 45], [45, 60], [40, 67], [60, 70], [80, 73], [105, 75], [140, 72], [170, 68], [178, 65], [160, 58], [150, 58], [140, 52], [135, 43], [128, 35], [122, 30], [120, 22], [108, 20], [105, 10], [100, 13], [98, 8], [92, 22], [80, 13], [77, 8], [72, 20], [66, 25], [57, 25], [52, 28], [48, 30], [44, 13], [35, 30], [36, 36]],
+    [[95, 5], [105, -6], [115, -8], [125, -9], [140, -6], [150, -6], [140, 0], [120, 2], [110, 2], [100, 3]],
+    [[130, 31], [135, 34], [141, 38], [142, 45], [140, 43], [136, 36]],
+    [[114, -22], [122, -17], [131, -12], [137, -12], [142, -11], [146, -18], [153, -25], [151, -34], [145, -39], [138, -35], [130, -32], [115, -34]],
+  ];
+  const LAND_D = LAND.map((poly) => poly.map(([lo, la], i) => (i ? 'L' : 'M') + P(lo, la).map((v) => v.toFixed(1)).join(' ')).join('') + 'Z').join('');
+  const mapColor = (s) => s.status === 'online' ? (s.warn ? '#f5a524' : '#3ddc84') : s.status === 'offline' ? '#ff4d5e' : '#8b8b98';
+  function markers(servers) {
+    return servers.filter((s) => s.lat != null && s.lon != null && s.status !== 'disabled').map((s) => {
+      const [x, y] = P(s.lon, s.lat), c = mapColor(s);
+      return `<div class="mk" style="left:${(x / 7.2).toFixed(2)}%;top:${(y / 3.6).toFixed(2)}%" title="${esc(s.name)}"><b style="background:${c}"></b><i style="background:${c};box-shadow:0 0 10px ${c}"></i><span>${esc(s.city || s.name)}</span></div>`;
+    }).join('');
+  }
+  const mapHtml = (servers) => `<div class="map" id="map"><svg viewBox="0 0 720 360" preserveAspectRatio="none" aria-hidden="true">
+    <defs><pattern id="dg" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.25" fill="var(--map-dot)"/></pattern></defs>
+    <path d="${LAND_D}" fill="url(#dg)"/></svg><div id="mapMk">${markers(servers)}</div></div>`;
+  function updateMap(servers) { const m = $('#mapMk'); if (m) m.innerHTML = markers(servers); }
+
+  // ------------------------------------------------------------------ grafikon
+  function barsChart(series, valueKey, lineKey) {
+    const W = 700, H = 180, max = Math.max(1, ...series.map((d) => d[valueKey])) * 1.15, maxL = Math.max(1, ...series.map((d) => d[lineKey] || 0)) * 1.15;
+    const n = series.length, slot = (W - 40) / n, bw = Math.max(3, Math.min(44, slot * 0.6));
+    let bars = '', last = '', line = '';
+    series.forEach((d, i) => {
+      const h = d[valueKey] / max * (H - 20), x = 40 + i * slot + (slot - bw) / 2;
+      const r = `M${x.toFixed(1)} ${(H - h).toFixed(1)}h${bw.toFixed(1)}v${h.toFixed(1)}h${(-bw).toFixed(1)}z`;
+      if (i === n - 1) last = r; else bars += r;
+      if (lineKey) line += `${i ? 'L' : 'M'}${(40 + i * slot + slot / 2).toFixed(1)} ${(H - (d[lineKey] || 0) / maxL * (H - 20)).toFixed(1)}`;
+    });
+    const grid = [0.25, 0.5, 0.75, 1].map((f) => `<path d="M40 ${(H - f * (H - 20)).toFixed(0)}H${W}" stroke="var(--line)"/><text x="0" y="${(H - f * (H - 20) + 4).toFixed(0)}" fill="var(--dim)" font-size="11">${esc(money(Math.round(max / 1.15 * f)))}</text>`).join('');
+    const step = Math.ceil(n / 10);
+    const labels = series.map((d, i) => (i % step === 0 || i === n - 1) ? `<span>${esc(d.day.slice(8))}.${esc(d.day.slice(5, 7))}.</span>` : '<span></span>').join('');
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:200px;display:block" role="img" aria-label="Grafikon zarade i prometa">${grid}
+      <path d="${bars}" fill="var(--acc)" opacity=".55"/><path d="${last}" fill="var(--acc)"/>${lineKey ? `<path d="${line}" fill="none" stroke="#8fb4ff" stroke-width="2.5" stroke-linejoin="round"/>` : ''}</svg>
+      <div class="chart-days" style="grid-template-columns:repeat(${n},minmax(0,1fr));margin-left:5.7%">${labels}</div>`;
+  }
+
+  // ================================================================== DASHBOARD (admin)
+  async function pageDash() {
+    const d = await GET(`dash?days=${S.dashDays}`);
+    S.servers = d.servers;
+    const pct = d.revPrev ? Math.round((d.revMonth - d.revPrev) / d.revPrev * 100) : null;
+    const mon = MONTHS[new Date().getMonth()];
+    const stat = (l, v, s, cls, icon) => `<div class="stat"><div class="l"><span>${l}</span>${ic(icon)}</div><div class="v">${v}</div><div class="s ${cls}">${s}</div></div>`;
+    const offline = d.servers.filter((s) => s.status === 'offline');
+    $('#view').innerHTML = `
+      ${top('Dashboard', `${longDate()} · ${offline.length ? `<span class="bad">${offline.length} server ne odgovara</span>` : 'sve radi normalno'}`,
+        `<label class="search hide-m" style="flex:0 1 320px">${ic('search')}<span class="sr">Pretraga korisnika</span><input id="dashSearch" placeholder="Traži korisnika…"></label>
+         ${can('users') ? `<button class="btn red" data-a="newUser">${ic('plus')}<span>Novi korisnik</span></button>` : ''}`)}
+      <section class="stats">
+        ${stat('Aktivni korisnici', d.counts.active + d.counts.expiring + d.counts.grace, `+${d.weekNew} ove sedmice`, 'ok', 'users')}
+        ${stat('Ističu uskoro', d.counts.expiring, d.counts.expiring ? '<a href="#/korisnici?status=expiring">Pogledaj listu →</a>' : 'nema', 'warn', 'bell')}
+        ${stat('Serveri online', `${d.online} / ${d.serversTotal}`, offline.length ? offline.map((s) => esc(s.name)).join(', ') + ' ne radi' : `${d.connected} spojenih sada`, offline.length ? 'bad' : 'ok', 'server')}
+        ${stat(`Zarada · ${mon}`, money(d.revMonth), pct === null ? 'prvi mjesec' : `${pct >= 0 ? '+' : ''}${pct}% u odnosu na prošli`, pct === null || pct >= 0 ? 'ok' : 'bad', 'money')}
+      </section>
+      <div class="grid2">
+        <section class="card p" style="min-width:0">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:12px">
+            <h2 style="flex:1">Zarada i promet</h2>
+            <div class="legend"><span><i style="background:var(--acc);border-radius:2px"></i>Zarada</span><span><i style="background:#8fb4ff;height:3px;border-radius:0"></i>Promet</span></div>
+            <div class="seg" role="group" aria-label="Period">${[7, 30, 90].map((n) => `<button type="button" class="${S.dashDays === n ? 'on' : ''}" data-a="dashDays" data-n="${n}">${n} dana</button>`).join('')}</div>
+          </div>
+          ${barsChart(d.series, 'rev', 'traffic')}
+          <div style="display:flex;flex-wrap:wrap;gap:28px;margin-top:12px;padding-top:14px;border-top:1px solid var(--line)">
+            <div><div class="muted" style="font-size:13px">Zarada</div><div class="num" style="font-size:22px">${money(d.totals.rev)}</div></div>
+            <div><div class="muted" style="font-size:13px">Promet</div><div class="num" style="font-size:22px">${bytes(d.totals.traffic)}</div></div>
+            <div><div class="muted" style="font-size:13px">Novi korisnici</div><div class="num" style="font-size:22px">${d.totals.newUsers}</div></div>
+            <div><div class="muted" style="font-size:13px">Produženja</div><div class="num" style="font-size:22px">${d.totals.renewals}</div></div>
+          </div>
+        </section>
+        <section class="card p" style="display:flex;flex-direction:column;gap:10px">
+          <h2>Brze akcije</h2>
+          ${can('users') ? `<button class="btn red" style="justify-content:flex-start" data-a="newUser">${ic('plus')}Dodaj korisnika</button>` : ''}
+          ${can('resellers') ? `<a class="btn" style="justify-content:flex-start" href="#/reselleri">${ic('res')}Reselleri i kredit</a>` : ''}
+          ${can('servers') ? `<button class="btn" style="justify-content:flex-start" data-a="newServer">${ic('server')}Dodaj server</button>` : ''}
+          ${can('finance') ? `<button class="btn" style="justify-content:flex-start" data-a="newTx" data-type="expense">${ic('money')}Upiši trošak</button>` : ''}
+          ${d.warnings.length ? `<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">${d.warnings.map((w) => `<div class="tag t-${w.kind === 'red' ? 'bad' : w.kind === 'amber' ? 'warn' : 'info'}" style="white-space:normal;padding:8px 10px;font-weight:500">${esc(w.text)}</div>`).join('')}</div>` : ''}
+        </section>
+      </div>
+      <section class="card p" style="display:flex;flex-wrap:wrap;gap:22px">
+        <div style="flex:999 1 520px;min-width:0">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-bottom:12px"><h2 style="flex:1">Mapa servera · uživo</h2>
+            <div class="legend"><span><i style="background:#3ddc84"></i>Online</span><span><i style="background:#f5a524"></i>Skoro pun</span><span><i style="background:#ff4d5e"></i>Offline</span><span class="dim" id="liveTime"></span></div></div>
+          ${mapHtml(d.servers)}
+          ${d.servers.some((s) => s.lat == null) ? '<p class="dim" style="font-size:12px;margin:8px 0 0">Server se pojavi na mapi kad se prvi put javi panelu (lokacija se odredi iz IP adrese).</p>' : ''}
+        </div>
+        <div style="flex:1 1 250px;min-width:0;display:flex;flex-direction:column;gap:12px">
+          <div class="mini-grid"><div class="mini"><small>Spojeno sada</small><b class="num" style="font-size:22px">${d.connected}</b></div><div class="mini"><small>Lokacije</small><b class="num" style="font-size:22px">${new Set(d.servers.map((s) => s.city || s.name)).size}</b></div></div>
+          <b>Odakle se korisnici spajaju</b>
+          ${d.countries.length ? d.countries.map((c) => `<div style="display:grid;grid-template-columns:34px minmax(0,1fr) 42px;gap:10px;align-items:center"><b class="dim">${flag(c.cc)}</b><div class="bar"><i style="width:${c.pct}%"></i></div><span style="text-align:right">${c.pct}%</span></div>`).join('') : '<span class="muted" style="font-size:13px">Još nema podataka.</span>'}
+          <small class="dim" style="border-top:1px solid var(--line);padding-top:10px">Bilježi se samo država, IP adresa se ne čuva.</small>
+        </div>
+      </section>
+      <div class="grid2">
+        <section class="card" style="min-width:0">
+          <div class="card-head"><h2>Status servera</h2><a href="#/serveri" style="font-size:13px">Svi serveri →</a></div>
+          ${d.servers.length ? `<div class="tbl">${trow(['Server', 'Status', 'Spojeno', 'Popunjenost', 'CPU / RAM', 'Promet / mj.'], true, SRVCOLS)}
+            ${d.servers.map((s) => trow([`${s.name.toUpperCase().startsWith((s.country || '#').toUpperCase() + ' ') ? '' : `<b class="dim">${flag(s.country)}</b> `}${esc(s.name)}`, `<span data-live-srv="${s.id}">${srvStatus(s)}</span>`, s.online, `<div style="display:flex;gap:8px;align-items:center"><div class="bar" style="flex:1"><i class="${s.warn ? 'w' : ''}" style="width:${Math.min(100, s.online / s.capacity * 100)}%"></i></div><span class="dim">${Math.round(s.online / s.capacity * 100)}%</span></div>`, s.status === 'online' ? `${Math.round(s.cpu)}% / ${Math.round(s.ram)}%` : '—', bytes(s.traffic_month)], false, SRVCOLS, ['', 'Status', 'Spojeno', 'Popunjenost', 'CPU / RAM', 'Promet'])).join('')}</div>`
+          : `<div class="empty">Još nema servera. <button class="btn sm red" data-a="newServer">Dodaj prvi server</button></div>`}
+        </section>
+        <section class="card p">
+          <div style="display:flex;align-items:center;margin-bottom:6px"><h2 style="flex:1">Top reselleri · ${mon}</h2><a href="#/reselleri" style="font-size:13px">Svi →</a></div>
+          ${d.top.length ? d.top.map((r, i) => `<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--row)"><span class="tag t-grey">${i + 1}</span><div style="flex:1;min-width:0"><b>${esc(r.username)}</b><div class="muted" style="font-size:12px">${r.users} korisnika${r.level ? ' · ' + esc(r.level) : ''}</div></div><b class="num">${money(r.rev)}</b></div>`).join('') : '<div class="muted">Još nema resellera.</div>'}
+        </section>
+      </div>
+      <section class="card">
+        <div class="card-head"><h2>Zadnje aktivnosti</h2>${can('logs') ? '<a href="#/logovi" style="font-size:13px">Svi logovi →</a>' : ''}</div>
+        <div class="tbl">${d.activity.map((a) => trow([fmtDT(a.ts), esc(a.actor), `<span class="tag ${a.kind === 'error' ? 't-bad' : a.kind === 'warn' ? 't-warn' : 't-grey'}">${esc(a.action)}</span>`, `<span class="muted">${esc(a.detail)}</span>`], false, '110px 1fr 180px 2.5fr', ['Vrijeme', 'Ko', 'Akcija', 'Detalji'])).join('') || '<div class="empty">Nema aktivnosti.</div>'}</div>
+      </section>`;
+    const sInp = $('#dashSearch');
+    if (sInp) sInp.onkeydown = (e) => { if (e.key === 'Enter') { S.userQ = { ...S.userQ, q: sInp.value, status: 'all', page: 1 }; location.hash = '#/korisnici'; } };
+    startLive();
+  }
+  const SRVCOLS = '1.5fr 1fr .7fr 1.4fr 1fr 1fr';
+  function trow(cells, head, cols, labels = []) {
+    return `<div class="tr${head ? ' th' : ''}" style="grid-template-columns:${cols}">${cells.map((c, i) => `<div class="cell${i === 0 ? ' first' : ''}"${!head && labels[i] ? ` data-l="${esc(labels[i])}"` : ''}>${c}</div>`).join('')}</div>`;
+  }
+
+  // ================================================================== DASHBOARD (reseller)
+  async function pageResDash() {
+    const d = await GET('res/dash');
+    S.me.credit = d.credit;
+    const c = d.counts;
+    $('#view').innerHTML = `
+      ${top(`Zdravo, ${S.me.username}`, d.level ? `Nivo ${esc(d.level.name)} · popust ${Math.round(d.level.discount * 100)}%` : 'Reseller panel', `<button class="btn red" data-a="newUser">${ic('plus')}<span>Novi korisnik</span></button>`)}
+      <section class="stats">
+        <div class="stat"><div class="l"><span>Moj kredit</span>${ic('credit')}</div><div class="v">${money(d.credit)}</div><div class="s"><a href="#/kredit">Dopuni kredit →</a></div></div>
+        <div class="stat"><div class="l"><span>Aktivni korisnici</span>${ic('users')}</div><div class="v">${c.active + c.expiring + c.grace}</div><div class="s muted">od ${c.all} ukupno · limit ${d.limit}</div></div>
+        <div class="stat"><div class="l"><span>Ističu uskoro</span>${ic('bell')}</div><div class="v">${c.expiring}</div><div class="s warn">${c.expiring ? '<a href="#/korisnici?status=expiring">Produži ih →</a>' : 'nema'}</div></div>
+        <div class="stat"><div class="l"><span>Istekli</span>${ic('users')}</div><div class="v">${c.expired}</div><div class="s muted">mogu se produžiti</div></div>
+      </section>
+      <div class="grid2">
+        <section class="card">
+          <div class="card-head"><h2>Moje cijene</h2></div>
+          <div class="tbl">${trow(['Plan', 'Trajanje', 'Promet', 'Tvoja cijena'], true, '2fr 1fr 1fr 1fr')}${d.plans.map((p) => trow([`<b>${esc(p.name)}</b>`, `${p.days} dana`, p.traffic_gb ? p.traffic_gb + ' GB' : 'neograničeno', p.trial ? '<span class="tag t-info">besplatno</span>' : `<b class="num">${money(p.price)}</b>`], false, '2fr 1fr 1fr 1fr', ['', 'Trajanje', 'Promet', 'Cijena'])).join('')}</div>
+        </section>
+        <section class="card p">
+          <h2 style="margin-bottom:10px">Serveri</h2>
+          ${d.servers.map((s) => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--row)"><span><b class="dim">${flag(s.country)}</b> ${esc(s.city || s.name)}</span>${srvStatus(s)}</div>`).join('') || '<span class="muted">Nema servera.</span>'}
+        </section>
+      </div>
+      <section class="card p"><h2 style="margin-bottom:8px">Zadnje aktivnosti</h2>
+        <div class="hist">${d.activity.map((a) => `<div><span>${fmtDT(a.ts)}</span><span><b>${esc(a.username || '')}</b> · ${esc(a.text)}</span></div>`).join('') || '<span class="muted">Još ništa.</span>'}</div></section>`;
+  }
+
+  // ================================================================== KORISNICI
+  async function pageUsers(params) {
+    if (params.get('status')) S.userQ.status = params.get('status');
+    const q = S.userQ;
+    const qs = new URLSearchParams({ status: q.status, q: q.q, plan: q.plan, owner: q.owner, page: q.page });
+    const [d, plans, resellers] = await Promise.all([
+      GET(R('users') + '?' + qs), isRes() ? Promise.resolve(null) : GET('plans').catch(() => []),
+      !isRes() && can('resellers') ? GET('resellers').catch(() => []) : Promise.resolve([]),
+    ]);
+    S.plans = plans; S.resellers = resellers;
+    const chips = [['all', 'Svi', d.counts.all], ['active', 'Aktivni', d.counts.active + d.counts.expiring + d.counts.grace], ['expiring', 'Ističu', d.counts.expiring], ['expired', 'Istekli', d.counts.expired], ['limited', 'Potrošen promet', d.counts.limited], ['disabled', 'Ugašeni', d.counts.disabled]];
+    const cols = isRes() ? '1.6fr 1.2fr 1.4fr 1fr .9fr' : '28px 1.6fr 1.1fr 1fr 1.3fr 1fr .9fr';
+    const wide = innerWidth >= 960;
+    $('#view').innerHTML = `
+      ${top(isRes() ? 'Moji korisnici' : 'Korisnici', `${d.counts.all} korisnika`, `
+        ${!isRes() ? `<button class="btn hide-m" data-a="bulk" ${S.sel.size ? '' : 'disabled'}>Masovne akcije${S.sel.size ? ` (${S.sel.size})` : ''}</button>
+        <a class="btn hide-m" href="api/users.csv">${ic('down')}Izvoz CSV</a>` : ''}
+        <button class="btn red" data-a="newUser">${ic('plus')}<span>Novi korisnik</span></button>`)}
+      <div class="chips">${chips.map(([k, l, n]) => `<button type="button" class="chip ${q.status === k ? 'on' : ''}" data-a="uStatus" data-k="${k}">${l}<span>${n}</span></button>`).join('')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <label class="search">${ic('search')}<span class="sr">Pretraga</span><input id="uSearch" value="${esc(q.q)}" placeholder="Ime, bilješka, kontakt…"></label>
+        ${plans ? `<label style="flex:1 1 150px;max-width:220px"><span class="sr">Plan</span><select class="input" id="uPlan"><option value="">Svi planovi</option>${plans.map((p) => `<option value="${p.id}" ${String(p.id) === q.plan ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
+        ${resellers.length ? `<label style="flex:1 1 150px;max-width:220px"><span class="sr">Vlasnik</span><select class="input" id="uOwner"><option value="">Svi vlasnici</option><option value="me" ${q.owner === 'me' ? 'selected' : ''}>Samo moji</option>${resellers.map((r) => `<option value="${r.id}" ${String(r.id) === q.owner ? 'selected' : ''}>${esc(r.username)}</option>`).join('')}</select></label>` : ''}
+      </div>
+      <div class="split">
+        <section class="card wide" style="overflow:hidden">
+          <div class="tbl">
+            ${trow(isRes() ? ['Korisnik', 'Plan', 'Promet', 'Ističe', 'Status'] : [`<input type="checkbox" class="cb" data-a="selAll" aria-label="Izaberi sve" ${d.users.length && d.users.every((u) => S.sel.has(u.id)) ? 'checked' : ''}>`, 'Korisnik', 'Plan', 'Server', 'Promet', 'Ističe', 'Status'], true, cols)}
+            ${d.users.map((u) => userRow(u, cols)).join('') || `<div class="empty">Nema korisnika${q.q || q.status !== 'all' ? ' za ovaj filter' : ''}. <button class="btn sm red" data-a="newUser">Dodaj korisnika</button></div>`}
+          </div>
+          <div class="pager"><span>Stranica ${d.page} od ${d.pages} · ${d.total} rezultata</span>
+            <button class="btn sm" data-a="uPage" data-p="${d.page - 1}" ${d.page <= 1 ? 'disabled' : ''}>← Prethodna</button>
+            <button class="btn sm" data-a="uPage" data-p="${d.page + 1}" ${d.page >= d.pages ? 'disabled' : ''}>Sljedeća →</button></div>
+        </section>
+        ${wide ? `<section class="card p narrow" id="uDetail">${S.selUser ? '<div class="muted">Učitavam…</div>' : '<div class="empty">Klikni korisnika da vidiš detalje, QR kod i akcije.</div>'}</section>` : ''}
+      </div>`;
+    let t;
+    $('#uSearch').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { S.userQ = { ...S.userQ, q: e.target.value, page: 1 }; pageUsers(new URLSearchParams()).then(() => { const i = $('#uSearch'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }); }, 350); };
+    if ($('#uPlan')) $('#uPlan').onchange = (e) => { S.userQ.plan = e.target.value; S.userQ.page = 1; pageUsers(new URLSearchParams()); };
+    if ($('#uOwner')) $('#uOwner').onchange = (e) => { S.userQ.owner = e.target.value; S.userQ.page = 1; pageUsers(new URLSearchParams()); };
+    if (wide && S.selUser) loadUserDetail(S.selUser, $('#uDetail')).catch(() => { S.selUser = null; });
+  }
+  function userRow(u, cols) {
+    const pct = u.traffic_limit ? Math.min(100, u.traffic_used / u.traffic_limit * 100) : 0;
+    const traffic = `<div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12.5px">${bytes(u.traffic_used)} / ${u.traffic_limit ? bytes(u.traffic_limit) : '∞'}</span>${u.traffic_limit ? `<div class="bar"><i class="${pct >= 100 ? 'w' : ''}" style="width:${pct}%"></i></div>` : ''}</div>`;
+    const exp = `<span class="${u.status === 'expired' ? 'bad' : u.status === 'expiring' || u.status === 'grace' ? 'warn' : ''}">${daysTxt(u.days_left)}</span><small>${fmtDate(u.expires_at)}</small>`;
+    const name = `<b>${esc(u.username)}</b><small>${esc(isRes() ? u.contact || u.note || '' : u.owner ? 'reseller · ' + u.owner : u.note || u.contact || 'tvoj korisnik')}</small>`;
+    const cells = isRes() ? [name, esc(u.plan || '—'), traffic, exp, stTag(u.status)]
+      : [`<input type="checkbox" class="cb" data-a="selOne" data-id="${u.id}" aria-label="Izaberi ${esc(u.username)}" ${S.sel.has(u.id) ? 'checked' : ''}>`, name, esc(u.plan || '—'), `<span class="muted">${esc(u.last_server || '—')}</span><small>${u.last_seen ? ago(u.last_seen) : 'nije se spajao'}</small>`, traffic, exp, stTag(u.status)];
+    const labels = isRes() ? ['', 'Plan', 'Promet', 'Ističe', 'Status'] : ['', '', 'Plan', 'Server', 'Promet', 'Ističe', 'Status'];
+    return `<div class="tr click ${S.selUser === u.id ? 'sel' : ''}" data-a="openUser" data-id="${u.id}" style="grid-template-columns:${cols}">${cells.map((c, i) => `<div class="cell${(isRes() ? i === 0 : i === 1) ? ' first' : ''}${!isRes() && i === 0 ? ' cbx' : ''}"${labels[i] ? ` data-l="${labels[i]}"` : ''}>${c}</div>`).join('')}</div>`;
+  }
+
+  async function loadUserDetail(id, box, full) {
+    const u = await GET(R('users/' + id));
+    const pct = u.traffic_limit ? Math.min(100, u.traffic_used / u.traffic_limit * 100) : 0;
+    box.innerHTML = `
+      ${full ? `<a href="#/korisnici" class="btn sm ghost" style="align-self:flex-start;margin-bottom:6px">${ic('back')}Nazad</a>` : ''}
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="avatar" style="width:44px;height:44px;border-radius:12px;font-size:18px">${esc(u.username[0])}</span>
+        <div style="flex:1;min-width:0"><div class="h2" style="font-size:20px;overflow:hidden;text-overflow:ellipsis">${esc(u.username)}</div><div class="muted" style="font-size:12.5px">${u.owner ? 'reseller · ' + esc(u.owner) : isRes() ? esc(u.contact || '') : 'tvoj korisnik'}</div></div>
+        ${stTag(u.status)}
+      </div>
+      <div class="mini-grid" style="margin-top:14px">
+        <div class="mini"><small>Plan</small><b>${esc(u.plan || '—')}</b></div>
+        <div class="mini"><small>Ističe</small><b>${fmtDate(u.expires_at)}</b> <span class="muted" style="font-size:12px">(${daysTxt(u.days_left)})</span></div>
+        <div class="mini"><small>Limit uređaja</small><b>${u.devices}</b></div>
+        <div class="mini"><small>Zadnje spajanje</small><b>${u.last_seen ? ago(u.last_seen) : 'nikad'}</b>${u.last_server ? ` <span class="muted" style="font-size:12px">· ${esc(u.last_server)}</span>` : ''}</div>
+      </div>
+      <div style="margin-top:14px"><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--soft);margin-bottom:6px"><span>Promet</span><span>${bytes(u.traffic_used)} / ${u.traffic_limit ? bytes(u.traffic_limit) : 'neograničeno'}</span></div>
+        <div class="bar" style="height:8px"><i class="${pct >= 100 ? 'w' : ''}" style="width:${u.traffic_limit ? pct : 4}%"></i></div></div>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--card2);flex-wrap:wrap">
+        <div class="qrbox">${u.qr}</div>
+        <div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:8px">
+          <small class="muted">Pretplatni link (za aplikacije i stranicu kupca)</small>
+          <div class="mono" style="color:var(--soft)">${esc(u.sub_link)}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <button class="btn sm" data-a="copy" data-v="${esc(u.sub_link)}">${ic('copy')}Kopiraj</button>
+            <a class="btn sm" href="${esc(u.sub_link)}" target="_blank" rel="noopener">Stranica kupca</a>
+            ${u.vless.length ? `<button class="btn sm" data-a="links" data-id="${u.id}">VLESS / WireGuard</button>` : ''}
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
+        <button class="btn red" data-a="extend" data-id="${u.id}">Produži</button>
+        ${isRes() ? `<button class="btn" data-a="editNote" data-id="${u.id}">Bilješka</button>` : `<button class="btn" data-a="editUser" data-id="${u.id}">Uredi</button>`}
+        <button class="btn" data-a="uAct" data-act="reset" data-id="${u.id}">Resetuj promet</button>
+        <button class="btn" data-a="uAct" data-act="rekey" data-id="${u.id}">Novi ključ</button>
+        <button class="btn warnb" data-a="uAct" data-act="toggle" data-id="${u.id}">${u.disabled ? 'Upali' : 'Ugasi'}</button>
+        <button class="btn danger" data-a="uAct" data-act="delete" data-id="${u.id}">Obriši</button>
+      </div>
+      ${u.note || u.contact ? `<div style="margin-top:14px" class="muted">${u.contact ? `<div>Kontakt: <span style="color:var(--text)">${esc(u.contact)}</span></div>` : ''}${u.note ? `<div>Bilješka: <span style="color:var(--text)">${esc(u.note)}</span></div>` : ''}</div>` : ''}
+      <div style="margin-top:14px"><small class="muted">Historija</small><div class="hist">${u.history.map((h) => `<div><span>${fmtDT(h.ts)}</span><span>${esc(h.text)}</span></div>`).join('')}</div></div>`;
+    S.lastUser = u;
+    return u;
+  }
+
+  async function pageUser(id) {
+    S.selUser = id;
+    $('#view').innerHTML = `<section class="card p" id="uDetail" style="display:flex;flex-direction:column"><div class="muted">Učitavam…</div></section>`;
+    await loadUserDetail(id, $('#uDetail'), true);
+  }
+  const refreshUser = async () => {
+    if (location.hash.startsWith('#/korisnik/')) return pageUser(S.selUser);
+    if (location.hash.startsWith('#/korisnici')) return pageUsers(new URLSearchParams());
+    return route();
+  };
+
+  async function newUser() {
+    const isR = isRes();
+    let plans, resellers = [];
+    if (isR) plans = (await GET('res/dash')).plans;
+    else { plans = (await GET('plans')).filter((p) => p.active); if (can('resellers')) resellers = await GET('resellers').catch(() => []); }
+    if (!plans.length) return toast('Prvo napravi bar jedan aktivan plan.', true);
+    const sug = (await GET(R('users/suggest'))).username;
+    const id = await formLoop(`<h2>Novi korisnik</h2>
+      <label class="field">Korisničko ime<input class="input" name="username" value="${esc(sug)}" required maxlength="40" pattern="[a-zA-Z0-9._@\\-]{3,40}"></label>
+      <label class="field">Plan<select class="input" name="plan_id" required>${plans.map((p) => `<option value="${p.id}">${esc(p.name)} · ${p.days} dana · ${p.traffic_gb ? p.traffic_gb + ' GB' : 'neograničeno'}${isR ? ` · ${p.trial ? 'besplatno' : money(p.price)}` : p.price ? ` · ${money(p.price)}` : ''}</option>`).join('')}</select></label>
+      ${!isR ? `<div class="row2"><label class="field">Trajanje (dana, prazno = po planu)<input class="input" name="days" inputmode="numeric"></label>
+        <label class="field">Promet GB (prazno = po planu, 0 = neograničeno)<input class="input" name="traffic_gb" inputmode="decimal"></label></div>
+        ${resellers.length ? `<label class="field">Vlasnik<select class="input" name="owner_id"><option value="">Moj korisnik</option>${resellers.map((r) => `<option value="${r.id}">reseller · ${esc(r.username)}</option>`).join('')}</select></label>` : ''}
+        <div class="row2"><label class="field">Plaćeno (€, opcionalno)<input class="input" name="paid" inputmode="decimal" placeholder="0"></label>
+        <label class="field">Način plaćanja<input class="input" name="method" placeholder="npr. Wise"></label></div>` : `<p class="muted" style="margin:0">Cijena se skida sa tvog kredita (${money(S.me.credit)}).</p>`}
+      <div class="row2"><label class="field">Kontakt (opcionalno)<input class="input" name="contact" placeholder="Telegram, telefon…"></label>
+      <label class="field">Bilješka (opcionalno)<input class="input" name="note"></label></div>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Napravi korisnika</button></div>`,
+    async (d) => {
+      const body = { username: d.username, plan_id: Number(d.plan_id), note: d.note, contact: d.contact };
+      if (!isR) Object.assign(body, { days: d.days ? Number(d.days) : undefined, traffic_gb: d.traffic_gb !== '' ? Number(d.traffic_gb) : undefined, owner_id: d.owner_id || undefined, paid: Number(String(d.paid || '0').replace(',', '.')), method: d.method });
+      return (await POST(R('users'), body)).id;
+    });
+    if (!id) return;
+    toast('Korisnik napravljen.');
+    if (isR) { S.me = await GET('me'); }
+    S.selUser = id;
+    if (innerWidth < 960) location.hash = '#/korisnik/' + id;
+    else if (location.hash.startsWith('#/korisnici')) pageUsers(new URLSearchParams());
+    else location.hash = '#/korisnici';
+  }
+
+  async function extend(id) {
+    const u = S.lastUser?.id === Number(id) ? S.lastUser : await GET(R('users/' + id));
+    const plans = isRes() ? (await GET('res/dash')).plans.filter((p) => !p.trial) : (await GET('plans')).filter((p) => p.active);
+    const ok = await formLoop(`<h2>Produži · ${esc(u.username)}</h2>
+      <p class="muted" style="margin:0">Ističe ${fmtDate(u.expires_at)}. Dani se dodaju na datum isteka ili od danas ako je istekao.</p>
+      <label class="field">Plan<select class="input" name="plan_id">${plans.map((p) => `<option value="${p.id}" ${p.id === u.plan_id ? 'selected' : ''}>${esc(p.name)} · ${p.days} dana${isRes() ? ` · ${money(p.price)}` : ''}</option>`).join('')}</select></label>
+      ${!isRes() ? `<div class="row2"><label class="field">Dana (prazno = po planu)<input class="input" name="days" inputmode="numeric"></label>
+        <label class="field">Plaćeno (€)<input class="input" name="paid" inputmode="decimal" placeholder="0"></label></div>
+        <label class="field">Način plaćanja<input class="input" name="method" placeholder="npr. Wise, gotovina"></label>` : `<p class="muted" style="margin:0">Skida se sa tvog kredita (${money(S.me.credit)}).</p>`}
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Produži</button></div>`,
+    (d) => POST(R(`users/${id}/extend`), { plan_id: Number(d.plan_id), days: d.days ? Number(d.days) : undefined, paid: Number(String(d.paid || '0').replace(',', '.')), method: d.method }));
+    if (ok) { toast('Produženo.'); if (isRes()) S.me = await GET('me'); refreshUser(); }
+  }
+
+  async function editUser(id) {
+    const u = await GET('users/' + id);
+    const plans = await GET('plans'); const resellers = can('resellers') ? await GET('resellers').catch(() => []) : [];
+    const exp = new Date(u.expires_at); const iso = new Date(exp.getTime() - exp.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const ok = await formLoop(`<h2>Uredi · ${esc(u.username)}</h2>
+      <label class="field">Korisničko ime<input class="input" name="username" value="${esc(u.username)}" required></label>
+      <div class="row2"><label class="field">Plan<select class="input" name="plan_id">${plans.map((p) => `<option value="${p.id}" ${p.id === u.plan_id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+      <label class="field">Ističe<input class="input" type="date" name="expires" value="${iso}"></label></div>
+      <div class="row2"><label class="field">Promet GB (0 = neograničeno)<input class="input" name="traffic_gb" value="${u.traffic_limit ? (u.traffic_limit / 1024 ** 3).toFixed(0) : 0}" inputmode="decimal"></label>
+      <label class="field">Limit uređaja<input class="input" name="devices" value="${u.devices}" inputmode="numeric"></label></div>
+      ${resellers.length ? `<label class="field">Vlasnik<select class="input" name="owner_id"><option value="">Moj korisnik</option>${resellers.map((r) => `<option value="${r.id}" ${r.id === u.owner_id ? 'selected' : ''}>reseller · ${esc(r.username)}</option>`).join('')}</select></label>` : ''}
+      <div class="row2"><label class="field">Kontakt<input class="input" name="contact" value="${esc(u.contact)}"></label><label class="field">Bilješka<input class="input" name="note" value="${esc(u.note)}"></label></div>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    (d) => PUT('users/' + id, { username: d.username, plan_id: Number(d.plan_id), expires_at: new Date(d.expires + 'T23:59:00').getTime(), traffic_gb: Number(d.traffic_gb || 0), devices: Number(d.devices || 1), owner_id: d.owner_id ?? undefined, contact: d.contact, note: d.note }));
+    if (ok) { toast('Spremljeno.'); refreshUser(); }
+  }
+  async function editNote(id) {
+    const u = S.lastUser;
+    const ok = await formLoop(`<h2>Bilješka · ${esc(u.username)}</h2>
+      <label class="field">Kontakt<input class="input" name="contact" value="${esc(u.contact)}"></label>
+      <label class="field">Bilješka<textarea class="input" name="note">${esc(u.note)}</textarea></label>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    (d) => PUT(R('users/' + id), { note: d.note, contact: d.contact }));
+    if (ok) refreshUser();
+  }
+  async function userAction(id, act) {
+    const u = S.lastUser;
+    const text = { reset: ['Resetuj promet', 'Brojač prometa se vraća na nulu.', 'Resetuj'], rekey: ['Novi ključ i link', 'Stari link i konfiguracije prestaju raditi. Korisnik mora ponovo uvesti novi link.', 'Napravi novi'],
+      toggle: [u?.disabled ? 'Upali korisnika' : 'Ugasi korisnika', u?.disabled ? 'Korisnik se ponovo može spojiti.' : 'Korisnik se ne može spojiti dok ga ne upališ.', u?.disabled ? 'Upali' : 'Ugasi'],
+      delete: ['Obriši korisnika', `Korisnik ${u?.username || ''} se briše zauvijek.`, 'Obriši'] }[act];
+    if (!(await ask(text[0], text[1], text[2], act === 'delete' || act === 'rekey'))) return;
+    try {
+      if (act === 'delete') { await DEL(R('users/' + id)); S.selUser = null; toast('Obrisano.'); if (location.hash.startsWith('#/korisnik/')) location.hash = '#/korisnici'; else pageUsers(new URLSearchParams()); return; }
+      await POST(R(`users/${id}/${act}`)); toast('Urađeno.'); refreshUser();
+    } catch (e) { fail(e); }
+  }
+  async function showLinks() {
+    const u = S.lastUser;
+    const r = await modal(`<h2>Konfiguracije · ${esc(u.username)}</h2>
+      ${u.vless.length ? `<b>VLESS + Reality</b>${u.vless.map((v) => `<div class="list-item"><span>${esc(v.server)}</span><button class="btn sm" type="button" data-a="copy" data-v="${esc(v.link)}">${ic('copy')}Kopiraj</button></div>`).join('')}` : ''}
+      ${u.wg.length ? `<b>WireGuard</b>${u.wg.map((w) => `<div class="list-item"><span>${esc(w.server)}</span><a class="btn sm" href="${esc(w.url)}" target="_blank" rel="noopener">${ic('down')}.conf</a><a class="btn sm" href="${esc(w.url)}?qr=1" target="_blank" rel="noopener">QR</a></div>`).join('')}` : ''}
+      <div class="dlg-actions"><button class="btn" value="cancel">Zatvori</button></div>`);
+    if (r) r.close();
+  }
+  async function bulk() {
+    const ids = [...S.sel];
+    const r = await formLoop(`<h2>Masovne akcije · ${ids.length} korisnika</h2>
+      <label class="field">Akcija<select class="input" name="action"><option value="extend">Produži</option><option value="disable">Ugasi</option><option value="enable">Upali</option><option value="reset">Resetuj promet</option><option value="delete">Obriši</option></select></label>
+      <label class="field">Dana (samo za produženje)<input class="input" name="days" value="30" inputmode="numeric"></label>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Primijeni</button></div>`,
+    (d) => POST('users/bulk', { ids, action: d.action, days: Number(d.days) }));
+    if (r) { toast(`Urađeno za ${r.n} korisnika.`); S.sel.clear(); pageUsers(new URLSearchParams()); }
+  }
+
+  // ================================================================== PLANOVI
+  async function pagePlans() {
+    const [plans, servers] = await Promise.all([GET('plans'), GET('servers').catch(() => [])]);
+    S.servers = servers;
+    const cols = '1.8fr .8fr 1fr .8fr .8fr 1.4fr .7fr .9fr';
+    $('#view').innerHTML = `${top('Planovi', 'Šta kupci i reselleri mogu kupiti', can('plans') ? `<button class="btn red" data-a="editPlan">${ic('plus')}<span>Novi plan</span></button>` : '')}
+      <section class="card" style="overflow:hidden"><div class="tbl">${trow(['Plan', 'Trajanje', 'Promet', 'Uređaji', 'Cijena', 'Serveri', 'Korisnici', 'Status'], true, cols)}
+      ${plans.map((p) => `<div class="tr click" data-a="editPlan" data-id="${p.id}" style="grid-template-columns:${cols}">${[
+        `<b>${esc(p.name)}</b>${p.trial ? '<small>probni plan</small>' : ''}`, `${p.days} d`, p.traffic_gb ? p.traffic_gb + ' GB' : 'neograničeno', p.devices, p.trial ? 'besplatno' : money(p.price),
+        p.locations.length ? esc(p.locations.map((id) => servers.find((s) => s.id === id)?.name || '#' + id).join(', ')) : '<span class="muted">svi serveri</span>', p.users,
+        p.active ? '<span class="tag t-ok">Aktivan</span>' : '<span class="tag t-grey">Isključen</span>',
+      ].map((c, i) => `<div class="cell${i === 0 ? ' first' : ''}" data-l="${['', 'Trajanje', 'Promet', 'Uređaji', 'Cijena', 'Serveri', 'Korisnici', 'Status'][i]}">${c}</div>`).join('')}</div>`).join('') || '<div class="empty">Nema planova.</div>'}</div></section>
+      <p class="dim" style="margin:0;font-size:13px">Reselleri plaćaju cijenu plana umanjenu za popust svog nivoa. Promjena plana ne mijenja postojeće korisnike dok ih ne produžiš.</p>`;
+  }
+  async function editPlan(id) {
+    const p = id ? (await GET('plans')).find((x) => x.id === Number(id)) : { name: '', days: 30, traffic_gb: 0, devices: 3, price: 5, locations: [], trial: false, active: true, sort: 0 };
+    const servers = S.servers?.length ? S.servers : await GET('servers').catch(() => []);
+    const r = await formLoop(`<h2>${id ? 'Uredi plan' : 'Novi plan'}</h2>
+      <label class="field">Ime plana<input class="input" name="name" value="${esc(p.name)}" required placeholder="npr. Premium 30 dana"></label>
+      <div class="row2"><label class="field">Trajanje (dana)<input class="input" name="days" value="${p.days}" inputmode="numeric" required></label>
+      <label class="field">Cijena (€)<input class="input" name="price" value="${p.price}" inputmode="decimal"></label></div>
+      <div class="row2"><label class="field">Promet GB (0 = neograničeno)<input class="input" name="traffic_gb" value="${p.traffic_gb}" inputmode="decimal"></label>
+      <label class="field">Limit uređaja<input class="input" name="devices" value="${p.devices}" inputmode="numeric"></label></div>
+      <div class="field">Serveri (ništa označeno = svi)
+        <div style="display:flex;flex-wrap:wrap;gap:8px 16px;color:var(--text)">${servers.map((s) => `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="cb" name="loc[]" value="${s.id}" ${p.locations.includes(s.id) ? 'checked' : ''}>${esc(s.name)}</label>`).join('') || '<span class="muted">Još nema servera.</span>'}</div></div>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="trial" ${p.trial ? 'checked' : ''}>Probni plan (besplatan za resellere, ograničen broj dnevno)</label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="active" ${p.active ? 'checked' : ''}>Aktivan (može se prodavati)</label>
+      <div class="dlg-actions">${id ? '<button class="btn danger" value="delete" formnovalidate>Obriši</button>' : ''}<span style="flex:1"></span><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    async (d) => {
+      if (d._btn === 'delete') { if (!(await confirmInline('Obrisati plan?'))) throw new Error('Odustao si od brisanja.'); return DEL('plans/' + id); }
+      const body = { name: d.name, days: Number(d.days), price: Number(String(d.price).replace(',', '.')), traffic_gb: Number(d.traffic_gb), devices: Number(d.devices), locations: (d._many.loc || []).map(Number), trial: d.trial, active: d.active };
+      return id ? PUT('plans/' + id, body) : POST('plans', body);
+    });
+    if (r) { toast('Spremljeno.'); pagePlans(); }
+  }
+  const confirmInline = (q) => Promise.resolve(window.confirm(q));
+
+  // ================================================================== SERVERI
+  async function pageServers() {
+    const servers = await GET('servers');
+    S.servers = servers;
+    const on = servers.filter((s) => s.status === 'online'), off = servers.filter((s) => s.status === 'offline');
+    const cap = servers.filter((s) => s.enabled).reduce((a, s) => a + s.capacity, 0), conn = on.reduce((a, s) => a + s.online, 0);
+    const tm = servers.reduce((a, s) => a + (s.traffic_month || 0), 0), cost = servers.filter((s) => s.enabled).reduce((a, s) => a + (s.cost || 0), 0);
+    const meter = (l, v) => `<div><small><span>${l}</span><span>${v == null ? '—' : Math.round(v) + '%'}</span></small><div class="bar"><i class="${v >= 80 ? 'w' : ''}" style="width:${v || 0}%"></i></div></div>`;
+    $('#view').innerHTML = `${top('Serveri', `${servers.length} servera · ${on.length} online`, `<button class="btn hide-m" data-a="reload">${ic('refresh')}Osvježi</button>${can('servers') ? `<button class="btn red" data-a="newServer">${ic('plus')}<span>Dodaj server</span></button>` : ''}`)}
+      <section class="stats">
+        <div class="stat"><div class="l"><span>Online</span>${ic('server')}</div><div class="v">${on.length} / ${servers.filter((s) => s.enabled).length}</div><div class="s ${off.length ? 'bad' : 'ok'}">${off.length ? off.map((s) => esc(s.name)).join(', ') + ' ne odgovara' : 'svi rade'}</div></div>
+        <div class="stat"><div class="l"><span>Spojeno / kapacitet</span>${ic('users')}</div><div class="v">${conn} / ${cap}</div><div class="s muted">${cap ? Math.round(conn / cap * 100) : 0}% popunjeno</div></div>
+        <div class="stat"><div class="l"><span>Promet ovaj mjesec</span>${ic('down')}</div><div class="v">${bytes(tm)}</div><div class="s muted">svi serveri</div></div>
+        <div class="stat"><div class="l"><span>Trošak servera</span>${ic('money')}</div><div class="v">${money(cost)}</div><div class="s muted">mjesečno</div></div>
+      </section>
+      ${servers.length ? `<section class="grid-auto">${servers.map((s) => `<article class="card srv ${s.status === 'offline' ? 'off' : ''}">
+        <div style="display:flex;gap:12px;align-items:flex-start"><span class="cc">${flag(s.country)}</span>
+          <div style="flex:1;min-width:0"><b style="font-size:15px">${esc(s.name)}</b><div class="muted" style="font-size:12.5px">${esc([s.city, s.provider, s.host].filter(Boolean).join(' · ')) || 'čeka prvo javljanje'}</div></div>
+          <span data-live-srv="${s.id}">${srvStatus(s)}</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${S.me && s.xray_ok ? '<span class="tag t-grey">VLESS Reality</span>' : ''}${s.wg_ok ? '<span class="tag t-grey">WireGuard</span>' : ''}${s.status === 'pending' ? '<span class="tag t-warn">nije instaliran</span>' : ''}${s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}</div>
+        <div class="meters">${meter('CPU', s.status === 'online' ? s.cpu : null)}${meter('RAM', s.status === 'online' ? s.ram : null)}${meter('Popunjeno', s.capacity ? s.online / s.capacity * 100 : 0)}</div>
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--soft);font-size:13px;padding-top:10px;border-top:1px solid var(--row)">
+          <span><b>${s.online}</b> / ${s.capacity} spojeno</span><span>${bytes(s.traffic_month)} / mj.</span><span class="dim">${s.last_seen ? 'javio se ' + ago(s.last_seen) : 'nije se javio'}</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${s.status === 'pending' ? `<button class="btn sm red" style="flex:1" data-a="install" data-id="${s.id}">Komanda za instalaciju</button>` : ''}
+          <button class="btn sm" style="flex:1" data-a="editServer" data-id="${s.id}">Uredi</button>
+          <button class="btn sm warnb" style="flex:1" data-a="srvAct" data-act="maintenance" data-id="${s.id}">${s.maintenance ? 'Završi održavanje' : 'Održavanje'}</button>
+          <button class="btn sm" style="flex:1" data-a="srvMore" data-id="${s.id}">${ic('more')}<span class="sr">Više</span></button>
+        </div></article>`).join('')}</section>`
+      : `<section class="card p" style="text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center"><h2>Dodaj svoj prvi VPN server</h2>
+          <p class="muted" style="max-width:520px;margin:0">Zakupi VPS (Ubuntu 22.04 ili 24.04), klikni "Dodaj server", pa zalijepi jednu komandu u server. Panel sve ostalo uradi sam.</p>
+          <button class="btn red" data-a="newServer">${ic('plus')}Dodaj server</button></section>`}`;
+    startLive();
+  }
+  async function newServer() {
+    const r = await formLoop(`<h2>Dodaj server</h2>
+      <ol class="muted" style="margin:0;padding-left:20px;line-height:1.7"><li>Zakupi VPS sa Ubuntu 22.04 ili 24.04</li><li>Upiši ime i kapacitet ispod</li><li>Dobićeš komandu koju zalijepiš u server kao root</li></ol>
+      <div class="row2"><label class="field">Ime servera<input class="input" name="name" required placeholder="npr. DE Frankfurt 1"></label>
+      <label class="field">Maksimalno spojenih<input class="input" name="capacity" value="400" inputmode="numeric"></label></div>
+      <div class="row2"><label class="field">Hoster (opcionalno)<input class="input" name="provider" placeholder="Hetzner, OVH…"></label>
+      <label class="field">Mjesečni trošak € (opcionalno)<input class="input" name="cost" inputmode="decimal"></label></div>
+      <details><summary class="muted" style="cursor:pointer">Napredno: IP, lokacija, portovi</summary>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <div class="row2"><label class="field">IP ili domena (prazno = sam se javi)<input class="input" name="host"></label><label class="field">Grad / država (npr. Frankfurt / DE)<input class="input" name="loc"></label></div>
+        <div class="row2"><label class="field">VLESS port<input class="input" name="vless_port" value="443"></label><label class="field">WireGuard port<input class="input" name="wg_port" value="51820"></label></div></div></details>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Dodaj i prikaži komandu</button></div>`,
+    (d) => { const [city, cc] = String(d.loc || '').split('/').map((x) => x.trim()); return POST('servers', { name: d.name, capacity: Number(d.capacity), provider: d.provider, cost: Number(String(d.cost || 0).replace(',', '.')), host: d.host, city, country: cc, vless_port: Number(d.vless_port), wg_port: Number(d.wg_port) }); });
+    if (r) { showInstall(r.install, true); if (location.hash.startsWith('#/serveri')) pageServers(); }
+  }
+  async function showInstall(cmd, fresh) {
+    const r = await modal(`<h2>${fresh ? 'Server dodan · ' : ''}Instalacija</h2>
+      <p class="muted" style="margin:0">Prijavi se na server preko SSH-a (kao root) i zalijepi ovu komandu. Instalacija traje 1–2 minute.</p>
+      <div class="code">${esc(cmd)}</div>
+      <p class="muted" style="margin:0;font-size:13px">Komanda sadrži tajni ključ servera. Ne dijeli je.${!S.me.panel_url_set ? ' Ako server ne vidi ovu adresu panela, upiši pravu adresu u Postavke → Općenito → Adresa panela.' : ''}</p>
+      <div class="dlg-actions"><button class="btn" type="button" data-a="copy" data-v="${esc(cmd)}">${ic('copy')}Kopiraj komandu</button><button class="btn red" value="cancel">Gotovo</button></div>`);
+    if (r) r.close();
+  }
+  async function editServer(id) {
+    const s = S.servers.find((x) => x.id === Number(id)) || (await GET('servers')).find((x) => x.id === Number(id));
+    const r = await formLoop(`<h2>Uredi · ${esc(s.name)}</h2>
+      <div class="row2"><label class="field">Ime<input class="input" name="name" value="${esc(s.name)}" required></label><label class="field">IP ili domena<input class="input" name="host" value="${esc(s.host)}"></label></div>
+      <div class="row2"><label class="field">Grad<input class="input" name="city" value="${esc(s.city)}"></label><label class="field">Država (2 slova, npr. DE)<input class="input" name="country" value="${esc(s.country)}" maxlength="2"></label></div>
+      <div class="row2"><label class="field">Maksimalno spojenih<input class="input" name="capacity" value="${s.capacity}"></label><label class="field">Mjesečni trošak €<input class="input" name="cost" value="${s.cost || 0}"></label></div>
+      <div class="row2"><label class="field">Hoster<input class="input" name="provider" value="${esc(s.provider)}"></label><label class="field">Reality SNI<input class="input" name="sni" value="${esc(s.sni)}"></label></div>
+      <div class="row2"><label class="field">VLESS port<input class="input" name="vless_port" value="${s.vless_port}"></label><label class="field">WireGuard port<input class="input" name="wg_port" value="${s.wg_port}"></label></div>
+      <p class="dim" style="margin:0;font-size:12.5px">Promjena porta ili SNI-ja mijenja linkove kupaca: aplikacije ih same osvježe preko pretplate.</p>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    (d) => PUT('servers/' + id, { ...d, capacity: Number(d.capacity), cost: Number(String(d.cost).replace(',', '.')), vless_port: Number(d.vless_port), wg_port: Number(d.wg_port) }));
+    if (r) { toast('Spremljeno.'); pageServers(); }
+  }
+  async function srvMore(id) {
+    const s = S.servers.find((x) => x.id === Number(id));
+    const r = await modal(`<h2>${esc(s.name)}</h2>
+      <div class="mini-grid"><div class="mini"><small>Agent</small><b>${esc(s.version || '—')}</b></div><div class="mini"><small>Uptime</small><b>${s.uptime ? Math.floor(s.uptime / 86400) + ' d ' + Math.floor(s.uptime % 86400 / 3600) + ' h' : '—'}</b></div>
+        <div class="mini"><small>Xray</small><b class="${s.xray_ok ? 'ok' : 'bad'}">${s.xray_ok ? 'radi' : 'ne radi'}</b></div><div class="mini"><small>WireGuard</small><b class="${s.wg_ok ? 'ok' : 'bad'}">${s.wg_ok ? 'radi' : 'ne radi'}</b></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn" value="install">Prikaži komandu za instalaciju</button>
+        <button class="btn" value="locate">Odredi lokaciju iz IP adrese</button>
+        <button class="btn warnb" value="toggle">${s.enabled ? 'Ugasi server (kupci ga ne vide)' : 'Upali server'}</button>
+        <button class="btn danger" value="delete">Obriši server iz panela</button></div>
+      <div class="dlg-actions"><button class="btn" value="cancel">Zatvori</button></div>`);
+    if (!r) return;
+    r.close();
+    try {
+      if (r.data._btn === 'install') return showInstall((await GET(`servers/${id}/install`)).install);
+      if (r.data._btn === 'delete') { if (!(await ask('Obriši server', `${s.name} se briše iz panela. Na samom serveru ugasi agenta ili obriši VPS.`, 'Obriši', true))) return; await DEL('servers/' + id); }
+      else await POST(`servers/${id}/${r.data._btn}`);
+      toast('Urađeno.'); pageServers();
+    } catch (e) { fail(e); }
+  }
+
+  // ================================================================== RESELLERI
+  async function pageResellers() {
+    const [list, levels] = await Promise.all([GET('resellers'), GET('levels')]);
+    S.resellers = list; S.levels = levels;
+    const cols = '1.6fr .8fr .9fr 1.3fr .9fr .8fr';
+    const wide = innerWidth >= 960;
+    const totalCredit = list.reduce((a, r) => a + Math.max(0, r.credit), 0), month = list.reduce((a, r) => a + r.month, 0);
+    $('#view').innerHTML = `${top('Reselleri', `${list.length} resellera · ${money(month)} kredita prodano ovaj mjesec`, `<a class="btn hide-m" href="#/reselleri/nivoi">${ic('levels')}Nivoi</a><button class="btn red" data-a="newReseller">${ic('plus')}<span>Novi reseller</span></button>`)}
+      <section class="stats">
+        <div class="stat"><div class="l"><span>Reselleri</span>${ic('res')}</div><div class="v">${list.filter((r) => !r.disabled).length}</div><div class="s muted">${list.filter((r) => r.disabled).length} blokiranih</div></div>
+        <div class="stat"><div class="l"><span>Njihovi korisnici</span>${ic('users')}</div><div class="v">${list.reduce((a, r) => a + r.users, 0)}</div><div class="s muted">ukupno</div></div>
+        <div class="stat"><div class="l"><span>Prodano ovaj mjesec</span>${ic('money')}</div><div class="v">${money(month)}</div><div class="s muted">kupovine kredita</div></div>
+        <div class="stat"><div class="l"><span>Neiskorišten kredit</span>${ic('credit')}</div><div class="v">${money(totalCredit)}</div><div class="s muted">kod resellera</div></div>
+      </section>
+      <div class="split">
+        <section class="card wide" style="overflow:hidden"><div class="tbl">${trow(['Reseller', 'Nivo', 'Kredit', 'Korisnici', 'Ovaj mjesec', 'Status'], true, cols)}
+          ${list.map((r) => `<div class="tr click ${S.selRes === r.id ? 'sel' : ''}" data-a="openRes" data-id="${r.id}" style="grid-template-columns:${cols}">${[
+            `<b>${esc(r.username)}</b><small>${esc(r.contact || r.brand || '')}</small>`, r.level ? `<span class="tag lvl-${esc(r.level)}">${esc(r.level)}</span>` : '<span class="muted">—</span>',
+            `<b class="${r.credit < 10 ? 'warn' : ''}">${money(r.credit)}</b>`,
+            `<div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12.5px">${r.users} / ${r.user_limit}</span><div class="bar"><i style="width:${Math.min(100, r.users / r.user_limit * 100)}%"></i></div></div>`,
+            money(r.month), r.disabled ? '<span class="tag t-bad">Blokiran</span>' : r.credit < 10 ? '<span class="tag t-warn">Malo kredita</span>' : '<span class="tag t-ok">Aktivan</span>',
+          ].map((c, i) => `<div class="cell${i === 0 ? ' first' : ''}" data-l="${['', 'Nivo', 'Kredit', 'Korisnici', 'Mjesec', 'Status'][i]}">${c}</div>`).join('')}</div>`).join('') || '<div class="empty">Još nema resellera.</div>'}</div></section>
+        ${wide ? `<section class="card p narrow" id="rDetail">${S.selRes ? '' : '<div class="empty">Klikni resellera za detalje i dodavanje kredita.</div>'}</section>` : ''}
+      </div>`;
+    if (wide && S.selRes) resDetail(S.selRes, $('#rDetail'));
+  }
+  function resDetail(id, box) {
+    const r = S.resellers.find((x) => x.id === Number(id));
+    if (!r) return;
+    const methods = String(S.payMethods || 'Wise, Kripto (USDT), PayPal, Gotovina').split(',').map((m) => m.trim()).filter(Boolean);
+    box.innerHTML = `${box.id === 'rFull' ? `<a href="#/reselleri" class="btn sm ghost" style="align-self:flex-start">${ic('back')}Nazad</a>` : ''}
+      <div style="display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0"><div class="h2" style="font-size:20px">${esc(r.username)}</div><div class="muted" style="font-size:12.5px">${esc(r.contact || '')} · od ${fmtDate(r.created_at)}</div></div>${r.level ? `<span class="tag lvl-${esc(r.level)}">${esc(r.level)}</span>` : ''}</div>
+      <div class="mini" style="display:flex;align-items:flex-end;gap:12px;margin-top:14px"><div style="flex:1"><small>Stanje kredita</small><b class="num" style="font-size:30px">${money(r.credit)}</b></div>
+        <div class="muted" style="text-align:right;font-size:12.5px">Popust ${Math.round((r.discount || 0) * 100)}%<br>Zadnja prijava: ${ago(r.last_login)}</div></div>
+      ${can('finance') ? `<form id="creditForm" style="display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line);border-radius:10px;margin-top:14px">
+        <b>Dodaj kredit</b>
+        <div class="row2"><label class="field">Iznos (€)<input class="input" name="amount" inputmode="decimal" required placeholder="100"></label>
+        <label class="field">Način plaćanja<select class="input" name="method">${methods.map((m) => `<option>${esc(m)}</option>`).join('')}</select></label></div>
+        <label class="field">Bilješka (opcionalno)<input class="input" name="note"></label>
+        <div style="display:flex;gap:8px"><button class="btn red" style="flex:1" type="submit" name="kind" value="topup">Dodaj na račun</button><button class="btn" type="submit" name="kind" value="adjust" title="Ispravka bez novca (npr. poklon ili greška)">Ispravka</button></div></form>` : ''}
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
+        <button class="btn" data-a="impersonate" data-id="${r.id}">Uđi kao reseller</button>
+        <button class="btn" data-a="editReseller" data-id="${r.id}">Uredi</button>
+        <button class="btn" data-a="resUsers" data-id="${r.id}">Njegovi korisnici</button>
+        <button class="btn danger" data-a="blockRes" data-id="${r.id}">${r.disabled ? 'Odblokiraj' : 'Blokiraj'}</button>
+      </div>
+      ${r.note ? `<p class="muted" style="margin:12px 0 0">Bilješka: ${esc(r.note)}</p>` : ''}`;
+    const f = $('#creditForm', box);
+    if (f) f.onsubmit = async (e) => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(f).entries());
+      try { await POST(`resellers/${r.id}/credit`, { amount: Number(String(d.amount).replace(',', '.')), method: d.method, note: d.note, kind: e.submitter.value }); toast('Kredit dodan.'); pageResellers(); } catch (err) { fail(err); }
+    };
+  }
+  async function editReseller(id) {
+    const r = id ? S.resellers.find((x) => x.id === Number(id)) : { username: '', level_id: S.levels?.[0]?.id, user_limit: 150, contact: '', brand: '', note: '' };
+    const levels = S.levels || await GET('levels');
+    const ok = await formLoop(`<h2>${id ? 'Uredi · ' + esc(r.username) : 'Novi reseller'}</h2>
+      ${id ? '' : `<label class="field">Korisničko ime (za prijavu)<input class="input" name="username" required></label>`}
+      <label class="field">${id ? 'Nova šifra (prazno = ne mijenja se)' : 'Šifra (bar 8 znakova)'}<input class="input" name="password" type="text" ${id ? '' : 'required minlength="8"'} autocomplete="new-password"></label>
+      <div class="row2"><label class="field">Nivo<select class="input" name="level_id"><option value="">Bez nivoa (bez popusta)</option>${levels.map((l) => `<option value="${l.id}" ${l.id === r.level_id ? 'selected' : ''}>${esc(l.name)} · ${Math.round(l.discount * 100)}%</option>`).join('')}</select></label>
+      <label class="field">Limit korisnika<input class="input" name="user_limit" value="${r.user_limit}" inputmode="numeric"></label></div>
+      <div class="row2"><label class="field">Kontakt<input class="input" name="contact" value="${esc(r.contact)}" placeholder="Telegram, e-mail"></label><label class="field">Njegov brend (opcionalno)<input class="input" name="brand" value="${esc(r.brand)}"></label></div>
+      <label class="field">Bilješka<input class="input" name="note" value="${esc(r.note)}"></label>
+      <div class="dlg-actions">${id ? '<button class="btn danger" value="delete" formnovalidate>Obriši</button>' : ''}<span style="flex:1"></span><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    async (d) => {
+      if (d._btn === 'delete') { if (!confirm('Obrisati resellera?')) throw new Error('Odustao si.'); return DEL('resellers/' + id); }
+      const body = { level_id: d.level_id ? Number(d.level_id) : null, user_limit: Number(d.user_limit), contact: d.contact, brand: d.brand, note: d.note, password: d.password || undefined };
+      return id ? PUT('resellers/' + id, body) : POST('resellers', { ...body, username: d.username });
+    });
+    if (ok) { toast('Spremljeno.'); if (ok.id) S.selRes = ok.id; pageResellers(); }
+  }
+  async function pageLevels() {
+    const levels = await GET('levels');
+    S.levels = levels;
+    $('#view').innerHTML = `${top('Nivoi i popusti', 'Reselleri kupuju planove jeftinije, po popustu svog nivoa', `<a class="btn" href="#/reselleri">${ic('back')}Reselleri</a><button class="btn red" data-a="editLevel">${ic('plus')}<span>Novi nivo</span></button>`)}
+      <section class="grid-auto">${levels.map((l) => `<div class="card p" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span class="tag lvl-${esc(l.name)}" style="font-size:13px">${esc(l.name)}</span><span class="muted" style="font-size:13px">${l.count} resellera</span></div>
+        <div class="num" style="font-size:28px">${Math.round(l.discount * 100)}% popusta</div>
+        <div class="muted" style="font-size:13px">Do ${l.max_users} korisnika${l.min_monthly ? ` · preporučena kupovina od ${money(l.min_monthly)} mjesečno` : ''}</div>
+        <button class="btn sm" data-a="editLevel" data-id="${l.id}">Uredi</button></div>`).join('')}</section>`;
+  }
+  async function editLevel(id) {
+    const l = id ? S.levels.find((x) => x.id === Number(id)) : { name: '', discount: 0.1, max_users: 150, min_monthly: 0 };
+    const ok = await formLoop(`<h2>${id ? 'Uredi nivo' : 'Novi nivo'}</h2>
+      <label class="field">Ime<input class="input" name="name" value="${esc(l.name)}" required></label>
+      <div class="row2"><label class="field">Popust %<input class="input" name="discount" value="${Math.round(l.discount * 100)}" inputmode="numeric"></label><label class="field">Maksimalno korisnika<input class="input" name="max_users" value="${l.max_users}"></label></div>
+      <label class="field">Preporučena mjesečna kupovina (€)<input class="input" name="min_monthly" value="${l.min_monthly}"></label>
+      <div class="dlg-actions">${id ? '<button class="btn danger" value="delete" formnovalidate>Obriši</button>' : ''}<span style="flex:1"></span><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    (d) => {
+      if (d._btn === 'delete') return DEL('levels/' + id);
+      const body = { name: d.name, discount: Number(d.discount) / 100, max_users: Number(d.max_users), min_monthly: Number(d.min_monthly) };
+      return id ? PUT('levels/' + id, body) : POST('levels', body);
+    });
+    if (ok) pageLevels();
+  }
+
+  // ================================================================== FINANSIJE
+  const TXT = { topup: ['Kupovina kredita', 't-ok'], sale: ['Direktna prodaja', 't-ok'], credit_use: ['Potrošen kredit', 't-grey'], expense: ['Trošak', 't-bad'], adjust: ['Ispravka kredita', 't-info'] };
+  async function pageFinance(params) {
+    const type = params.get('type') || '';
+    const tx = await GET('transactions' + (type ? '?type=' + type : ''));
+    const cols = '120px 1.3fr 1.4fr 1fr .9fr .9fr';
+    $('#view').innerHTML = `${top('Transakcije', 'Uplate, prodaje, troškovi i kredit resellera', `<button class="btn" data-a="newTx" data-type="expense">Upiši trošak</button><button class="btn red" data-a="newTx" data-type="sale">${ic('plus')}<span>Upiši prodaju</span></button>`)}
+      <div class="chips">${[['', 'Sve'], ['topup', 'Kupovine kredita'], ['sale', 'Direktne prodaje'], ['credit_use', 'Potrošnja kredita'], ['expense', 'Troškovi']].map(([k, l]) => `<a class="chip ${type === k ? 'on' : ''}" href="#/finansije${k ? '?type=' + k : ''}">${l}</a>`).join('')}</div>
+      <section class="card" style="overflow:hidden"><div class="tbl">${trow(['Datum', 'Ko', 'Vrsta', 'Način', 'Iznos', 'Faktura'], true, cols)}
+      ${tx.map((t) => trow([fmtDT(t.ts), `<b>${esc(t.reseller || t.user || t.actor || '—')}</b><small>${esc(t.note || '')}</small>`, `<span class="tag ${TXT[t.type]?.[1]}">${TXT[t.type]?.[0] || t.type}</span>`, esc(t.method || '—'),
+        t.amount ? `<b class="${t.amount < 0 ? 'bad' : 'ok'}">${t.amount < 0 ? '−' : '+'} ${money(Math.abs(t.amount))}</b>` : `<span class="muted">${t.credit_delta > 0 ? '+' : ''}${money(t.credit_delta)} kredita</span>`,
+        t.amount > 0 ? `<a href="api/invoice/${t.id}" target="_blank" rel="noopener">${esc(t.invoice_no || 'Faktura')}</a>` : '<span class="dim">—</span>'], false, cols, ['', '', 'Vrsta', 'Način', 'Iznos', 'Faktura'])).join('') || '<div class="empty">Nema transakcija.</div>'}</div></section>`;
+  }
+  async function newTx(type) {
+    const ok = await formLoop(`<h2>${type === 'expense' ? 'Upiši trošak' : 'Upiši prodaju'}</h2>
+      <div class="row2"><label class="field">Iznos (€)<input class="input" name="amount" inputmode="decimal" required></label><label class="field">Način<input class="input" name="method" placeholder="${type === 'expense' ? 'Kartica' : 'Wise, gotovina…'}"></label></div>
+      <label class="field">Opis<input class="input" name="note" placeholder="${type === 'expense' ? 'npr. Hetzner račun oktobar' : 'npr. prodaja preko Telegrama'}"></label>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    (d) => POST('transactions', { type, amount: Number(String(d.amount).replace(',', '.')), method: d.method, note: d.note }));
+    if (ok) { toast('Upisano.'); route(); }
+  }
+  async function pageReports(params) {
+    const year = Number(params.get('year')) || new Date().getFullYear();
+    const r = await GET('reports?year=' + year);
+    const max = Math.max(1, ...r.months.map((m) => Math.max(m.income, m.expense)));
+    const inc = r.months.reduce((a, m) => a + m.income, 0), exp = r.months.reduce((a, m) => a + m.expense, 0);
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Avg', 'Sep', 'Okt', 'Nov', 'Dec'];
+    let bars = '';
+    r.months.forEach((m, i) => {
+      const x = 20 + i * 57, hi = m.income / max * 160, he = m.expense / max * 160;
+      bars += `<rect x="${x}" y="${170 - hi}" width="22" height="${hi}" fill="var(--acc)"/><rect x="${x + 24}" y="${170 - he}" width="12" height="${he}" fill="#8b8b98"/>`;
+    });
+    $('#view').innerHTML = `${top('Izvještaji', `Godina ${year}`, `<a class="btn" href="#/finansije/izvjestaji?year=${year - 1}">← ${year - 1}</a><a class="btn" href="#/finansije/izvjestaji?year=${year + 1}">${year + 1} →</a>`)}
+      <section class="stats">
+        <div class="stat"><div class="l"><span>Prihod</span>${ic('money')}</div><div class="v">${money(inc)}</div><div class="s muted">kredit + direktna prodaja</div></div>
+        <div class="stat"><div class="l"><span>Troškovi</span>${ic('money')}</div><div class="v">${money(exp)}</div><div class="s muted">upisani troškovi</div></div>
+        <div class="stat"><div class="l"><span>Dobit</span>${ic('report')}</div><div class="v ${inc - exp >= 0 ? '' : 'bad'}">${money(inc - exp)}</div><div class="s muted">serveri trenutno ${money(r.serverCost)}/mj.</div></div>
+        <div class="stat"><div class="l"><span>Neiskorišten kredit</span>${ic('credit')}</div><div class="v">${money(r.unusedCredit)}</div><div class="s muted">kod ${r.unusedCreditCount} resellera</div></div>
+      </section>
+      <section class="card p"><div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px"><h2 style="flex:1">Po mjesecima</h2><div class="legend"><span><i style="background:var(--acc);border-radius:2px"></i>Prihod</span><span><i style="background:#8b8b98;border-radius:2px"></i>Troškovi</span></div></div>
+        <svg viewBox="0 0 700 175" style="width:100%;height:220px;display:block" role="img" aria-label="Prihod i troškovi po mjesecima">${bars}</svg>
+        <div class="chart-days" style="grid-template-columns:repeat(12,minmax(0,1fr))">${MON.map((m) => `<span>${m}</span>`).join('')}</div></section>
+      <div class="grid2"><section class="card"><div class="card-head"><h2>Mjeseci</h2></div><div class="tbl">${trow(['Mjesec', 'Prihod', 'Troškovi', 'Dobit'], true, '1fr 1fr 1fr 1fr')}
+        ${r.months.filter((m) => m.income || m.expense).map((m) => trow([MON[m.month - 1], money(m.income), money(m.expense), `<b>${money(m.income - m.expense)}</b>`], false, '1fr 1fr 1fr 1fr', ['', 'Prihod', 'Troškovi', 'Dobit'])).join('') || '<div class="empty">Nema podataka.</div>'}</div></section>
+        <section class="card p"><h2 style="margin-bottom:8px">Po izvoru</h2>
+          <div style="display:flex;justify-content:space-between;padding:8px 0"><span>Direktna prodaja</span><b>${money(r.direct)}</b></div>
+          ${r.byReseller.map((x) => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--row)"><span>${esc(x.username)}</span><b>${money(x.total)}</b></div>`).join('')}</section></div>`;
+  }
+
+  // ================================================================== RESELLER: KREDIT
+  async function pageCredit() {
+    const [tx, me] = await Promise.all([GET('res/transactions'), GET('me')]);
+    S.me = me;
+    const p = me.pay || {};
+    const cols = '120px 1.6fr 1fr 1fr';
+    $('#view').innerHTML = `${top('Kredit i uplate', 'Kredit se troši kad praviš ili produžavaš korisnike')}
+      <div class="grid2">
+        <section class="card p"><div class="muted">Stanje kredita</div><div class="num" style="font-size:40px">${money(me.credit)}</div>
+          <p class="muted" style="margin:6px 0 0">Za dopunu pošalji uplatu i javi se administratoru. Kredit se doda čim uplata stigne.</p></section>
+        <section class="card p" style="display:flex;flex-direction:column;gap:8px"><h2>Kako uplatiti</h2>
+          ${p.methods ? `<div class="muted">Načini: ${esc(p.methods)}</div>` : ''}
+          ${p.iban ? `<div class="list-item"><span>IBAN <span class="mono">${esc(p.iban)}</span></span><button class="btn sm" data-a="copy" data-v="${esc(p.iban)}">${ic('copy')}</button></div>` : ''}
+          ${p.usdt ? `<div class="list-item"><span>USDT (TRC20) <span class="mono">${esc(p.usdt)}</span></span><button class="btn sm" data-a="copy" data-v="${esc(p.usdt)}">${ic('copy')}</button></div>` : ''}
+          ${p.paypal ? `<div class="list-item"><span>PayPal ${esc(p.paypal)}</span><button class="btn sm" data-a="copy" data-v="${esc(p.paypal)}">${ic('copy')}</button></div>` : ''}
+          ${p.min ? `<small class="dim">Minimalna uplata: ${money(p.min)}</small>` : ''}</section>
+      </div>
+      <section class="card" style="overflow:hidden"><div class="card-head"><h2>Historija</h2></div><div class="tbl">${trow(['Datum', 'Opis', 'Promjena', 'Faktura'], true, cols)}
+        ${tx.map((t) => trow([fmtDT(t.ts), esc(t.note || (TXT[t.type]?.[0] || t.type)), `<b class="${t.credit_delta < 0 ? '' : 'ok'}">${t.credit_delta > 0 ? '+' : ''}${money(t.credit_delta)}</b>`, t.amount > 0 ? `<a href="api/invoice/${t.id}" target="_blank" rel="noopener">${esc(t.invoice_no || 'Faktura')}</a>` : '<span class="dim">—</span>'], false, cols, ['', 'Opis', 'Promjena', 'Faktura'])).join('') || '<div class="empty">Još nema uplata.</div>'}</div></section>`;
+  }
+
+  // ================================================================== LOGOVI
+  async function pageLogs(params) {
+    const q = params.get('q') || '', kind = params.get('kind') || '';
+    const logs = await GET(`logs?q=${encodeURIComponent(q)}&kind=${kind}`);
+    const cols = '120px 1fr 1.2fr 2.6fr';
+    $('#view').innerHTML = `${top('Logovi', 'Ko je šta uradio u panelu i šta se dešavalo sa serverima')}
+      <div style="display:flex;flex-wrap:wrap;gap:10px"><label class="search">${ic('search')}<span class="sr">Pretraga</span><input id="logQ" value="${esc(q)}" placeholder="Traži…"></label>
+        <div class="chips">${[['', 'Sve'], ['warn', 'Upozorenja'], ['error', 'Greške']].map(([k, l]) => `<a class="chip ${kind === k ? 'on' : ''}" href="#/logovi?kind=${k}&q=${encodeURIComponent(q)}">${l}</a>`).join('')}</div></div>
+      <section class="card" style="overflow:hidden"><div class="tbl">${trow(['Vrijeme', 'Ko', 'Akcija', 'Detalji'], true, cols)}
+        ${logs.map((a) => trow([fmtDT(a.ts), esc(a.actor), `<span class="tag ${a.kind === 'error' ? 't-bad' : a.kind === 'warn' ? 't-warn' : 't-grey'}">${esc(a.action)}</span>`, `<span class="muted">${esc(a.detail)}</span>`], false, cols, ['', 'Ko', 'Akcija', 'Detalji'])).join('') || '<div class="empty">Nema zapisa.</div>'}</div></section>`;
+    $('#logQ').onkeydown = (e) => { if (e.key === 'Enter') location.hash = `#/logovi?kind=${kind}&q=${encodeURIComponent(e.target.value)}`; };
+  }
+
+  // ================================================================== POSTAVKE
+  async function pageSettings() {
+    const { schema, values } = await GET('settings');
+    const owner = S.me.role === 'owner';
+    const [admins, keys, backups, sys] = await Promise.all([owner ? GET('admins') : [], GET('apikeys').catch(() => []), GET('backups').catch(() => []), GET('system').catch(() => null)]);
+    S.settingsDirty = {};
+    const ctl = (r) => {
+      const v = values[r.key];
+      if (r.type === 'toggle') return `<button type="button" class="switch" role="switch" aria-checked="${!!v}" aria-label="${esc(r.label)}" data-a="setToggle" data-k="${r.key}"></button>`;
+      if (r.type === 'select') return `<select class="input" data-set="${r.key}" aria-label="${esc(r.label)}">${r.options.map((o, i) => `<option value="${esc(o)}" ${String(v) === o ? 'selected' : ''}>${esc(r.labels?.[i] || o)}</option>`).join('')}</select>`;
+      if (r.type === 'chips') return r.options.map((o) => `<button type="button" class="chip ${v === o ? 'on' : ''}" data-a="setChip" data-k="${r.key}" data-v="${esc(o)}">${esc(o[0].toUpperCase() + o.slice(1))}</button>`).join('');
+      if (r.type === 'textarea') return `<textarea class="input" data-set="${r.key}" aria-label="${esc(r.label)}">${esc(v)}</textarea>`;
+      return `<input class="input${r.mono ? ' mono' : ''}" data-set="${r.key}" value="${esc(v)}" ${r.type === 'number' ? 'inputmode="decimal"' : ''} ${r.type === 'secret' ? 'autocomplete="off"' : ''} aria-label="${esc(r.label)}" ${r.key === 'admin_path' && !owner ? 'disabled' : ''}>`;
+    };
+    const extra = {
+      sigurnost: owner ? `<div class="set-row"><div class="lbl"><b>Admin nalozi i uloge</b><small>Podrška vidi korisnike bez finansija, finansije vide samo novac</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
+          ${admins.map((a) => `<div class="list-item"><span><b>${esc(a.username)}</b> · ${({ owner: 'Vlasnik', admin: 'Admin', support: 'Podrška', finance: 'Finansije' })[a.role]}${a.totp_on ? ' · 2FA' : ''}${a.disabled ? ' · <span class="bad">blokiran</span>' : ''}</span><span class="dim">${ago(a.last_login)}</span>${a.role !== 'owner' ? `<button class="btn sm" data-a="editAdmin" data-id="${a.id}">Uredi</button>` : '<span class="tag t-ok">Ti</span>'}</div>`).join('')}
+          <button class="btn sm" style="align-self:flex-start" data-a="editAdmin">${ic('plus')}Dodaj admina</button></div></div>` : '',
+      obavijesti: `<div class="set-row"><div class="lbl"><b>Probna poruka</b><small>Prvo spremi token i chat ID</small></div><div class="ctl"><button class="btn sm" data-a="testTg">${ic('send')}Pošalji probnu poruku</button></div></div>`,
+      backup: `<div class="set-row"><div class="lbl"><b>Backupi</b><small>Čuvaju se u folderu data/backups na serveru panela</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
+          ${backups.slice(0, 6).map((b) => `<div class="list-item"><span>${fmtDT(b.ts)}</span><span class="dim">${bytes(b.size)}</span><a class="btn sm" href="api/backups/${encodeURIComponent(b.name)}">${ic('down')}Preuzmi</a></div>`).join('') || '<span class="muted">Još nema backupa.</span>'}
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-a="backupNow">Napravi backup sada</button>${owner ? '<button class="btn sm danger" data-a="restore">Vrati iz backupa…</button>' : ''}</div></div></div>`,
+      api: `<div class="set-row"><div class="lbl"><b>API ključevi</b><small>Za prodajnog bota ili sajt. Dokumentacija u README fajlu.</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
+          ${keys.map((k) => `<div class="list-item"><span><b>${esc(k.name)}</b> <span class="mono dim">${esc(k.prefix)}…</span></span><span class="dim">${k.last_used ? 'korišten ' + ago(k.last_used) : 'nije korišten'}</span><button class="btn sm danger" data-a="delKey" data-id="${k.id}">Opozovi</button></div>`).join('')}
+          <button class="btn sm" style="align-self:flex-start" data-a="newKey">${ic('key')}Novi API ključ</button></div></div>`,
+      sistem: sys ? `<div class="set-row"><div class="lbl"><b>Stanje</b></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
+          <div class="list-item"><span>Verzija panela</span><b>${esc(sys.version)}</b></div><div class="list-item"><span>Node.js</span><span>${esc(sys.node)}</span></div>
+          <div class="list-item"><span>Baza</span><span>${bytes(sys.db_size)} · ${sys.users} korisnika · ${sys.servers} servera</span></div>
+          <div class="list-item"><span>Radi bez prekida</span><span>${Math.floor(sys.uptime / 3600)} h ${Math.floor(sys.uptime % 3600 / 60)} min</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${owner ? `<a class="btn sm" href="api/export.json">${ic('down')}Izvezi sve podatke</a><button class="btn sm danger" data-a="restart">Restartuj panel</button>` : ''}</div></div></div>` : '',
+    };
+    $('#view').innerHTML = `${top('Postavke', 'Sve postavke sistema · vidi ih samo admin', `<span class="warn" id="dirty" style="font-size:13px"></span><button class="btn" data-a="reload">Poništi</button><button class="btn red" data-a="saveSettings">Spremi sve</button>`)}
+      <div class="split" style="align-items:flex-start">
+        <nav class="card set-nav narrow" style="flex:1 1 210px;max-width:260px" aria-label="Kategorije">${schema.map((s, i) => `<a href="javascript:void 0" data-a="jump" data-id="${s.id}"><span>${String(i + 1).padStart(2, '0')}</span>${esc(s.title)}</a>`).join('')}</nav>
+        <div class="wide" style="display:flex;flex-direction:column;gap:16px">${schema.map((s, i) => `<section class="card set-sec" id="sec-${s.id}"><header><h2><span style="color:var(--acc-hi);margin-right:8px">${String(i + 1).padStart(2, '0')}</span>${esc(s.title)}</h2><p>${esc(s.desc)}</p></header>
+          ${s.rows.map((r) => `<div class="set-row"><div class="lbl"><b>${esc(r.label)}</b>${r.soon ? '<span class="soon">uskoro</span>' : ''}${r.sub ? `<small>${esc(r.sub)}</small>` : ''}</div><div class="ctl">${ctl(r)}</div></div>`).join('')}
+          ${extra[s.id] || ''}</section>`).join('')}</div>
+      </div>`;
+    $$('[data-set]').forEach((el) => { el.oninput = el.onchange = () => markDirty(el.dataset.set, el.value); });
+    const h = location.hash.split('#sec-')[1];
+    if (h) $('#sec-' + h)?.scrollIntoView();
+  }
+  function markDirty(k, v) { S.settingsDirty[k] = v; const n = Object.keys(S.settingsDirty).length; const d = $('#dirty'); if (d) d.textContent = n ? `${n} nespremljenih izmjena` : ''; }
+  async function saveSettings() {
+    try {
+      const old = location.pathname;
+      const r = await PUT('settings', S.settingsDirty);
+      S.settingsDirty = {};
+      toast('Postavke spremljene.');
+      if (r.admin_path && !old.startsWith(r.admin_path + '/')) { await ask('Nova adresa panela', `Panel je sada na ${location.origin}${r.admin_path}/ — sačuvaj ovu adresu.`, 'Otvori'); location.href = r.admin_path + '/'; return; }
+      S.me = await GET('me'); renderShell(); route();
+    } catch (e) { fail(e); }
+  }
+  async function editAdmin(id) {
+    const a = id ? (await GET('admins')).find((x) => x.id === Number(id)) : { username: '', role: 'support' };
+    const ok = await formLoop(`<h2>${id ? 'Uredi · ' + esc(a.username) : 'Novi admin'}</h2>
+      ${id ? '' : '<label class="field">Korisničko ime<input class="input" name="username" required></label>'}
+      <label class="field">Uloga<select class="input" name="role">${[['admin', 'Admin (sve osim vlasničkih postavki)'], ['support', 'Podrška (korisnici, bez finansija)'], ['finance', 'Finansije (samo novac)']].map(([v, l]) => `<option value="${v}" ${a.role === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="field">${id ? 'Nova šifra (prazno = ne mijenja se)' : 'Šifra (bar 8 znakova)'}<input class="input" name="password" ${id ? '' : 'required minlength="8"'} autocomplete="new-password"></label>
+      ${id ? `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="disabled" ${a.disabled ? 'checked' : ''}>Blokiran</label><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="reset2fa">Resetuj 2FA</label>` : ''}
+      <div class="dlg-actions">${id ? '<button class="btn danger" value="delete" formnovalidate>Obriši</button>' : ''}<span style="flex:1"></span><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    (d) => d._btn === 'delete' ? DEL('admins/' + id) : id ? PUT('admins/' + id, { role: d.role, password: d.password || undefined, disabled: d.disabled, reset2fa: d.reset2fa }) : POST('admins', d));
+    if (ok) pageSettings();
+  }
+
+  // ================================================================== PROFIL
+  async function pageProfile() {
+    const sessions = await GET('sessions');
+    $('#view').innerHTML = `${top('Moj profil', esc(S.me.real || S.me.username))}
+      <div class="grid2">
+        <section class="card p" style="display:flex;flex-direction:column;gap:12px"><h2>Promjena šifre</h2>
+          <form id="pwForm" style="display:flex;flex-direction:column;gap:10px">
+            <label class="field">Stara šifra<input class="input" type="password" name="old" required autocomplete="current-password"></label>
+            <label class="field">Nova šifra (bar 8 znakova)<input class="input" type="password" name="new" required minlength="8" autocomplete="new-password"></label>
+            <button class="btn red" type="submit" style="align-self:flex-start">Promijeni šifru</button></form></section>
+        <section class="card p" style="display:flex;flex-direction:column;gap:12px"><h2>Dvostepena prijava (2FA)</h2>
+          <p class="muted" style="margin:0">${S.me.totp_on ? 'Uključena. Pri prijavi trebaš kod iz aplikacije.' : 'Isključena. Preporučujemo da je uključiš: Google Authenticator, Authy ili Microsoft Authenticator.'}</p>
+          <button class="btn ${S.me.totp_on ? 'danger' : 'red'}" style="align-self:flex-start" data-a="${S.me.totp_on ? 'off2fa' : 'on2fa'}">${S.me.totp_on ? 'Isključi 2FA' : 'Uključi 2FA'}</button></section>
+      </div>
+      <section class="card p"><h2 style="margin-bottom:10px">Aktivne prijave</h2>
+        ${sessions.map((s) => `<div class="list-item" style="margin-bottom:6px"><span>${esc(s.ua.replace(/\(.*?\)/g, '').slice(0, 60) || 'Nepoznat uređaj')} · ${esc(s.ip)}</span><span class="dim">${ago(s.last_active)}</span>${s.current ? '<span class="tag t-ok">Ova</span>' : `<button class="btn sm" data-a="killSess" data-id="${s.id}">Odjavi</button>`}</div>`).join('')}</section>`;
+    $('#pwForm').onsubmit = async (e) => { e.preventDefault(); try { await POST('password', Object.fromEntries(new FormData(e.target).entries())); toast('Šifra promijenjena. Ostali uređaji su odjavljeni.'); e.target.reset(); } catch (err) { fail(err); } };
+  }
+  async function setup2fa(forced) {
+    const s = await POST('2fa/setup');
+    const ok = await formLoop(`<h2>Uključi 2FA</h2>
+      <p class="muted" style="margin:0">1. Otvori Google Authenticator (ili Authy) i skeniraj QR kod. 2. Upiši kod od 6 cifara.</p>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div class="qrbox" style="width:180px">${s.svg}</div><div class="mono dim" style="flex:1;min-width:160px">Ručni unos:<br>${esc(s.secret)}</div></div>
+      <input type="hidden" name="secret" value="${esc(s.secret)}">
+      <label class="field">Kod iz aplikacije<input class="input" name="code" inputmode="numeric" maxlength="6" required autocomplete="one-time-code"></label>
+      <div class="dlg-actions">${forced ? '' : '<button class="btn" value="cancel">Odustani</button>'}<button class="btn red" value="ok">Uključi</button></div>`,
+    (d) => POST('2fa/enable', { secret: d.secret, code: d.code }));
+    if (ok) { toast('2FA uključena.'); S.me = await GET('me'); renderShell(); route(); }
+    else if (forced) setup2fa(true);
+  }
+
+  // ================================================================== "VIŠE" (telefon)
+  function pageMore() {
+    const items = navItems().flatMap((g) => g.items).filter(([, , h]) => !['', 'korisnici', 'serveri', 'reselleri'].includes(h));
+    $('#view').innerHTML = `${top('Više', '')}
+      <section class="card" style="overflow:hidden">${items.map(([i, l, h]) => `<a href="#/${h}" style="display:flex;align-items:center;gap:12px;min-height:56px;padding:0 16px;border-top:1px solid var(--row);color:var(--text);text-decoration:none"><span class="avatar" style="border-radius:9px;background:var(--row);color:var(--acc-hi)">${ic(i)}</span><span style="flex:1">${esc(l)}</span><span class="dim">›</span></a>`).join('')}</section>
+      <button class="btn danger" data-a="logout">${ic('logout')}Odjava</button>`;
+  }
+
+  // ================================================================== RUTER
+  async function route() {
+    if (!S.me) return;
+    $('#shell')?.classList.remove('open');
+    const [path, qs] = location.hash.replace(/^#\/?/, '').split('?');
+    const params = new URLSearchParams(qs || '');
+    paintNav();
+    if (path !== 'korisnici' && !path.startsWith('korisnik/')) S.sel.clear();
+    if (!['', 'serveri'].includes(path)) stopLive();
+    try {
+      if (S.me.must2fa) { $('#view').innerHTML = top('Uključi 2FA', 'Obavezno za sve admine (postavka sigurnosti)'); return setup2fa(true); }
+      if (isRes()) {
+        if (path === '' ) return await pageResDash();
+        if (path === 'korisnici') return await pageUsers(params);
+        if (path.startsWith('korisnik/')) return await pageUser(Number(path.split('/')[1]));
+        if (path === 'kredit') return await pageCredit();
+        if (path === 'profil') return await pageProfile();
+        location.hash = '#/'; return;
+      }
+      if (path === '') return await pageDash();
+      if (path === 'korisnici') return await pageUsers(params);
+      if (path.startsWith('korisnik/')) return await pageUser(Number(path.split('/')[1]));
+      if (path === 'planovi') return await pagePlans();
+      if (path === 'serveri') return await pageServers();
+      if (path === 'reselleri') return await pageResellers();
+      if (path === 'reselleri/nivoi') return await pageLevels();
+      if (path.startsWith('reseller/')) { await pageResellers(); S.selRes = Number(path.split('/')[1]); $('#view').innerHTML = `<section class="card p" id="rFull" style="display:flex;flex-direction:column;gap:10px"></section>`; return resDetail(S.selRes, $('#rFull')); }
+      if (path === 'finansije') return await pageFinance(params);
+      if (path === 'finansije/izvjestaji') return await pageReports(params);
+      if (path === 'logovi') return await pageLogs(params);
+      if (path === 'postavke') return await pageSettings();
+      if (path === 'profil') return await pageProfile();
+      if (path === 'vise') return pageMore();
+      $('#view').innerHTML = `${top('Stranica ne postoji', '')}<a class="btn" href="#/">Na početnu</a>`;
+    } catch (e) {
+      $('#view').innerHTML = `${top('Greška', '')}<div class="card p">${esc(e.message)}</div>`;
+    }
+  }
+  window.addEventListener('hashchange', route);
+
+  // ------------------------------------------------------------------ klikovi
+  const ACT = {
+    menu: () => $('#shell').classList.toggle('open'),
+    logout: async () => { await POST('logout').catch(() => {}); S.me = null; renderLogin(); },
+    stopImp: async () => { await POST('impersonate/stop'); S.me = null; location.hash = '#/reselleri'; await boot(); },
+    reload: () => route(),
+    copy: (d) => copy(d.v),
+    newUser: (d, el, e) => { e.preventDefault(); newUser().catch(fail); },
+    dashDays: (d) => { S.dashDays = Number(d.n); pageDash().catch(fail); },
+    uStatus: (d) => { S.userQ = { ...S.userQ, status: d.k, page: 1 }; history.replaceState(null, '', '#/korisnici'); pageUsers(new URLSearchParams()).catch(fail); },
+    uPage: (d) => { S.userQ.page = Number(d.p); pageUsers(new URLSearchParams()).catch(fail); },
+    selOne: (d, el, e) => { e.stopPropagation(); el.checked ? S.sel.add(Number(d.id)) : S.sel.delete(Number(d.id)); const b = $('[data-a="bulk"]'); if (b) { b.disabled = !S.sel.size; b.textContent = `Masovne akcije${S.sel.size ? ` (${S.sel.size})` : ''}`; } },
+    selAll: (d, el) => { $$('[data-a="selOne"]').forEach((c) => { c.checked = el.checked; el.checked ? S.sel.add(Number(c.dataset.id)) : S.sel.delete(Number(c.dataset.id)); }); const b = $('[data-a="bulk"]'); if (b) { b.disabled = !S.sel.size; b.textContent = `Masovne akcije${S.sel.size ? ` (${S.sel.size})` : ''}`; } },
+    openUser: (d, el, e) => {
+      if (e.target.closest('input')) return;
+      S.selUser = Number(d.id);
+      if (innerWidth < 960 || !$('#uDetail')) { location.hash = '#/korisnik/' + d.id; return; }
+      $$('.tr.sel').forEach((x) => x.classList.remove('sel')); el.classList.add('sel');
+      loadUserDetail(S.selUser, $('#uDetail')).catch(fail);
+    },
+    extend: (d) => extend(d.id).catch(fail),
+    editUser: (d) => editUser(d.id).catch(fail),
+    editNote: (d) => editNote(d.id).catch(fail),
+    uAct: (d) => userAction(d.id, d.act),
+    links: () => showLinks(),
+    bulk: () => bulk().catch(fail),
+    editPlan: (d) => editPlan(d.id).catch(fail),
+    newServer: () => newServer().catch(fail),
+    install: async (d) => showInstall((await GET(`servers/${d.id}/install`)).install),
+    editServer: (d) => editServer(d.id).catch(fail),
+    srvAct: async (d) => { try { await POST(`servers/${d.id}/${d.act}`); pageServers(); } catch (e) { fail(e); } },
+    srvMore: (d) => srvMore(d.id).catch(fail),
+    openRes: (d, el) => {
+      S.selRes = Number(d.id);
+      if (innerWidth < 960 || !$('#rDetail')) { location.hash = '#/reseller/' + d.id; return; }
+      $$('.tr.sel').forEach((x) => x.classList.remove('sel')); el.classList.add('sel');
+      resDetail(S.selRes, $('#rDetail'));
+    },
+    newReseller: () => editReseller().catch(fail),
+    editReseller: (d) => editReseller(d.id).catch(fail),
+    impersonate: async (d) => { try { await POST(`resellers/${d.id}/impersonate`); S.me = null; location.hash = '#/'; await boot(); } catch (e) { fail(e); } },
+    resUsers: (d) => { S.userQ = { status: 'all', q: '', plan: '', owner: String(d.id), page: 1 }; location.hash = '#/korisnici'; },
+    blockRes: async (d) => {
+      const r = S.resellers.find((x) => x.id === Number(d.id));
+      if (r.disabled) { await POST(`resellers/${d.id}/toggle`).catch(fail); return pageResellers(); }
+      const m = await modal(`<h2>Blokiraj ${esc(r.username)}</h2><p class="muted" style="margin:0">Reseller se više ne može prijaviti.</p>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="users">Ugasi i sve njegove korisnike (${r.users})</label>
+        <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn danger" value="ok">Blokiraj</button></div>`);
+      if (!m) return; m.close();
+      await POST(`resellers/${d.id}/toggle`, { users: m.data.users }).catch(fail); pageResellers();
+    },
+    editLevel: (d) => editLevel(d.id).catch(fail),
+    newTx: (d) => newTx(d.type).catch(fail),
+    jump: (d) => $('#sec-' + d.id)?.scrollIntoView({ behavior: 'smooth' }),
+    setToggle: (d, el) => { const v = el.getAttribute('aria-checked') !== 'true'; el.setAttribute('aria-checked', String(v)); markDirty(d.k, v); },
+    setChip: (d, el) => { $$(`[data-a="setChip"][data-k="${d.k}"]`).forEach((c) => c.classList.toggle('on', c === el)); markDirty(d.k, d.v); },
+    saveSettings: () => saveSettings(),
+    testTg: async () => { try { await POST('settings/test-telegram'); toast('Poruka poslana. Provjeri Telegram.'); } catch (e) { fail(e); } },
+    editAdmin: (d) => editAdmin(d.id).catch(fail),
+    newKey: async () => {
+      const r = await formLoop('<h2>Novi API ključ</h2><label class="field">Za šta je ključ<input class="input" name="name" required placeholder="npr. Telegram prodajni bot"></label><div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Napravi</button></div>', (d) => POST('apikeys', { name: d.name }));
+      if (!r) return;
+      const m = await modal(`<h2>Ključ napravljen</h2><p class="muted" style="margin:0">Sačuvaj ga sada. Panel ga više neće prikazati.</p><div class="code">${esc(r.key)}</div>
+        <div class="dlg-actions"><button class="btn" type="button" data-a="copy" data-v="${esc(r.key)}">${ic('copy')}Kopiraj</button><button class="btn red" value="cancel">Gotovo</button></div>`);
+      if (m) m.close();
+      pageSettings();
+    },
+    delKey: async (d) => { if (await ask('Opozovi ključ', 'Programi koji koriste ovaj ključ prestaju raditi.', 'Opozovi', true)) { await DEL('apikeys/' + d.id); pageSettings(); } },
+    backupNow: async () => { try { await POST('backups'); toast('Backup napravljen.'); pageSettings(); } catch (e) { fail(e); } },
+    restore: () => {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.db';
+      inp.onchange = async () => {
+        if (!inp.files[0] || !(await ask('Vrati iz backupa', 'Trenutna baza se zamjenjuje backupom (stara se čuva sa strane). Panel se restartuje.', 'Vrati', true))) return;
+        try { await api('POST', 'backups/restore', inp.files[0]); toast('Backup vraćen. Panel se restartuje…'); setTimeout(() => location.reload(), 4000); } catch (e) { fail(e); }
+      };
+      inp.click();
+    },
+    restart: async () => { if (await ask('Restartuj panel', 'Panel će biti nedostupan par sekundi. VPN serveri rade normalno.', 'Restartuj')) { await POST('system/restart').catch(() => {}); toast('Restartujem…'); setTimeout(() => location.reload(), 4000); } },
+    on2fa: () => setup2fa(false).catch(fail),
+    off2fa: async () => {
+      const ok = await formLoop('<h2>Isključi 2FA</h2><label class="field">Tvoja šifra<input class="input" type="password" name="password" required></label><div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn danger" value="ok">Isključi</button></div>', (d) => POST('2fa/disable', d));
+      if (ok) { S.me = await GET('me'); renderShell(); route(); }
+    },
+    killSess: async (d) => { await DEL('sessions/' + d.id).catch(fail); pageProfile(); },
+  };
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-a]');
+    if (!el) return;
+    const fn = ACT[el.dataset.a];
+    if (!fn) return;
+    if (el.tagName === 'BUTTON' && el.closest('#modalForm') && el.dataset.a === 'copy') e.preventDefault();
+    if (el.tagName === 'A' && el.getAttribute('href')?.startsWith('javascript')) e.preventDefault();
+    fn(el.dataset, el, e);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.closest?.('.tr.click') && !e.target.matches('input')) e.target.closest('.tr.click').click(); });
+
+  // ------------------------------------------------------------------ start
+  async function boot() {
+    try { S.me = await api('GET', 'me'); } catch { S.me = null; return renderLogin(); }
+    document.title = `${S.me.brand} · Panel`;
+    S.badges = {};
+    if (!isRes()) {
+      try {
+        const st = await GET('settings').catch(() => null);
+        if (st) { S.payMethods = st.values.pay_methods; S.me.panel_url_set = !!st.values.panel_url; }
+      } catch { /* bez dozvole */ }
+    }
+    renderShell();
+    route();
+  }
+  boot();
+})();

@@ -1,0 +1,6 @@
+panel/data/
+node_modules/
+__pycache__/
+*.db
+*.db-*
+.DS_Store
