@@ -143,10 +143,11 @@ if ! command -v caddy >/dev/null; then
   apt-get update -qq
   apt-get install -y -qq caddy >/dev/null
 fi
-SITE="${DOMAIN:-:80}"
+# isti proxy za sve adrese; uz domenu ostaje i stara adresa preko IP-a (port 80),
+# da agenti na serverima i stari linkovi kupaca (http://IP/...) rade i dalje
 cat > /etc/caddy/Caddyfile <<EOF
 # Napravio install-panel.sh
-$SITE {
+(panel) {
 	encode gzip
 	reverse_proxy 127.0.0.1:$PORT {
 		flush_interval -1
@@ -158,7 +159,14 @@ $SITE {
 		output discard
 	}
 }
+
 EOF
+if [ -n "$DOMAIN" ]; then
+  printf '%s {\n\timport panel\n}\n\n# stara adresa preko IP-a: agenti i stari linkovi kupaca\n:80 {\n\timport panel\n}\n' "$DOMAIN" >> /etc/caddy/Caddyfile
+else
+  printf ':80 {\n\timport panel\n}\n' >> /etc/caddy/Caddyfile
+fi
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 || die "Caddyfile nije ispravan (provjeri /etc/caddy/Caddyfile)"
 systemctl enable caddy >/dev/null 2>&1
 systemctl reload caddy 2>/dev/null || systemctl restart caddy
 
@@ -183,6 +191,15 @@ for _ in $(seq 1 30); do
   sleep 0.5
 done
 systemctl is-active --quiet vpn-panel || { journalctl -u vpn-panel -n 30 --no-pager; die "panel se nije pokrenuo (log iznad)"; }
+
+# uz domenu: novi linkovi i komande za servere koriste https adresu (stari http linkovi i dalje rade)
+if [ -n "$DOMAIN" ]; then
+  runuser -u vpnpanel -- env VPN_DATA_DIR="$DATA" node -e '
+    const s = require(process.argv[1] + "/panel/lib/settings"); const want = "https://" + process.argv[2];
+    const cur = String(s.get("panel_url") || "");
+    if (cur !== want && (!cur || /^http:\/\//.test(cur))) { s.set({ panel_url: want }); console.log("Adresa panela postavljena na " + want); }
+  ' "$APP" "$DOMAIN" 2>/dev/null || warn "Upiši adresu https://$DOMAIN u Postavke → Općenito → Adresa panela"
+fi
 
 say "Gotovo"
 if [ $FIRST = 1 ] && [ -f "$DATA/prva-prijava.txt" ]; then
