@@ -25,6 +25,8 @@ const route = (method, pattern, perm, fn) => {
   routes.push({ method, re, keys, perm, fn });
 };
 
+// kupac je 'online' ako je imao promet u zadnje 2 minute
+const ONLINE_MS = 120000;
 // perm: null = svako prijavljen; 'res' = reseller; 'any' = admin ili reseller; ostalo po auth.can
 function allowed(me, perm, method) {
   if (perm === null || perm === 'any') return true;
@@ -241,11 +243,13 @@ function listUsers(c, me) {
   else if (q.owner) { where.push('u.owner_id = ?'); args.push(Number(q.owner)); }
   let rows = all(`${core.USER_SELECT} ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY u.id DESC`, ...args).map((u) => core.userRow(u, t));
   if (q.server) rows = rows.filter((u) => String(u.last_server) === q.server);
+  const onlineN = rows.filter((u) => u.online).length;
   const counts = { all: rows.length, active: 0, expiring: 0, grace: 0, expired: 0, limited: 0, disabled: 0, devices: 0 };
   for (const u of rows) counts[u.status]++;
-  if (q.status && q.status !== 'all') rows = rows.filter((u) => (q.status === 'active' ? ['active', 'expiring', 'grace'].includes(u.status) : u.status === q.status));
+  if (q.status === 'online') rows = rows.filter((u) => u.online);
+  else if (q.status && q.status !== 'all') rows = rows.filter((u) => (q.status === 'active' ? ['active', 'expiring', 'grace'].includes(u.status) : u.status === q.status));
   const per = 50, page = Math.max(1, Number(q.page) || 1);
-  return { counts, total: rows.length, page, pages: Math.max(1, Math.ceil(rows.length / per)), users: rows.slice((page - 1) * per, page * per) };
+  return { counts, online: onlineN, total: rows.length, page, pages: Math.max(1, Math.ceil(rows.length / per)), users: rows.slice((page - 1) * per, page * per) };
 }
 route('GET', 'users', 'users', (c) => listUsers(c, c.auth.me));
 route('GET', 'res/users', 'res', (c) => listUsers(c, c.auth.me));
@@ -454,6 +458,40 @@ route('POST', 'servers/:id/maintenance', 'servers', (c) => {
   log(c.auth.me.username, sv.maintenance ? 'Održavanje završeno' : 'Server na održavanju', sv.name);
   return { ok: true };
 });
+// ---------- detalji servera: grafikoni, historija rada, kupci spojeni sada, komande
+const SRV_CMDS = ['restart_vpn', 'reboot', 'update_agent', 'speedtest'];
+route('GET', 'servers/:id/detail', 'servers', (c) => {
+  const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
+  if (!sv) fail(404, 'Server ne postoji.');
+  const t = now(), week = c.query.range === '7d';
+  const from = t - (week ? 7 : 1) * 86400000, step = week ? 3600000 : 300000;
+  const series = all(`SELECT (ts / ${step}) * ${step} AS ts, AVG(cpu) AS cpu, AVG(ram) AS ram, MAX(online) AS online, SUM(traffic) AS traffic
+    FROM server_stats WHERE server_id = ? AND ts >= ? GROUP BY ts / ${step} ORDER BY ts`, sv.id, from);
+  // historija rada za 30 dana: padovi i ukupno vrijeme bez rada
+  const since = t - 30 * 86400000;
+  const view = serverView(sv);
+  const events = all('SELECT ts, kind, dur FROM server_events WHERE server_id = ? AND ts >= ? ORDER BY ts DESC LIMIT 40', sv.id, since);
+  let downMs = all("SELECT dur FROM server_events WHERE server_id = ? AND kind = 'down' AND ts >= ?", sv.id, since).reduce((a, e) => a + (e.dur || 0), 0);
+  const open = one("SELECT ts FROM server_events WHERE server_id = ? AND kind = 'down' AND dur = 0 ORDER BY id DESC LIMIT 1", sv.id);
+  if (open && view.status === 'offline') downMs += t - open.ts;
+  const tracked = Math.max(1, t - Math.max(since, sv.created_at || since));
+  const users = all(`SELECT u.id, u.username, u.last_seen, p.name AS plan, (u.traffic_up + u.traffic_down) AS traffic FROM users u LEFT JOIN plans p ON p.id = u.plan_id
+    WHERE u.last_server = ? AND u.last_seen > ? ORDER BY u.last_seen DESC LIMIT 200`, sv.id, t - ONLINE_MS);
+  const cmds = all('SELECT id, cmd, by, created_at, sent_at, done_at, ok, result FROM server_cmds WHERE server_id = ? ORDER BY id DESC LIMIT 12', sv.id);
+  const month = one('SELECT COUNT(*) AS n FROM users WHERE last_server = ? AND last_seen > ?', sv.id, t - 30 * 86400000).n;
+  return { server: view, range: week ? '7d' : '24h', step, series, events, uptime: Math.max(0, Math.min(100, 100 - downMs / tracked * 100)), downMs, users, cmds, labels: require('./nodes').CMD_LABEL, users_month: month };
+});
+route('POST', 'servers/:id/cmd', 'servers', (c) => {
+  const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
+  if (!sv) fail(404, 'Server ne postoji.');
+  const cmd = String(c.body.cmd || '');
+  if (!SRV_CMDS.includes(cmd)) fail(400, 'Nepoznata komanda.');
+  if (!sv.last_seen) fail(400, 'Server se još nije javio panelu.');
+  if (one('SELECT id FROM server_cmds WHERE server_id = ? AND cmd = ? AND done_at IS NULL AND created_at > ?', sv.id, cmd, now() - 600000)) fail(400, 'Ova komanda već čeka da je server izvrši.');
+  const r = run('INSERT INTO server_cmds (server_id, cmd, by, created_at) VALUES (?,?,?,?)', sv.id, cmd, c.auth.me.username, now());
+  log(c.auth.me.username, `Komanda serveru: ${require('./nodes').CMD_LABEL[cmd]}`, sv.name, cmd === 'reboot' ? 'warn' : 'info');
+  return { id: Number(r.lastInsertRowid) };
+});
 route('POST', 'servers/:id/locate', 'servers', async (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
   const g = await geoIp(sv.host);
@@ -468,6 +506,7 @@ route('DELETE', 'servers/:id', 'servers', (c) => {
   const used = all('SELECT * FROM chains').filter((c) => vpn.chainHops(c).includes(sv.id));
   if (used.length) fail(400, `Server je dio lanca: ${used.map((c) => c.name).join(', ')}. Prvo obriši ili izmijeni lanac.`);
   run('DELETE FROM servers WHERE id = ?', sv.id);
+  for (const tb of ['server_stats', 'server_events', 'server_cmds']) run(`DELETE FROM ${tb} WHERE server_id = ?`, sv.id);
   log(c.auth.me.username, 'Server obrisan', sv.name, 'warn');
   return { ok: true };
 });

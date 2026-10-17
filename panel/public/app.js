@@ -691,7 +691,7 @@
       !isRes() && can('resellers') ? GET('resellers').catch(() => []) : Promise.resolve([]),
     ]);
     S.plans = plans; S.resellers = resellers;
-    const chips = [['all', 'Svi', d.counts.all], ['active', 'Aktivni', d.counts.active + d.counts.expiring + d.counts.grace], ['expiring', 'Ističu', d.counts.expiring], ['expired', 'Istekli', d.counts.expired], ['limited', 'Potrošen promet', d.counts.limited], ['disabled', 'Ugašeni', d.counts.disabled], ...(d.counts.devices ? [['devices', 'Previše uređaja', d.counts.devices]] : [])];
+    const chips = [['all', 'Svi', d.counts.all], ['online', '<i class="odot"></i>Online sada', d.online ?? 0], ['active', 'Aktivni', d.counts.active + d.counts.expiring + d.counts.grace], ['expiring', 'Ističu', d.counts.expiring], ['expired', 'Istekli', d.counts.expired], ['limited', 'Potrošen promet', d.counts.limited], ['disabled', 'Ugašeni', d.counts.disabled], ...(d.counts.devices ? [['devices', 'Previše uređaja', d.counts.devices]] : [])];
     const cols = isRes() ? '1.6fr 1.2fr 1.4fr 1fr .9fr' : '28px 1.6fr 1.1fr 1fr 1.3fr 1fr .9fr';
     const wide = innerWidth >= 960;
     $('#view').innerHTML = `
@@ -728,9 +728,9 @@
     const pct = u.traffic_limit ? Math.min(100, u.traffic_used / u.traffic_limit * 100) : 0;
     const traffic = `<div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12.5px">${bytes(u.traffic_used)} / ${u.traffic_limit ? bytes(u.traffic_limit) : '∞'}</span>${u.traffic_limit ? `<div class="bar"><i class="${pct >= 100 ? 'w' : ''}" style="width:${pct}%"></i></div>` : ''}</div>`;
     const exp = `<span class="${u.status === 'expired' ? 'bad' : u.status === 'expiring' || u.status === 'grace' ? 'warn' : ''}">${daysTxt(u.days_left)}</span><small>${fmtDate(u.expires_at)}</small>`;
-    const name = `<b>${esc(u.username)}</b><small>${esc(isRes() ? u.contact || u.note || '' : u.owner ? 'reseller · ' + u.owner : u.note || u.contact || 'tvoj korisnik')}</small>`;
+    const name = `<b>${u.online ? '<i class="odot" title="Spojen sada"></i> ' : ''}${esc(u.username)}</b><small>${esc(isRes() ? u.contact || u.note || '' : u.owner ? 'reseller · ' + u.owner : u.note || u.contact || 'tvoj korisnik')}</small>`;
     const cells = isRes() ? [name, esc(u.plan || '—'), traffic, exp, stTag(u.status)]
-      : [`<input type="checkbox" class="cb" data-a="selOne" data-id="${u.id}" aria-label="Izaberi ${esc(u.username)}" ${S.sel.has(u.id) ? 'checked' : ''}>`, name, esc(u.plan || '—'), `<span class="muted">${esc(u.last_server || '—')}</span><small>${u.last_seen ? ago(u.last_seen) : 'nije se spajao'}</small>`, traffic, exp, stTag(u.status)];
+      : [`<input type="checkbox" class="cb" data-a="selOne" data-id="${u.id}" aria-label="Izaberi ${esc(u.username)}" ${S.sel.has(u.id) ? 'checked' : ''}>`, name, esc(u.plan || '—'), (u.online ? `<span class="ok" style="font-weight:600">${esc(u.last_server || '—')}</span><small class="ok">spojen sada</small>` : `<span class="muted">${esc(u.last_server || '—')}</span><small>${u.last_seen ? ago(u.last_seen) : 'nije se spajao'}</small>`), traffic, exp, stTag(u.status)];
     const labels = isRes() ? ['', 'Plan', 'Promet', 'Ističe', 'Status'] : ['', '', 'Plan', 'Server', 'Promet', 'Ističe', 'Status'];
     return `<div class="tr click ${S.selUser === u.id ? 'sel' : ''}" data-a="openUser" data-id="${u.id}" style="grid-template-columns:${cols}">${cells.map((c, i) => `<div class="cell${(isRes() ? i === 0 : i === 1) ? ' first' : ''}${!isRes() && i === 0 ? ' cbx' : ''}"${labels[i] ? ` data-l="${labels[i]}"` : ''}>${c}</div>`).join('')}</div>`;
   }
@@ -749,7 +749,7 @@
         <div class="mini"><small>Plan</small><b>${esc(u.plan || '—')}</b></div>
         <div class="mini"><small>Ističe</small><b>${fmtDate(u.expires_at)}</b> <span class="muted" style="font-size:12px">(${daysTxt(u.days_left)})</span></div>
         <div class="mini"><small>Uređaji sada / limit</small><b class="${u.devices_seen > u.devices ? 'warn' : ''}">${u.devices_seen || 0} / ${u.devices}</b>${u.status === 'devices' ? ` <button class="btn sm" data-a="unblock" data-id="${u.id}" style="margin-left:6px">Odblokiraj</button>` : ''}</div>
-        <div class="mini"><small>Zadnje spajanje</small><b>${u.last_seen ? ago(u.last_seen) : 'nikad'}</b>${u.last_server ? ` <span class="muted" style="font-size:12px">· ${esc(u.last_server)}</span>` : ''}</div>
+        <div class="mini"><small>Zadnje spajanje</small><b class="${u.online ? 'ok' : ''}">${u.online ? '<i class="odot"></i> spojen sada' : u.last_seen ? ago(u.last_seen) : 'nikad'}</b>${u.last_server ? ` <span class="muted" style="font-size:12px">· ${esc(u.last_server)}</span>` : ''}</div>
       </div>
       <div style="margin-top:14px"><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--soft);margin-bottom:6px"><span>Promet</span><span>${bytes(u.traffic_used)} / ${u.traffic_limit ? bytes(u.traffic_limit) : 'neograničeno'}</span></div>
         <div class="bar" style="height:8px"><i class="${pct >= 100 ? 'w' : ''}" style="width:${u.traffic_limit ? pct : 4}%"></i></div></div>
@@ -770,7 +770,7 @@
         <button class="btn red" data-a="extend" data-id="${u.id}">Produži</button>
         ${isRes() ? `<button class="btn" data-a="editNote" data-id="${u.id}">Bilješka</button>` : `<button class="btn" data-a="editUser" data-id="${u.id}">Uredi</button>`}
         <button class="btn" data-a="uAct" data-act="reset" data-id="${u.id}">Resetuj promet</button>
-        <button class="btn" data-a="uAct" data-act="rekey" data-id="${u.id}">Novi ključ</button>
+        <button class="btn" data-a="uAct" data-act="rekey" data-id="${u.id}">${ic('key')}Novi link</button>
         <button class="btn warnb" data-a="uAct" data-act="toggle" data-id="${u.id}">${u.disabled ? 'Upali' : 'Ugasi'}</button>
         <button class="btn danger" data-a="uAct" data-act="delete" data-id="${u.id}">Obriši</button>
       </div>
@@ -874,14 +874,28 @@
   }
   async function userAction(id, act) {
     const u = S.lastUser;
-    const text = { reset: ['Resetuj promet', 'Brojač prometa se vraća na nulu.', 'Resetuj'], rekey: ['Novi ključ i link', 'Stari link i konfiguracije prestaju raditi. Korisnik mora ponovo uvesti novi link.', 'Napravi novi'],
+    const text = { reset: ['Resetuj promet', 'Brojač prometa se vraća na nulu.', 'Resetuj'], rekey: ['Novi link za kupca', 'Pravi se novi pristupni link i novi ključevi. Stari link i sve stare konfiguracije odmah prestaju raditi (korisno kad je kupac podijelio link). Kupac mora uvesti novi link.', 'Napravi novi link'],
       toggle: [u?.disabled ? 'Upali korisnika' : 'Ugasi korisnika', u?.disabled ? 'Korisnik se ponovo može spojiti.' : 'Korisnik se ne može spojiti dok ga ne upališ.', u?.disabled ? 'Upali' : 'Ugasi'],
       delete: ['Obriši korisnika', `Korisnik ${u?.username || ''} se briše zauvijek.`, 'Obriši'] }[act];
     if (!(await ask(text[0], text[1], text[2], act === 'delete' || act === 'rekey'))) return;
     try {
       if (act === 'delete') { await DEL(R('users/' + id)); S.selUser = null; toast('Obrisano.'); if (location.hash.startsWith('#/korisnik/')) location.hash = '#/korisnici'; else pageUsers(new URLSearchParams()); return; }
-      await POST(R(`users/${id}/${act}`)); toast('Urađeno.'); refreshUser();
+      await POST(R(`users/${id}/${act}`));
+      if (act === 'rekey') return await showNewLink(id);
+      toast('Urađeno.'); refreshUser();
     } catch (e) { fail(e); }
+  }
+  // poslije novog linka: odmah pokaži link i QR, da ga možeš poslati kupcu
+  async function showNewLink(id) {
+    const u = await GET(R('users/' + id));
+    S.lastUser = u;
+    const r = await modal(`<h2>Novi link za ${esc(u.username)}</h2>
+      <p class="muted" style="margin:0">Stari link više ne radi. Pošalji kupcu ovaj novi, pa neka ga uveze u aplikaciju (ili skenira QR).</p>
+      <div class="newlink"><div class="qrbox">${u.qr}</div><div class="mono newlink-l">${esc(u.sub_link)}</div></div>
+      <div class="dlg-actions"><button class="btn" type="button" data-a="copy" data-v="${esc(u.sub_link)}">${ic('copy')}Kopiraj link</button><span style="flex:1"></span><button class="btn" value="cancel">Zatvori</button><button class="btn red" value="send">${ic('send')}Pošalji kupcu</button></div>`);
+    if (r) r.close();
+    refreshUser();
+    if (r?.data?._btn === 'send') sendCustomer().catch(fail);
   }
   async function showLinks() {
     const u = S.lastUser;
@@ -1078,6 +1092,105 @@
     });
   }
 
+  // ================================================================== DETALJI SERVERA
+  // mali grafikon jedne mjere kroz vrijeme; rupa u liniji = server se nije javljao
+  function metricChart(series, key, { from, to, step, max, color, fmt, W = 520 }) {
+    const H = 150, L = 44, B = 22, T = 8;
+    const vals = series.map((d) => Number(d[key]) || 0);
+    const top = max || (() => { const p = Math.max(0, ...vals); if (!p) return 4; const m = 10 ** Math.floor(Math.log10(p)); return Math.ceil(p * 1.15 / m) * m; })();
+    const x = (ts) => L + (W - L - 8) * (ts - from) / Math.max(1, to - from), y = (v) => T + (H - B - T) * (1 - Math.min(v, top) / top);
+    let line = '', area = '', seg = [];
+    const flush = () => {
+      if (!seg.length) return;
+      const d = seg.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('');
+      line += d; area += `${d}L${seg[seg.length - 1][0].toFixed(1)} ${H - B}L${seg[0][0].toFixed(1)} ${H - B}Z`; seg = [];
+    };
+    series.forEach((d, i) => { if (i && d.ts - series[i - 1].ts > step * 2.5) flush(); seg.push([x(d.ts), y(Number(d[key]) || 0)]); });
+    flush();
+    const grid = [0, 0.5, 1].map((f) => `<path d="M${L} ${y(top * f).toFixed(0)}H${W - 8}" stroke="var(--line)" ${f ? 'stroke-dasharray="3 4"' : ''}/><text x="${L - 7}" y="${(y(top * f) + 4).toFixed(0)}" text-anchor="end" fill="var(--dim)" font-size="11">${esc(fmt(top * f))}</text>`).join('');
+    const ticks = [];
+    const span = to - from, tstep = span > 2 * 86400000 ? 86400000 : 4 * 3600000;
+    for (let t = Math.ceil(from / tstep) * tstep; t <= to; t += tstep) {
+      const d = new Date(t);
+      ticks.push(`<text x="${x(t).toFixed(1)}" y="${H - 5}" text-anchor="middle" fill="var(--dim)" font-size="11">${span > 2 * 86400000 ? `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.` : fmtTime(t)}</text>`);
+    }
+    const id = 'mg' + key;
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${esc(key)}">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".3"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+      ${grid}${ticks.join('')}${series.length ? `<path d="${area}" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>` : `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--dim)" font-size="13">Još nema podataka. Pojavljuju se za par minuta.</text>`}</svg>`;
+  }
+  const CMD_BTN = { restart_vpn: ['refresh', 'Restartuj VPN', 'Xray i WireGuard se restartuju. Spojeni kupci se odspoje na par sekundi i aplikacije se same ponovo spoje.', ''],
+    speedtest: ['bolt', 'Test brzine', 'Server mjeri brzinu svoje internet veze (Cloudflare). Traje oko 20 sekundi i troši oko 100 MB prometa.', ''],
+    update_agent: ['down', 'Ažuriraj agent', 'Agent na serveru preuzima najnoviju verziju iz panela i ponovo se pokreće. Kupci ostaju spojeni.', ''],
+    reboot: ['plug', 'Restartuj server', 'Cijeli server se restartuje. Kupci na ovom serveru nemaju VPN 1–2 minute, aplikacije se same spoje kad se vrati.', 'danger'] };
+  function cmdResult(c) {
+    if (!c.done_at) return `<span class="tag t-warn">${c.sent_at ? 'izvršava se…' : 'čeka server…'}</span>`;
+    if (!c.ok) return `<span class="tag t-bad" title="${esc(c.result || '')}">nije uspjelo</span>${c.result ? `<small class="dim cmdres">${esc(c.result)}</small>` : ''}`;
+    if (c.cmd === 'speedtest') { try { const j = JSON.parse(c.result); return `<span class="speedres"><b>↓ ${j.down}</b> <b>↑ ${j.up}</b> Mbit/s · ping ${j.ping} ms</span>`; } catch { /* običan tekst */ } }
+    return `<span class="tag t-ok">urađeno</span>${c.result ? `<small class="dim cmdres">${esc(c.result)}</small>` : ''}`;
+  }
+  async function pageServer(id, range = S.srvRange || '24h') {
+    S.srvRange = range;
+    const d = await GET(`servers/${id}/detail?range=${range}`);
+    const s = d.server, t = Date.now(), from = t - (range === '7d' ? 7 : 1) * 86400000;
+    const last = d.series[d.series.length - 1] || {};
+    const traffic = d.series.reduce((a, x) => a + (x.traffic || 0), 0);
+    const opts = { from, to: t, step: d.step };
+    const CH = {};
+    const chart = (title, key, o, now) => { CH[key] = { ...opts, ...o }; return `<section class="card p mchart"><div class="ch"><h2>${title}</h2><b class="mnow">${now}</b></div><div class="mbox" data-key="${key}"></div></section>`; };
+    const pct = (v) => Math.round(v) + '%';
+    const dur = (ms) => ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} s` : ms < 3600000 ? `${Math.round(ms / 60000)} min` : `${Math.floor(ms / 3600000)} h ${Math.round(ms % 3600000 / 60000)} min`;
+    const pending = d.cmds.some((c) => !c.done_at);
+    $('#view').innerHTML = `${top(s.name, `<a href="#/serveri">← Svi serveri</a> · ${esc([s.country ? ccName(s.country) : '', s.provider, s.host].filter(Boolean).join(' · '))}`,
+      `<div class="seg"><button class="${range === '24h' ? 'on' : ''}" data-a="srvRange" data-id="${s.id}" data-r="24h">24 sata</button><button class="${range === '7d' ? 'on' : ''}" data-a="srvRange" data-id="${s.id}" data-r="7d">7 dana</button></div>`)}
+      <section class="card p srvhead">
+        <span class="srvflag big">${s.country ? flag(s.country) : ic('server')}<i class="dot s-${s.warn ? 'warn' : s.status}"></i></span>
+        <div class="srvhead-t"><span data-live-srv="${s.id}">${srvStatus(s)}</span>
+          <div class="chips">${(s.tags || []).map((x) => `<span class="tag t-info">${esc(TAG_LABEL[x] || x)}</span>`).join('')}${s.xray_ok ? '<span class="pchip ok"><i></i>VLESS Reality</span>' : ''}${s.wg_ok ? '<span class="pchip ok"><i></i>WireGuard</span>' : ''}<span class="tag t-grey">agent ${esc(s.version || '—')}</span>${s.xray_version ? `<span class="tag t-grey">Xray ${esc(s.xray_version)}</span>` : ''}</div></div>
+        <div class="srvcmds">${Object.entries(CMD_BTN).map(([k, [icn, l, , cls]]) => `<button class="btn sm ${cls}" data-a="srvCmd" data-id="${s.id}" data-cmd="${k}" ${s.status !== 'online' && k !== 'update_agent' ? 'disabled' : ''}>${ic(icn)}${l}</button>`).join('')}
+          <button class="btn sm" data-a="editServer" data-id="${s.id}">${ic('edit')}Uredi</button><button class="btn sm warnb" data-a="srvAct" data-act="maintenance" data-id="${s.id}" data-back="1">${s.maintenance ? 'Završi održavanje' : 'Održavanje'}</button></div>
+      </section>
+      ${s.last_error ? `<div class="banner bad">${ic('x')}<span>${esc(s.last_error)}</span></div>` : ''}
+      <section class="stats">
+        <div class="stat"><div class="l"><span>Dostupnost (30 dana)</span>${ic('check')}</div><div class="v ${d.uptime < 99 ? 'warn' : ''}">${d.uptime >= 99.995 ? '100' : d.uptime.toFixed(2)}%</div><div class="s muted">${d.downMs ? 'bez rada ukupno ' + dur(d.downMs) : 'bez ijednog pada'}</div></div>
+        <div class="stat"><div class="l"><span>Spojeno sada</span>${ic('users')}</div><div class="v">${s.online} <small class="muted">/ ${s.capacity}</small></div><div class="s muted">${d.users_month} kupaca u zadnjih 30 dana</div></div>
+        <div class="stat"><div class="l"><span>Promet (${range === '7d' ? '7 dana' : '24 sata'})</span>${ic('down')}</div><div class="v">${bytes(traffic)}</div><div class="s muted">${bytes(s.traffic_month)} ovaj mjesec</div></div>
+        <div class="stat"><div class="l"><span>Radi bez prekida</span>${ic('clock')}</div><div class="v">${uptimeStr(s.uptime)}</div><div class="s muted">${s.last_seen ? 'javio se ' + ago(s.last_seen) : 'nije se javio'}</div></div>
+      </section>
+      <div class="mgrid">
+        ${chart('CPU', 'cpu', { max: 100, color: '#5b8cff', fmt: pct }, s.status === 'online' ? pct(s.cpu || 0) : '—')}
+        ${chart('RAM', 'ram', { max: 100, color: '#a78bfa', fmt: pct }, s.status === 'online' ? pct(s.ram || 0) : '—')}
+        ${chart('Spojeni kupci', 'online', { color: '#3ddc84', fmt: (v) => String(Math.round(v)) }, String(s.online))}
+        ${chart(`Promet po ${range === '7d' ? 'satu' : '5 minuta'}`, 'traffic', { color: '#ff5a6a', fmt: (v) => v ? bytes(v) : '0' }, bytes(last.traffic || 0))}
+      </div>
+      <div class="srvlists">
+        <section class="card p"><div class="ch"><h2>${ic('users')}Spojeni sada</h2><span class="pill">${d.users.length}</span></div>
+          ${d.users.length ? `<div class="ulist">${d.users.map((u) => `<a class="urow" href="#/korisnik/${u.id}"><i class="odot"></i><b>${esc(u.username)}</b><span class="muted">${esc(u.plan || '')}</span><span class="dim">${bytes(u.traffic)}</span></a>`).join('')}</div>`
+            : '<div class="muted" style="font-size:13px">Trenutno niko nije spojen na ovaj server.</div>'}</section>
+        <section class="card p"><div class="ch"><h2>${ic('act')}Komande i historija rada</h2></div>
+          <div class="evlist">
+            ${d.cmds.map((c) => `<div class="ev"><span class="evi">${ic(CMD_BTN[c.cmd]?.[0] || 'act')}</span><div><b>${esc(CMD_BTN[c.cmd]?.[1] || d.labels[c.cmd] || c.cmd)}</b><small class="dim">${fmtDT(c.created_at)} · ${esc(c.by || '')}</small></div><div class="evr">${cmdResult(c)}</div></div>`).join('')}
+            ${d.events.map((e) => `<div class="ev"><span class="evi ${e.kind === 'down' ? 'bad' : 'ok'}">${ic(e.kind === 'down' ? 'x' : 'check')}</span><div><b>${e.kind === 'down' ? 'Server pao' : 'Server se vratio'}</b><small class="dim">${fmtDT(e.ts)}</small></div><div class="evr">${e.kind === 'down' ? (e.dur ? `<span class="muted">trajalo ${dur(e.dur)}</span>` : '<span class="tag t-bad">još ne radi</span>') : ''}</div></div>`).join('')}
+            ${!d.cmds.length && !d.events.length ? '<div class="muted" style="font-size:13px">Nema padova u zadnjih 30 dana i još nisi slao komande.</div>' : ''}
+          </div></section>
+      </div>`;
+    // grafikoni se crtaju u stvarnoj širini, da tekst ostane čitljiv i na telefonu
+    const draw = () => $$('.mbox').forEach((el) => { el.innerHTML = metricChart(d.series, el.dataset.key, { ...CH[el.dataset.key], W: Math.max(260, Math.round(el.clientWidth)) }); });
+    draw();
+    S.chartRO?.disconnect();
+    if (window.ResizeObserver && $('.mbox')) { let w = 0; S.chartRO = new ResizeObserver((e) => { const nw = Math.round(e[0].contentRect.width); if (Math.abs(nw - w) > 8) { w = nw; draw(); } }); S.chartRO.observe($('.mbox')); }
+    startLive();
+    clearTimeout(S.srvPoll);
+    if (pending) S.srvPoll = setTimeout(() => { if (location.hash === `#/server/${id}`) pageServer(id, range).catch(() => {}); }, 4000);
+  }
+  async function srvCmd(id, cmd) {
+    const [, l, text, cls] = CMD_BTN[cmd];
+    if (!(await ask(l, text, l, cls === 'danger'))) return;
+    await POST(`servers/${id}/cmd`, { cmd });
+    toast('Komanda poslana. Server je preuzima za par sekundi.');
+    pageServer(id);
+  }
+
   // ================================================================== SERVERI
   async function pageServers() {
     const [servers, chains] = await Promise.all([GET('servers'), GET('chains').catch(() => [])]);
@@ -1111,7 +1224,7 @@
     return `<article class="card srv2 ${s.status === 'offline' ? 'off' : ''} ${s.status === 'disabled' ? 'dis' : ''} ${s.maintenance ? 'mnt' : ''}">
       <header>
         <span class="srvflag">${s.country ? flag(s.country) : ic('server')}<i class="dot s-${s.warn ? 'warn' : s.status}"></i></span>
-        <div class="srv-t"><b title="${esc(s.name)}">${esc(s.city && s.city !== s.name ? s.name : s.city || s.name)}</b><span>${esc(sub)}</span></div>
+        <a class="srv-t" href="#/server/${s.id}"><b title="${esc(s.name)}">${esc(s.city && s.city !== s.name ? s.name : s.city || s.name)}</b><span>${esc(sub)}</span></a>
         <span data-live-srv="${s.id}">${srvStatus(s)}</span>
       </header>
       ${s.host ? `<button class="iprow" data-a="copy" data-v="${esc(s.host)}" title="Kopiraj IP adresu"><span class="mono">${esc(s.host)}</span>${ic('copy')}</button>` : ''}
@@ -1120,8 +1233,8 @@
       <div class="srv-f"><span>${ic('down')}${bytes(s.traffic_month)} <small>ovaj mjesec</small></span><span class="dim">${s.last_seen ? 'javio se ' + ago(s.last_seen) : 'nije se javio'}</span></div>
       <div class="srv-a">
         ${s.status === 'pending' ? `<button class="btn sm red" data-a="install" data-id="${s.id}">Komanda za instalaciju</button>` : ''}
+        <a class="btn sm" href="#/server/${s.id}">${ic('chart')}Detalji</a>
         <button class="btn sm" data-a="editServer" data-id="${s.id}">${ic('edit')}Uredi</button>
-        <button class="btn sm warnb" data-a="srvAct" data-act="maintenance" data-id="${s.id}">${s.maintenance ? 'Završi održavanje' : 'Održavanje'}</button>
         <button class="btn sm icon" data-a="srvMore" data-id="${s.id}" aria-label="Više">${ic('more')}</button>
       </div></article>`;
   }
@@ -1197,7 +1310,7 @@
       <p class="dim" style="margin:0;font-size:12.5px">Promjena porta ili SNI-ja mijenja linkove kupaca: aplikacije ih same osvježe preko pretplate.</p>
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
     (d) => PUT('servers/' + id, { ...d, tags: Object.keys(TAG_LABEL).filter((k) => d['tag_' + k]), capacity: Number(d.capacity), cost: Number(String(d.cost).replace(',', '.')), vless_port: Number(d.vless_port), wg_port: Number(d.wg_port), ss_port: Number(d.ss_port) }));
-    if (r) { toast('Spremljeno.'); pageServers(); }
+    if (r) { toast('Spremljeno.'); if (location.hash.startsWith('#/server/')) pageServer(id); else pageServers(); }
   }
   async function srvMore(id) {
     S.servers = await GET('servers');
@@ -1209,6 +1322,7 @@
       <div style="display:flex;flex-direction:column;gap:8px">
         <button class="btn" value="install">Prikaži komandu za instalaciju</button>
         <button class="btn" value="locate">Odredi lokaciju iz IP adrese</button>
+        <button class="btn warnb" value="maintenance">${s.maintenance ? 'Završi održavanje' : 'Stavi na održavanje (kupci ga ne biraju automatski)'}</button>
         <button class="btn warnb" value="toggle">${s.enabled ? 'Ugasi server (kupci ga ne vide)' : 'Upali server'}</button>
         <button class="btn danger" value="delete">Obriši server iz panela</button></div>
       <div class="dlg-actions"><button class="btn" value="cancel">Zatvori</button></div>`);
@@ -1550,7 +1664,7 @@
     const params = new URLSearchParams(qs || '');
     paintNav();
     if (path !== 'korisnici' && !path.startsWith('korisnik/')) S.sel.clear();
-    if (!['', 'serveri'].includes(path)) stopLive();
+    if (!['', 'serveri'].includes(path) && !path.startsWith('server/')) stopLive();
     try {
       if (S.me.must2fa) { $('#view').innerHTML = top('Uključi 2FA', 'Obavezno za sve admine (postavka sigurnosti)'); return setup2fa(true); }
       if (isRes()) {
@@ -1567,6 +1681,7 @@
       if (path.startsWith('korisnik/')) return await pageUser(Number(path.split('/')[1]));
       if (path === 'planovi') return await pagePlans();
       if (path === 'serveri') return await pageServers();
+      if (path.startsWith('server/') && can('servers')) return await pageServer(Number(path.split('/')[1]));
       if (path === 'reselleri') return await pageResellers();
       if (path === 'reselleri/nivoi') return await pageLevels();
       if (path.startsWith('reseller/')) { await pageResellers(); S.selRes = Number(path.split('/')[1]); $('#view').innerHTML = `<section class="card p" id="rFull" style="display:flex;flex-direction:column;gap:10px"></section>`; return resDetail(S.selRes, $('#rFull')); }
@@ -1648,8 +1763,10 @@
     editChain: (d) => editChain(d.id).catch(fail),
     toggleChain: async (d) => { const c = S.chains.find((x) => x.id === Number(d.id)); try { await PUT('chains/' + d.id, { enabled: !c.enabled }); pageServers(); } catch (e) { fail(e); } },
     delChain: async (d) => { if (!(await ask('Obrisati lanac?', 'Kupci koji ga koriste prebacit će se na drugi server.', 'Obriši', true))) return; try { await DEL('chains/' + d.id); toast('Lanac obrisan.'); pageServers(); } catch (e) { fail(e); } },
-    srvAct: async (d) => { try { await POST(`servers/${d.id}/${d.act}`); pageServers(); } catch (e) { fail(e); } },
+    srvAct: async (d) => { try { await POST(`servers/${d.id}/${d.act}`); if (d.back) pageServer(d.id); else pageServers(); } catch (e) { fail(e); } },
     srvMore: (d) => srvMore(d.id).catch(fail),
+    srvCmd: (d) => srvCmd(d.id, d.cmd).catch(fail),
+    srvRange: (d) => pageServer(d.id, d.r).catch(fail),
     openRes: (d, el) => {
       S.selRes = Number(d.id);
       if (innerWidth < 960 || !$('#rDetail')) { location.hash = '#/reseller/' + d.id; return; }

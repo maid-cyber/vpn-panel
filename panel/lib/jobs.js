@@ -25,6 +25,7 @@ function checkServers() {
   for (const sv of all("SELECT * FROM servers WHERE enabled = 1")) {
     if (sv.status === 'online' && sv.last_seen && now() - sv.last_seen > off) {
       run("UPDATE servers SET status = 'offline' WHERE id = ?", sv.id);
+      run("INSERT INTO server_events (server_id, ts, kind) VALUES (?, ?, 'down')", sv.id, sv.last_seen);
       log('sistem', 'Server pao', `${sv.name} ne odgovara ${Math.round((now() - sv.last_seen) / 1000)} s`, 'error');
       if (!sv.maintenance) notify('n_server', `🔴 ${sv.name} (${sv.host}) ne odgovara! Provjeri server.`);
     }

@@ -271,6 +271,14 @@ Na glavnoj adresi servera (npr. `http://IP/`) je javni sajt: funkcije, lokacije 
 
 **Vlastiti brend (white-label):** uključi u Postavke → Reselleri → "Vlastiti brend za resellere". Reseller tada u meniju **Moj brend** upiše ime, kontakt, boju, poruku dobrodošlice i učita logo, uz pregled uživo. Njegovi kupci na svojoj stranici, u aplikacijama (ime profila) i u podsjetnicima vide njegov brend. Može sakriti i Veltrix aplikaciju, pa kupci vide samo Hiddify i druge. Admin može ukloniti neprikladan logo u Reselleri → Uredi.
 
+## 19. Detalji servera, komande i kupci online
+
+**Serveri → Detalji** (ili klik na ime servera): dostupnost za 30 dana, grafikoni CPU, RAM, spojeni kupci i promet (24 sata ili 7 dana), lista kupaca spojenih sada i historija padova. Podaci se čuvaju 8 dana (po 5 minuta), historija padova 90 dana.
+
+Dugmad **Restartuj VPN**, **Test brzine**, **Ažuriraj agent** i **Restartuj server** šalju komandu agentu; agent je preuzme pri sljedećem javljanju (par sekundi) i rezultat se pojavi na istoj stranici. Treba agent 1.4.0 (ažurira se sam kad ažuriraš panel).
+
+**Korisnici → Online sada**: kupci koji su imali promet u zadnje 2 minute, sa zelenom tačkom i serverom na koji su spojeni. **Novi link** u detaljima kupca pravi novi link i nove ključeve (stari odmah prestaju raditi) i odmah pokaže QR i dugme "Pošalji kupcu".
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

@@ -13,10 +13,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
 
-VERSION = "1.3.1"
+VERSION = "1.4.0"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
@@ -469,6 +470,85 @@ def self_update(panel):
         log("Ažuriranje agenta nije uspjelo:", e)
 
 
+# ---------------------------------------------------------------- komande iz panela
+SPEED_URL = "https://speed.cloudflare.com"
+RUNNING = set()
+
+
+def speedtest():
+    """Brzina servera prema internetu (Cloudflare): ping, preuzimanje i slanje u Mbit/s."""
+    hdr = {"user-agent": "Mozilla/5.0 (vpn-agent)"}
+    pings = []
+    for _ in range(3):
+        t0 = time.time()
+        with urllib.request.urlopen(urllib.request.Request(SPEED_URL + "/__down?bytes=0", headers=hdr), timeout=10) as r:
+            r.read()
+        pings.append((time.time() - t0) * 1000)
+    n, t0 = 0, time.time()
+    with urllib.request.urlopen(urllib.request.Request(SPEED_URL + "/__down?bytes=100000000", headers=hdr), timeout=30) as r:
+        while time.time() - t0 < 8:
+            b = r.read(1 << 16)
+            if not b:
+                break
+            n += len(b)
+    down = n * 8 / max(0.001, time.time() - t0) / 1e6
+    payload = b"\0" * 15_000_000
+    t0 = time.time()
+    req = urllib.request.Request(SPEED_URL + "/__up", data=payload, method="POST", headers={**hdr, "content-type": "application/octet-stream"})
+    with urllib.request.urlopen(req, timeout=40) as r:
+        r.read()
+    up = len(payload) * 8 / max(0.001, time.time() - t0) / 1e6
+    return {"down": round(down, 1), "up": round(up, 1), "ping": round(min(pings))}
+
+
+def run_cmd(panel, token, c):
+    """Izvrši komandu iz panela i javi rezultat. Restart i ažuriranje prvo jave rezultat, pa se izvrše."""
+    cid, cmd = c.get("id"), c.get("cmd")
+    if cid in RUNNING:
+        return
+    RUNNING.add(cid)
+
+    def report(ok, result):
+        try:
+            request(panel, token, "/agent/cmd-result", {"id": cid, "ok": ok, "result": result})
+        except Exception as e:  # noqa: BLE001
+            log("Rezultat komande nije poslan:", e)
+
+    def work():
+        try:
+            log("Komanda iz panela:", cmd)
+            if cmd == "restart_vpn":
+                if DRY:
+                    return report(True, "Xray: radi · WireGuard: radi (probni način)")
+                sh("systemctl restart xray")
+                if os.path.exists(WG_CONF):
+                    sh("systemctl restart wg-quick@wg0")
+                time.sleep(2)
+                x, w = service_ok("xray"), service_ok("wg-quick@wg0") if os.path.exists(WG_CONF) else None
+                return report(x, f"Xray: {'radi' if x else 'ne radi'}" + ("" if w is None else f" · WireGuard: {'radi' if w else 'ne radi'}"))
+            if cmd == "reboot":
+                report(True, "Server se restartuje, vraća se za 1–2 minute")
+                if not DRY:
+                    subprocess.Popen(["sh", "-c", "sleep 2; systemctl reboot"])
+                return None
+            if cmd == "update_agent":
+                report(True, f"Agent {VERSION} preuzima najnoviju verziju")
+                if not DRY:
+                    self_update(panel)
+                return None
+            if cmd == "speedtest":
+                if DRY:
+                    return report(True, json.dumps({"down": 912.4, "up": 845.1, "ping": 4}))
+                return report(True, json.dumps(speedtest()))
+            return report(False, "Agent ne zna ovu komandu. Ažuriraj agenta.")
+        except Exception as e:  # noqa: BLE001
+            report(False, str(e)[-500:])
+        finally:
+            RUNNING.discard(cid)
+
+    threading.Thread(target=work, daemon=True).start()
+
+
 def main():
     if DRY:
         panel, token = arg("--panel"), arg("--token")
@@ -515,6 +595,8 @@ def main():
             fails = 0
             interval = max(5, int(r.get("interval", 15)))
             want_devices = bool(r.get("devices", True))
+            for c in r.get("cmds") or []:
+                run_cmd(panel, token, c)
             if r.get("xray_update"):
                 maybe_update_xray()
             if r.get("agent_version") and r["agent_version"] != VERSION and not DRY:

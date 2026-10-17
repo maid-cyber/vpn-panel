@@ -478,3 +478,46 @@ body { background: radial-gradient(900px 500px at 12% -10%, rgba(47, 107, 255, .
 .pv-btn { display: block; text-align: center; border-radius: 10px; padding: 10px; font-weight: 600; color: #fff; }
 .pv-btn.o { border: 1px solid #2c2c37; background: none; }
 .pv-sup { text-align: center; color: #a5a5b2; }
+
+/* ---------- detalji servera */
+a.srv-t { color: inherit; text-decoration: none; }
+a.srv-t:hover b { color: var(--acc-hi); }
+.srvhead { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.srvflag.big { width: 58px; height: 58px; }
+.srvflag.big .dot { width: 15px; height: 15px; }
+.srvhead-t { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 220px; }
+.srvcmds { display: flex; flex-wrap: wrap; gap: 8px; }
+.srvcmds .btn svg { width: 15px; height: 15px; }
+.srvcmds .btn[disabled] { opacity: .45; cursor: not-allowed; }
+.stat .v.warn { color: var(--warn); }
+.stat .v small { font-size: 15px; font-weight: 500; }
+.mgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 960px) { .mgrid { grid-template-columns: minmax(0, 1fr); } }
+.mchart .ch { margin-bottom: 6px; }
+.mnow { font: 700 18px var(--display); font-variant-numeric: tabular-nums; }
+.srvlists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .srvlists { grid-template-columns: minmax(0, 1fr); } }
+.ulist { display: flex; flex-direction: column; max-height: 420px; overflow: auto; }
+.urow { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 9px 4px; border-top: 1px solid var(--line); color: inherit; text-decoration: none; font-size: 13.5px; }
+.urow:first-child { border-top: 0; }
+.urow:hover b { color: var(--acc-hi); }
+.urow b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.odot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); display: inline-block; flex: none; }
+.evlist { display: flex; flex-direction: column; max-height: 460px; overflow: auto; }
+.ev { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+.ev:first-child { border-top: 0; }
+.ev b { font-size: 13.5px; white-space: nowrap; } .ev small { display: block; font-size: 12px; white-space: nowrap; }
+.evi { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--card2); color: var(--soft); }
+.evi svg { width: 16px; height: 16px; }
+.evi.bad { background: var(--bad-bg); color: var(--bad); } .evi.ok { background: var(--ok-bg); color: var(--ok); }
+.evr { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; max-width: 55vw; min-width: 0; }
+.cmdres { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+.speedres { font-size: 13px; color: var(--soft); white-space: nowrap; }
+.speedres b { color: var(--text); font: 700 14px var(--display); }
+.banner.bad { background: var(--bad-bg); color: var(--bad); border-color: transparent; } .banner.bad svg { width: 18px; height: 18px; flex: none; }
+.newlink { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.newlink .qrbox { background: #fff; border-radius: 12px; padding: 10px; width: 200px; }
+.newlink .qrbox svg { display: block; width: 100%; height: auto; }
+.newlink-l { font-size: 12.5px; word-break: break-all; text-align: center; color: var(--soft); background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; width: 100%; }
+.chip .odot { margin-right: 6px; width: 7px; height: 7px; vertical-align: 1px; }
+b .odot { width: 7px; height: 7px; vertical-align: 2px; margin-right: 4px; }

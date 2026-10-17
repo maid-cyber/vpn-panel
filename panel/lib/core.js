@@ -17,7 +17,7 @@ function userRow(u, t = now()) {
     status, disabled: !!u.disabled, expires_at: u.expires_at, days_left: Math.ceil((u.expires_at - t) / vpn.DAY),
     traffic_used: u.traffic_up + u.traffic_down, traffic_limit: u.traffic_limit, devices: u.devices,
     note: u.note, contact: u.contact, email: u.email || '', auto_renew: !!u.auto_renew, tg: !!u.tg_chat,
-    devices_seen: u.devices_seen || 0, blocked_until: u.blocked_until || 0, last_seen: u.last_seen, last_server: u.last_server_name || null, created_at: u.created_at,
+    devices_seen: u.devices_seen || 0, blocked_until: u.blocked_until || 0, last_seen: u.last_seen, last_server: u.last_server_name || null, last_server_id: u.last_server || null, online: !!(u.last_seen && t - u.last_seen < 120000), created_at: u.created_at,
   };
 }
 

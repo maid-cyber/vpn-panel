@@ -177,6 +177,17 @@ async function handle(req, res, p) {
         notify('n_server', `🟢 ${sv.name}: VPN (Xray) ponovo radi.`);
       }
     }
+    // statistika po 5 minuta (prosjek CPU/RAM, najviše spojenih, zbir prometa)
+    const bucket = Math.floor(t / 300000) * 300000;
+    run(`INSERT INTO server_stats (server_id, ts, cpu, ram, online, traffic, n) VALUES (?,?,?,?,?,?,1)
+      ON CONFLICT(server_id, ts) DO UPDATE SET cpu = (cpu * n + excluded.cpu) / (n + 1), ram = (ram * n + excluded.ram) / (n + 1),
+      online = MAX(online, excluded.online), traffic = traffic + excluded.traffic, n = n + 1`, sv.id, bucket, Number(b.cpu) || 0, Number(b.ram) || 0, Number(b.online) || 0, total);
+    if (Math.random() < 0.002) { run('DELETE FROM server_stats WHERE ts < ?', t - 8 * 86400000); run('DELETE FROM server_events WHERE ts < ?', t - 90 * 86400000); run('DELETE FROM server_cmds WHERE created_at < ?', t - 30 * 86400000); }
+    if (wasOffline) {
+      const down = one("SELECT id, ts FROM server_events WHERE server_id = ? AND kind = 'down' ORDER BY id DESC LIMIT 1", sv.id);
+      if (down) run('UPDATE server_events SET dur = ? WHERE id = ?', t - down.ts, down.id);
+      run("INSERT INTO server_events (server_id, ts, kind, dur) VALUES (?, ?, 'up', ?)", sv.id, t, down ? t - down.ts : 0);
+    }
     if (!sv.last_seen) {
       log('sistem', 'Server se prvi put javio', `${sv.name} (${host})`);
       notify('n_server', `🟢 Novi server ${sv.name} je online (${host})`);
@@ -198,9 +209,23 @@ async function handle(req, res, p) {
     if (lastIps.size > 20000) lastIps.clear();
     LIVE.set(sv.id, { t, flows: flowsFromIps(ips) });
     const cfg = vpn.nodeConfig(one('SELECT * FROM servers WHERE id = ?', sv.id));
-    return send(res, 200, { hash: cfg.hash, interval: Number(settings.get('heartbeat_sec') || 15), agent_version: agentVersion(), xray_update: !!settings.get('xray_autoupdate'), devices: settings.get('device_limit') !== 'iskljuceno' });
+    // komande iz panela (restart, test brzine…): pošalji one koje još nisu poslane ili nisu potvrđene 3 minute
+    const cmds = all('SELECT id, cmd FROM server_cmds WHERE server_id = ? AND done_at IS NULL AND (sent_at IS NULL OR sent_at < ?) AND created_at > ? ORDER BY id LIMIT 5', sv.id, t - 180000, t - 1800000);
+    for (const c of cmds) run('UPDATE server_cmds SET sent_at = ? WHERE id = ?', t, c.id);
+    return send(res, 200, { cmds, hash: cfg.hash, interval: Number(settings.get('heartbeat_sec') || 15), agent_version: agentVersion(), xray_update: !!settings.get('xray_autoupdate'), devices: settings.get('device_limit') !== 'iskljuceno' });
+  }
+  if (p === '/agent/cmd-result' && req.method === 'POST') {
+    const b = await readBody(req, 64 << 10);
+    const c = one('SELECT * FROM server_cmds WHERE id = ? AND server_id = ?', Number(b.id), sv.id);
+    if (!c) fail(404, 'Nepoznata komanda.');
+    if (!c.done_at) {
+      run('UPDATE server_cmds SET done_at = ?, ok = ?, result = ? WHERE id = ?', now(), b.ok ? 1 : 0, String(b.result ?? '').slice(0, 4000), c.id);
+      log('sistem', `Server: ${CMD_LABEL[c.cmd] || c.cmd}`, `${sv.name} · ${b.ok ? 'uspjelo' : 'nije uspjelo'}${b.result && !b.ok ? ': ' + String(b.result).slice(0, 200) : ''}`, b.ok ? 'info' : 'warn');
+    }
+    return send(res, 200, { ok: true });
   }
   fail(404, 'Nepoznato.');
 }
+const CMD_LABEL = { restart_vpn: 'restart VPN-a', reboot: 'restart servera', update_agent: 'ažuriranje agenta', speedtest: 'test brzine' };
 
-module.exports = { handle, installScript, liveFlows, flowsFromIps };
+module.exports = { handle, installScript, liveFlows, flowsFromIps, CMD_LABEL };

@@ -115,6 +115,12 @@ addCol('users', 'ref_code', 'TEXT');
 addCol('users', 'referred_by', 'INTEGER');
 addCol('users', 'paid_once', 'INTEGER DEFAULT 0');
 addCol('users', 'trial_device', 'TEXT');
+// statistika servera kroz vrijeme (po 5 minuta, čuva se 8 dana), historija rada i komande serveru
+db.exec(`CREATE TABLE IF NOT EXISTS server_stats (server_id INTEGER NOT NULL, ts INTEGER NOT NULL, cpu REAL DEFAULT 0, ram REAL DEFAULT 0, online INTEGER DEFAULT 0, traffic INTEGER DEFAULT 0, n INTEGER DEFAULT 0, PRIMARY KEY (server_id, ts));
+CREATE TABLE IF NOT EXISTS server_events (id INTEGER PRIMARY KEY, server_id INTEGER NOT NULL, ts INTEGER NOT NULL, kind TEXT NOT NULL, dur INTEGER DEFAULT 0);
+CREATE INDEX IF NOT EXISTS server_events_s ON server_events(server_id, ts);
+CREATE TABLE IF NOT EXISTS server_cmds (id INTEGER PRIMARY KEY, server_id INTEGER NOT NULL, cmd TEXT NOT NULL, by TEXT, created_at INTEGER NOT NULL, sent_at INTEGER, done_at INTEGER, ok INTEGER, result TEXT);
+CREATE INDEX IF NOT EXISTS server_cmds_s ON server_cmds(server_id, id);`);
 // vlastiti brend resellera (white-label)
 addCol('admins', 'brand_color', "TEXT DEFAULT ''");
 addCol('admins', 'brand_logo', "TEXT DEFAULT ''");
