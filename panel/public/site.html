@@ -101,6 +101,9 @@ dialog::backdrop{background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
 dialog h3{font-size:22px;margin-bottom:6px}
 dialog input{width:100%;min-height:50px;border-radius:12px;border:1px solid var(--line2);background:var(--bg2);color:var(--text);padding:0 14px;font:16px Inter,sans-serif;margin:16px 0 8px}
 dialog .err{color:var(--red2);font-size:14px;min-height:20px}
+.cpn{display:none;gap:8px;align-items:center}.cpn.on{display:flex}.cpn input{margin:0;min-height:44px;text-transform:uppercase;flex:1}.cpn .btn{min-height:44px;padding:0 16px}
+.cpnlink{background:none;border:0;color:var(--muted);font:14px Inter,sans-serif;text-decoration:underline;cursor:pointer;padding:0;margin-bottom:8px}.cpnok{color:#5fe0a0;font-size:14px;min-height:0}
+#buyTitle s{color:var(--muted);font-weight:500;font-size:.8em;margin-left:6px}
 .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s,transform .6s}
 .reveal.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
@@ -182,6 +185,9 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   <h3 id="buyTitle"></h3>
   <p style="color:var(--muted);margin:0" data-t="b_p">Na ovaj e-mail šaljemo tvoj pristupni link poslije plaćanja.</p>
   <input type="email" name="email" required autocomplete="email" placeholder="tvoj@email.com">
+  <button type="button" class="cpnlink" id="cpnShow" data-t="b_cc" hidden>Imaš kod za popust?</button>
+  <div class="cpn" id="cpnRow"><input name="coupon" id="cpnIn" autocomplete="off" placeholder="KOD"><button type="button" class="btn" id="cpnGo" data-t="b_ca">Primijeni</button></div>
+  <div class="cpnok" id="cpnOk"></div>
   <div class="err" id="buyErr"></div>
   <div style="display:flex;gap:10px;margin-top:8px"><button class="btn" value="cancel" formnovalidate style="flex:1" data-t="b_c">Odustani</button><button class="btn red" value="ok" style="flex:1.4" id="buyGo" data-t="b_go">Plati karticom</button></div>
   <p style="color:var(--muted);font-size:13px;margin:14px 0 0;text-align:center" data-t="b_s">🔒 Sigurno plaćanje preko Stripea</p>
@@ -223,7 +229,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
         ['Mogu li probati prije kupovine?', 'Da. U Android i Windows aplikaciji klikni "Probaj besplatno" i dobiješ probni nalog.'],
         ['Kako produžim pretplatu?', 'U aplikaciji (Nalog → Produži pretplatu) ili na stranici svog naloga. Dani se dodaju na trenutni datum isteka.']],
       z_h: 'Spreman za privatan internet?', z_p: 'Kupi plan i spoji se za manje od minute.',
-      b_p: 'Na ovaj e-mail šaljemo tvoj pristupni link poslije plaćanja.', b_c: 'Odustani', b_go: 'Plati karticom', b_s: '🔒 Sigurno plaćanje preko Stripea', b_wait: 'Otvaram plaćanje…',
+      b_p: 'Na ovaj e-mail šaljemo tvoj pristupni link poslije plaćanja.', b_c: 'Odustani', b_go: 'Plati karticom', b_s: '🔒 Sigurno plaćanje preko Stripea', b_wait: 'Otvaram plaćanje…', b_cc: 'Imaš kod za popust?', b_ca: 'Primijeni', b_cok: 'Kod prihvaćen', b_days: 'dana gratis',
       support: 'Podrška: ',
     },
     en: {
@@ -256,7 +262,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
         ['Can I try before buying?', 'Yes. In the Android and Windows app tap "Try free" to get a trial account.'],
         ['How do I renew?', 'In the app (Account → Renew subscription) or on your account page. Days are added to your current expiry date.']],
       z_h: 'Ready for private internet?', z_p: 'Buy a plan and connect in under a minute.',
-      b_p: 'We send your access link to this email after payment.', b_c: 'Cancel', b_go: 'Pay by card', b_s: '🔒 Secure payment by Stripe', b_wait: 'Opening payment…',
+      b_p: 'We send your access link to this email after payment.', b_c: 'Cancel', b_go: 'Pay by card', b_s: '🔒 Secure payment by Stripe', b_wait: 'Opening payment…', b_cc: 'Have a discount code?', b_ca: 'Apply', b_cok: 'Code applied', b_days: 'free days',
       support: 'Support: ',
     },
   };
@@ -329,12 +335,28 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   document.getElementById('burger').addEventListener('click', () => links.classList.toggle('open'));
   links.addEventListener('click', (e) => { if (e.target.tagName === 'A') links.classList.remove('open'); });
   // kupovina
-  const dlg = document.getElementById('buyDlg'); let buyId = 0;
+  const dlg = document.getElementById('buyDlg'); let buyId = 0, cpn = '';
+  // kod za popust: provjeri na serveru i pokaži novu cijenu
+  document.getElementById('cpnShow').addEventListener('click', (e) => { e.target.hidden = true; document.getElementById('cpnRow').classList.add('on'); document.getElementById('cpnIn').focus(); });
+  document.getElementById('cpnIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cpnGo').click(); } });
+  document.getElementById('cpnGo').addEventListener('click', async () => {
+    const code = document.getElementById('cpnIn').value.trim(), ok = document.getElementById('cpnOk'), err = document.getElementById('buyErr');
+    if (!code) return; err.textContent = ''; ok.textContent = '';
+    try {
+      const j = await (await fetch('/coupon', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan_id: buyId, code }) })).json();
+      if (!j.ok) { cpn = ''; err.textContent = j.error || 'Greška'; return; }
+      cpn = code; const p = D.plans.find((x) => x.id === buyId);
+      document.getElementById('buyTitle').innerHTML = `${esc(p.name)} · ${money(j.price)}<s>${money(j.old)}</s>`;
+      ok.textContent = `✓ ${T[lang].b_cok}: −${money(j.discount)}${j.bonus_days ? ` · +${j.bonus_days} ${T[lang].b_days}` : ''}`;
+    } catch { err.textContent = 'Greška, pokušaj ponovo.'; }
+  });
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-buy]'); if (!b) return;
     buyId = Number(b.dataset.buy); const p = D.plans.find((x) => x.id === buyId);
     document.getElementById('buyTitle').textContent = `${p.name} · ${money(p.price)}`;
     document.getElementById('buyErr').textContent = '';
+    cpn = ''; document.getElementById('cpnOk').textContent = ''; document.getElementById('cpnIn').value = '';
+    document.getElementById('cpnShow').hidden = !D.coupons; document.getElementById('cpnRow').classList.remove('on');
     dlg.showModal(); dlg.querySelector('input').focus();
   });
   document.getElementById('buyForm').addEventListener('submit', async (e) => {
@@ -343,7 +365,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     const go = document.getElementById('buyGo'), err = document.getElementById('buyErr');
     go.disabled = true; go.textContent = T[lang].b_wait; err.textContent = '';
     try {
-      const r = await fetch('/buy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan_id: buyId, email: e.target.email.value }) });
+      const r = await fetch('/buy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan_id: buyId, email: e.target.email.value, coupon: cpn }) });
       const j = await r.json();
       if (j.url) { location.href = j.url; return; }
       err.textContent = j.error || 'Greška';

@@ -233,6 +233,88 @@ route('GET', 'res/dash', 'res', (c) => {
   };
 });
 
+// ============================== uživo i analitika ==============================
+route('GET', 'live/feed', 'dash', (c) => {
+  const t = now(), tz = settings.get('timezone'), after = Number(c.query.after) || 0;
+  const day0 = dayStart(t, 0);
+  const events = all(`SELECT id, ts, actor, action, detail, kind FROM logs WHERE id > ? ${after ? '' : 'AND ts > ' + (t - 86400000)} ORDER BY id DESC LIMIT 40`, after);
+  const sales = one("SELECT COUNT(*) AS n, COALESCE(SUM(amount),0) AS s FROM transactions WHERE ts >= ? AND type IN ('topup','sale')", day0);
+  return {
+    t, events,
+    stats: {
+      online: one('SELECT COUNT(*) AS n FROM users WHERE last_seen > ?', t - ONLINE_MS).n,
+      sessions: serversList().reduce((a, s) => a + (s.status === 'online' ? s.online : 0), 0),
+      revToday: core.round2(sales.s), salesToday: sales.n,
+      newToday: one('SELECT COUNT(*) AS n FROM users WHERE created_at >= ?', day0).n,
+      trafficToday: one('SELECT traffic FROM daily WHERE day = ?', dayKey(t, tz))?.traffic || 0,
+    },
+  };
+});
+route('GET', 'analytics', 'dash', (c) => {
+  const t = now(), days = [30, 90, 365].includes(Number(c.query.days)) ? Number(c.query.days) : 30;
+  const from = dayStart(t, days - 1);
+  const users = all('SELECT u.id, u.created_at, u.expires_at, u.owner_id, u.plan_id, u.disabled, u.last_seen, p.price, p.days AS pdays, p.trial FROM users u LEFT JOIN plans p ON p.id = u.plan_id');
+  const tx = all("SELECT ts, type, amount, user_id FROM transactions WHERE ts >= ? AND type IN ('topup','sale','expense')", from);
+  const series = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const a = dayStart(t, i), b = i ? dayStart(t, i - 1) : t + 1;
+    let rev = 0, exp = 0;
+    for (const x of tx) if (x.ts >= a && x.ts < b) { if (x.type === 'expense') exp += Math.abs(x.amount); else rev += x.amount; }
+    series.push({ ts: a, rev: core.round2(rev), exp: core.round2(exp), new: users.filter((u) => u.created_at >= a && u.created_at < b).length,
+      active: users.filter((u) => u.created_at < b && u.expires_at >= Math.min(b, t) && !u.disabled).length });
+  }
+  const active = users.filter((u) => u.expires_at > t && !u.disabled);
+  const paying = active.filter((u) => u.price > 0 && !u.trial);
+  const mrr = paying.reduce((a, u) => a + u.price * 30 / Math.max(1, u.pdays || 30), 0);
+  const grace = Number(settings.get('grace_days') || 0) * 86400000;
+  const atStart = users.filter((u) => u.created_at < from && u.expires_at >= from).length;
+  const churned = users.filter((u) => u.expires_at >= from && u.expires_at + grace < t && u.price > 0 && !u.trial).length;
+  const renewals = one('SELECT COALESCE(SUM(renewals),0) AS n FROM daily WHERE day >= ?', dayKey(from, settings.get('timezone'))).n;
+  const plans = all('SELECT id, name, price, days FROM plans').map((p) => {
+    const n = active.filter((u) => u.plan_id === p.id).length;
+    return { name: p.name, n, mrr: core.round2(n * (p.price || 0) * 30 / Math.max(1, p.days || 30)) };
+  }).filter((p) => p.n).sort((a, b) => b.n - a.n);
+  const ltvRow = one("SELECT COALESCE(SUM(amount),0) AS s, COUNT(DISTINCT user_id) AS n FROM transactions WHERE user_id IS NOT NULL AND type IN ('sale','topup')");
+  const heat = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (const x of tx) if (x.type !== 'expense') { const d = new Date(x.ts); heat[(d.getDay() + 6) % 7][d.getHours()]++; }
+  const ctotal = one('SELECT COALESCE(SUM(n),0) AS n FROM countries WHERE day >= ?', dayKey(from, settings.get('timezone'))).n;
+  const countries = all('SELECT cc, SUM(n) AS n FROM countries WHERE day >= ? GROUP BY cc ORDER BY n DESC LIMIT 10', dayKey(from, settings.get('timezone'))).map((r) => ({ ...r, pct: ctotal ? Math.round(r.n / ctotal * 100) : 0 }));
+  const owners = { direct: active.filter((u) => !u.owner_id).length, resellers: active.filter((u) => u.owner_id).length };
+  const rev = series.reduce((a, d) => a + d.rev, 0), exp = series.reduce((a, d) => a + d.exp, 0);
+  return {
+    days, series, plans, heat, countries, owners,
+    kpi: {
+      active: active.length, paying: paying.length, mrr: core.round2(mrr), arpu: paying.length ? core.round2(mrr / paying.length) : 0,
+      newUsers: series.reduce((a, d) => a + d.new, 0), renewals, churned, churnPct: atStart ? Math.round(churned / atStart * 1000) / 10 : 0,
+      rev: core.round2(rev), exp: core.round2(exp), profit: core.round2(rev - exp), ltv: ltvRow.n ? core.round2(ltvRow.s / ltvRow.n) : 0,
+      online: users.filter((u) => u.last_seen && t - u.last_seen < ONLINE_MS).length,
+    },
+  };
+});
+
+// ============================== kuponi ==============================
+const coupons = require('./coupons');
+route('GET', 'coupons', 'plans', () => coupons.listAll());
+route('POST', 'coupons', 'plans', (c) => coupons.create(c.body, c.auth.me.username));
+route('PUT', 'coupons/:id', 'plans', (c) => coupons.update(c.params.id, c.body, c.auth.me.username));
+route('DELETE', 'coupons/:id', 'plans', (c) => coupons.remove(c.params.id, c.auth.me.username));
+
+// ============================== korpa ==============================
+route('GET', 'trash', 'users', (c) => {
+  const res = isRes(c.auth.me);
+  return all(`SELECT id, user_id, username, owner_id, deleted_at, by, reason, data FROM trash ${res ? 'WHERE owner_id = ?' : ''} ORDER BY id DESC LIMIT 500`, ...(res ? [c.auth.me.id] : []))
+    .map((t) => { const u = JSON.parse(t.data).user || {}; const p = u.plan_id ? one('SELECT name FROM plans WHERE id = ?', u.plan_id) : null; const o = u.owner_id ? one('SELECT username FROM admins WHERE id = ?', u.owner_id) : null;
+      return { id: t.id, username: t.username, deleted_at: t.deleted_at, by: t.by, reason: t.reason, plan: p?.name || null, owner: o?.username || null, expires_at: u.expires_at, traffic: (u.traffic_up || 0) + (u.traffic_down || 0), contact: u.contact || u.email || '', purge_at: t.deleted_at + 30 * 86400000 }; });
+});
+route('POST', 'trash/:id/restore', 'users', (c) => core.restoreUser(c.auth.me, c.params.id));
+route('DELETE', 'trash/:id', 'users', (c) => {
+  const t = one('SELECT * FROM trash WHERE id = ?', Number(c.params.id));
+  if (!t || (isRes(c.auth.me) && t.owner_id !== c.auth.me.id)) fail(404, 'Toga više nema u korpi.');
+  run('DELETE FROM trash WHERE id = ?', t.id);
+  log(c.auth.me.username, 'Trajno obrisan iz korpe', t.username, 'warn');
+  return { ok: true };
+});
+
 // ============================== korisnici ==============================
 function listUsers(c, me) {
   const q = c.query, t = now();

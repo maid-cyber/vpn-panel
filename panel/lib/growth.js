@@ -91,6 +91,8 @@ async function renew(req, res, u, link) {
   const b = await readBody(req, 4096).catch(() => ({}));
   const plan = renewPlans(u).find((p) => p.id === Number(b.plan_id));
   if (!plan) return send(res, 400, { error: 'Plan nije dostupan za plaćanje karticom.' });
+  let k;
+  try { k = require('./coupons').apply(b.coupon, plan); } catch (e) { return send(res, 400, { error: e.message }); }
   const form = new URLSearchParams({
     mode: 'payment',
     success_url: `${link}?placeno=1`,
@@ -99,9 +101,10 @@ async function renew(req, res, u, link) {
     'metadata[purpose]': 'renew', 'metadata[user_id]': String(u.id), 'metadata[plan_id]': String(plan.id),
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': String(s.currency || 'EUR').toLowerCase(),
-    'line_items[0][price_data][unit_amount]': String(Math.round(plan.price * 100)),
-    'line_items[0][price_data][product_data][name]': `${s.brand} · ${plan.name}`,
+    'line_items[0][price_data][unit_amount]': String(Math.round(k.price * 100)),
+    'line_items[0][price_data][product_data][name]': `${s.brand} · ${plan.name}${k.coupon ? ` (kod ${k.coupon.code})` : ''}`,
   });
+  if (k.coupon) { form.set('metadata[coupon_id]', String(k.coupon.id)); form.set('metadata[discount]', String(k.discount)); }
   if (u.email) form.set('customer_email', u.email);
   const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST', headers: { authorization: `Bearer ${s.stripe_secret}`, 'content-type': 'application/x-www-form-urlencoded' }, body: form.toString(), signal: AbortSignal.timeout(20000),
@@ -122,6 +125,7 @@ function paidRenew(ses) {
   core.extendUser({ username: 'Stripe', role: 'owner', id: 0 }, uid, { plan_id: pid, paid: amount, method: 'Stripe (kartica)' });
   const trx = one('SELECT id FROM transactions WHERE user_id = ? AND ext_id IS NULL ORDER BY id DESC LIMIT 1', uid);
   if (trx) run('UPDATE transactions SET ext_id = ? WHERE id = ?', ses.id, trx.id);
+  require('./coupons').used(ses, uid);
   // preporuka: prva uplata pozvanog kupca → gratis dani obojici
   const s = settings.load();
   if (!u.paid_once) {

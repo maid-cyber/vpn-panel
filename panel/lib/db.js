@@ -121,6 +121,9 @@ CREATE TABLE IF NOT EXISTS server_events (id INTEGER PRIMARY KEY, server_id INTE
 CREATE INDEX IF NOT EXISTS server_events_s ON server_events(server_id, ts);
 CREATE TABLE IF NOT EXISTS server_cmds (id INTEGER PRIMARY KEY, server_id INTEGER NOT NULL, cmd TEXT NOT NULL, by TEXT, created_at INTEGER NOT NULL, sent_at INTEGER, done_at INTEGER, ok INTEGER, result TEXT);
 CREATE INDEX IF NOT EXISTS server_cmds_s ON server_cmds(server_id, id);`);
+// korpa: obrisani kupci se čuvaju 30 dana i mogu se vratiti
+db.exec(`CREATE TABLE IF NOT EXISTS trash (id INTEGER PRIMARY KEY, user_id INTEGER, username TEXT, owner_id INTEGER, data TEXT NOT NULL, deleted_at INTEGER NOT NULL, by TEXT, reason TEXT DEFAULT '');
+CREATE INDEX IF NOT EXISTS trash_t ON trash(deleted_at);`);
 // vlastiti brend resellera (white-label)
 addCol('servers', 'hz_id', 'INTEGER');
 // server zakupljen preko panela kod hostera (Hetzner, DigitalOcean, Vultr, OVH, Contabo)

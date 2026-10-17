@@ -131,9 +131,10 @@ async function minute() {
       const grace = Number(s.grace_days || 0);
       const cut = now() - (delDays + grace) * vpn.DAY;
       const old = all('SELECT id, username FROM users WHERE expires_at < ?', cut);
-      for (const u of old) { run('DELETE FROM user_history WHERE user_id = ?', u.id); run('DELETE FROM users WHERE id = ?', u.id); }
+      for (const u of old) require('./core').trashUser(u.id, 'sistem', `istekao prije više od ${delDays} dana`);
       if (old.length) log('sistem', 'Obrisani stari istekli nalozi', `${old.length} korisnika`);
     }
+    run('DELETE FROM trash WHERE deleted_at < ?', now() - 30 * vpn.DAY);   // korpa čuva 30 dana
     run('DELETE FROM logs WHERE ts < ?', now() - Number(s.log_days || 90) * vpn.DAY);
     run('DELETE FROM login_fail WHERE ts < ?', now() - vpn.DAY);
     run('DELETE FROM sessions WHERE last_active < ?', now() - 30 * vpn.DAY);

@@ -295,6 +295,13 @@ Upiši ključ hostera u **Postavke → Hosteri** (samo za hostere koje koristiš
 
 OVH klasični "VPS" se ne može naručiti preko API-ja (ide kroz korpu i plaćanje), zato panel koristi OVH Public Cloud. Panel mora imati javnu adresu (Postavke → Općenito → Adresa panela).
 
+## 21. Uživo, Analitika, Kuponi i Korpa
+
+- **Pregled → Uživo**: velika mapa sa spajanjima, stanje svih servera i tok događaja (prodaje, padovi, prijave) koji se sam osvježava. Gore su kupci online, aktivne veze, prodaja, novi kupci i promet danas.
+- **Pregled → Analitika** (30 dana, 90 dana, godina): aktivni kupci, procjena mjesečnog prihoda, prosjek po kupcu, odliv kupaca, vrijednost kupca, čista zarada, grafikoni rasta, planovi, ko prodaje (ti ili reselleri), kada kupci kupuju (dan × sat) i odakle su.
+- **Prodaja → Kuponi i akcije**: kodovi za popust u % ili iznosu, sa gratis danima, rokom, brojem korištenja i ograničenjem na planove. Kupac ih upisuje na sajtu i kod produženja na svojoj stranici. Polje za kod se pojavi samo dok postoji aktivan kupon.
+- **Korisnici → Korpa**: obrisani kupci (i oni koje panel sam obriše jer su dugo istekli) čuvaju se 30 dana i vraćaju jednim klikom sa istim linkom, ključem, danima i historijom.
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

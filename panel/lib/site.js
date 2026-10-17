@@ -7,6 +7,7 @@ const settings = require('./settings');
 const core = require('./core');
 const vpn = require('./vpn');
 const QR = require('../public/qr.js');
+const coupons = require('./coupons');
 const { send, esc, readBody } = require('./http');
 
 db.exec('CREATE TABLE IF NOT EXISTS purchases (session TEXT PRIMARY KEY, user_id INTEGER, email TEXT, ts INTEGER)');
@@ -57,6 +58,7 @@ function siteData(d) {
     servers: servers.length, protocols: { vless: !!s.proto_vless, ss: !!s.proto_ss, wg: !!s.proto_wg },
     blocks: { ads: !!s.block_ads, malware: !!s.block_malware },
     apk: d.apk, exe: d.exe, releases: d.page,
+    coupons: !!one('SELECT id FROM coupons WHERE active = 1 AND (expires_at = 0 OR expires_at > ?) AND (max_uses = 0 OR used < max_uses) LIMIT 1', now()),
   };
 }
 
@@ -78,15 +80,18 @@ async function buy(req, res) {
   const email = String(b.email || '').trim().slice(0, 120);
   if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) return send(res, 400, { error: 'Upiši ispravnu e-mail adresu.' });
   const site = base(req);
+  let k;
+  try { k = coupons.apply(b.coupon, plan); } catch (e) { return send(res, 400, { error: e.message }); }
   const form = new URLSearchParams({
     mode: 'payment', customer_email: email,
     success_url: `${site}/kupljeno?s={CHECKOUT_SESSION_ID}`, cancel_url: `${site}/#cijene`,
     'metadata[purpose]': 'buy', 'metadata[plan_id]': String(plan.id), 'metadata[email]': email,
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': String(s.currency || 'EUR').toLowerCase(),
-    'line_items[0][price_data][unit_amount]': String(Math.round(plan.price * 100)),
-    'line_items[0][price_data][product_data][name]': `${s.brand} · ${plan.name}`,
+    'line_items[0][price_data][unit_amount]': String(Math.round(k.price * 100)),
+    'line_items[0][price_data][product_data][name]': `${s.brand} · ${plan.name}${k.coupon ? ` (kod ${k.coupon.code})` : ''}`,
   });
+  if (k.coupon) { form.set('metadata[coupon_id]', String(k.coupon.id)); form.set('metadata[discount]', String(k.discount)); }
   const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST', headers: { authorization: `Bearer ${s.stripe_secret}`, 'content-type': 'application/x-www-form-urlencoded' }, body: form.toString(), signal: AbortSignal.timeout(20000),
   });
@@ -105,6 +110,7 @@ function paidBuy(ses, siteBase) {
   const amount = (ses.amount_total || 0) / 100;
   const id = core.createUser(SYSTEM, { plan_id: plan.id, email, paid: amount, method: 'Stripe (kartica)', note: 'Kupljeno na sajtu', contact: email });
   run('INSERT INTO purchases (session, user_id, email, ts) VALUES (?,?,?,?)', ses.id, id, email, now());
+  coupons.used(ses, id);
   const trx = one('SELECT id FROM transactions WHERE user_id = ? AND ext_id IS NULL ORDER BY id DESC LIMIT 1', id);
   if (trx) run('UPDATE transactions SET ext_id = ? WHERE id = ?', ses.id, trx.id);
   const u = one('SELECT * FROM users WHERE id = ?', id);

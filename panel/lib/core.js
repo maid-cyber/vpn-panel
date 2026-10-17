@@ -155,9 +155,41 @@ function deleteUser(actor, id) {
       }
     }
   }
-  run('DELETE FROM user_history WHERE user_id = ?', u.id);
-  run('DELETE FROM users WHERE id = ?', u.id);
-  log(actor.username, 'Korisnik obrisan', u.username, 'warn');
+  trashUser(u.id, actor.username, '');
+  log(actor.username, 'Korisnik obrisan (u korpi 30 dana)', u.username, 'warn');
+}
+
+// ---------- korpa: kopija kupca i njegove historije, vraća se sa istim linkom, ključem i danima
+function trashUser(id, by, reason) {
+  const u = one('SELECT * FROM users WHERE id = ?', id);
+  if (!u) return;
+  const history = all('SELECT ts, text FROM user_history WHERE user_id = ? ORDER BY id', id);
+  run('INSERT INTO trash (user_id, username, owner_id, data, deleted_at, by, reason) VALUES (?,?,?,?,?,?,?)', u.id, u.username, u.owner_id, JSON.stringify({ user: u, history }), now(), by, reason || '');
+  run('DELETE FROM user_history WHERE user_id = ?', id);
+  run('DELETE FROM users WHERE id = ?', id);
+}
+function restoreUser(actor, trashId) {
+  const t = one('SELECT * FROM trash WHERE id = ?', Number(trashId));
+  if (!t) fail(404, 'Toga više nema u korpi.');
+  if (actor.role === 'reseller' && t.owner_id !== actor.id) fail(404, 'Toga više nema u korpi.');
+  const { user, history: hist } = JSON.parse(t.data);
+  const u = { ...user };
+  let renamed = '';
+  if (one('SELECT id FROM users WHERE username = ?', u.username)) { let n = 2; while (one('SELECT id FROM users WHERE username = ?', `${user.username}-${n}`)) n++; u.username = `${user.username}-${n}`; renamed = u.username; }
+  if (one('SELECT id FROM users WHERE sub_token = ?', u.sub_token)) u.sub_token = vpn.subToken();
+  if (one('SELECT id FROM users WHERE uuid = ?', u.uuid)) u.uuid = vpn.uuid();
+  if (one('SELECT id FROM users WHERE id = ?', u.id)) delete u.id;   // id zauzet: dobije novi
+  if (u.plan_id && !one('SELECT id FROM plans WHERE id = ?', u.plan_id)) u.plan_id = null;
+  if (u.owner_id && !one('SELECT id FROM admins WHERE id = ?', u.owner_id)) u.owner_id = null;
+  if (u.last_server && !one('SELECT id FROM servers WHERE id = ?', u.last_server)) u.last_server = null;
+  const cols = Object.keys(u).filter((k) => one(`SELECT 1 AS x FROM pragma_table_info('users') WHERE name = ?`, k));
+  const r = run(`INSERT INTO users (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, ...cols.map((k) => u[k]));
+  const nid = u.id ?? Number(r.lastInsertRowid);
+  for (const h of hist || []) run('INSERT INTO user_history (user_id, ts, text) VALUES (?,?,?)', nid, h.ts, h.text);
+  history(nid, `Vraćen iz korpe · ${actor.username}${renamed ? ` (novo ime ${renamed}, staro je bilo zauzeto)` : ''}`);
+  run('DELETE FROM trash WHERE id = ?', t.id);
+  log(actor.username, 'Korisnik vraćen iz korpe', u.username);
+  return { id: nid, username: u.username, renamed };
 }
 
 function setDisabled(actor, id, disabled) {
@@ -232,6 +264,6 @@ function addCredit(actor, resellerId, body) {
 }
 
 module.exports = {
-  GB, USER_SELECT, userRow, getUser, createUser, extendUser, deleteUser, setDisabled, resetTraffic, rekey,
+  GB, USER_SELECT, userRow, getUser, createUser, extendUser, deleteUser, trashUser, restoreUser, setDisabled, resetTraffic, rekey,
   addCredit, resellerPrice, history, suggestUsername, round2, cleanEmail, invoiceHtml, INVOICE_SELECT,
 };

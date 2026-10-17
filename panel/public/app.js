@@ -21,6 +21,9 @@
     plus: 'M12 5v14M5 12h14', search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5',
     menu: 'M4 7h16M4 12h16M4 17h16', bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4', logout: 'M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3',
     edit: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
+    trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
+    tag: 'M3 12V4h8l10 10-8 8L3 12zM7.5 8.5h.01',
+    layers: 'M12 3 2 8l10 5 10-5-10-5zM2 13l10 5 10-5M2 17.5l10 5 10-5',
     copy: 'M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2', down: 'M12 3v12M7 10l5 5 5-5M4 20h16',
     refresh: 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5', more: 'M5 12h.01M12 12h.01M19 12h.01', back: 'M15 18l-6-6 6-6',
     key: 'M15 7a4 4 0 1 1-3.9 4.9L3 20v-3h3v-3h3l1.1-1.1A4 4 0 0 1 15 7z', credit: 'M3 6h18v12H3zM3 10h18M7 15h3',
@@ -314,11 +317,13 @@
   // ------------------------------------------------------------------ okvir
   function navItems() {
     if (isRes()) return [{ label: 'Moj panel', items: [['dash', 'Pregled', ''], ['users', 'Moji korisnici', 'korisnici'], ['credit', 'Kredit i uplate', 'kredit'], ...(S.me?.wl ? [['shield', 'Moj brend', 'brend']] : [])] }];
-    const g = [{ label: 'Pregled', items: [['dash', 'Dashboard', '']] }];
+    const g = [{ label: 'Pregled', items: [['dash', 'Dashboard', ''], ...(can('dash') ? [['act', 'Uživo', 'uzivo'], ['chart', 'Analitika', 'analitika']] : [])] }];
     const u = [];
     if (can('users')) u.push(['users', 'Korisnici', 'korisnici', S.badges?.users]);
     if (can('plans')) u.push(['plans', 'Planovi', 'planovi']);
+    if (can('users')) u.push(['trash', 'Korpa', 'korpa']);
     if (u.length) g.push({ label: 'Korisnici', items: u });
+    if (can('plans')) g.push({ label: 'Prodaja', items: [['tag', 'Kuponi i akcije', 'kuponi']] });
     if (can('resellers')) g.push({ label: 'Reselleri', items: [['res', 'Reselleri', 'reselleri', S.badges?.res], ['levels', 'Nivoi i popusti', 'reselleri/nivoi']] });
     if (can('servers')) g.push({ label: 'Serveri', items: [['server', 'Serveri', 'serveri', S.badges?.servers]] });
     if (can('finance')) g.push({ label: 'Finansije', items: [['money', 'Transakcije', 'finansije'], ['report', 'Izvještaji', 'finansije/izvjestaji']] });
@@ -381,6 +386,7 @@
         const badge = `${d.servers.filter((s) => s.status === 'online').length}/${d.servers.filter((s) => s.status !== 'disabled').length}`;
         if (S.badges && S.badges.servers !== badge) { S.badges.servers = badge; paintNav(); }
         updateMap(d.servers, d.flows);
+        if (S.liveHook) S.liveHook(d);
         $$('[data-live-srv]').forEach((el) => { const s = d.servers.find((x) => x.id === Number(el.dataset.liveSrv)); if (s) el.outerHTML = `<span data-live-srv="${s.id}">${srvStatus(s)}</span>`; });
         const lt = $('#liveTime'); if (lt) lt.textContent = 'osvježeno ' + fmtTime(d.t);
         void off;
@@ -1092,6 +1098,181 @@
     });
   }
 
+  // ================================================================== UŽIVO
+  const EV_LABEL = (a) => a.action;
+  function feedItem(a, fresh) {
+    return `<div class="feed-i ${actKind(a)} ${fresh ? 'fresh' : ''}" data-id="${a.id}"><span class="feed-ic">${ic(actIcon(a))}</span>
+      <div class="feed-t"><b>${esc(EV_LABEL(a))}</b><small>${esc(a.detail || '')}</small></div><time>${fmtTime(a.ts)}</time></div>`;
+  }
+  function liveStats(st) {
+    const k = (icon, label, val, cls = '') => `<div class="lstat ${cls}"><span>${ic(icon)}</span><div><small>${label}</small><b>${val}</b></div></div>`;
+    return k('users', 'Kupci online', `<i class="odot"></i>${st.online}`, 'ok') + k('act', 'Aktivne veze', st.sessions) + k('money', 'Prodaja danas', `${money(st.revToday)} <small>(${st.salesToday})</small>`)
+      + k('plus', 'Novi kupci danas', st.newToday) + k('down', 'Promet danas', bytes(st.trafficToday));
+  }
+  function liveServers(servers) {
+    return servers.filter((s) => s.status !== 'disabled').map((s) => `<a class="lsrv" href="#/server/${s.id}"><span class="ccb sm">${s.country ? flag(s.country) : ic('server')}</span>
+      <span class="lsrv-t"><b>${esc(s.city || s.name)}</b><small class="s-${s.warn ? 'warn' : s.status}">● ${s.status === 'online' ? `${s.online ?? 0} spojeno · CPU ${Math.round(s.cpu || 0)}%` : esc(SRV[s.status] || s.status)}</small></span></a>`).join('');
+  }
+  async function pageLive() {
+    const [d, f] = await Promise.all([GET('dash?days=7'), GET('live/feed')]);
+    S.servers = d.servers; S.feedLast = f.events[0]?.id || 0;
+    $('#view').innerHTML = `${top('Uživo', `<span class="livebadge"><i></i>UŽIVO</span> Sve što se dešava na mreži, u stvarnom vremenu`)}
+      <section class="lstats" id="lStats">${liveStats(f.stats)}</section>
+      <div class="livegrid">
+        <section class="card p livemap"><div class="ch"><h2>${ic('globe')}Mreža</h2><span class="dim" style="font-size:12.5px"><span class="flowleg"><i></i>Linije: <b id="flowN">${flowCount(d.flows)}</b></span> · <span id="liveTime">osvježeno ${fmtTime(Date.now())}</span></span></div>
+          ${mapHtml(d.servers, d.flows)}
+          <div class="lsrvs" id="lSrvs">${liveServers(d.servers)}</div></section>
+        <section class="card p feed"><div class="ch"><h2>${ic('act')}Događaji</h2><span class="pill">uživo</span></div>
+          <div class="feed-l" id="feedL">${f.events.map((a) => feedItem(a)).join('') || '<div class="muted" style="font-size:13px">Još nema događaja danas.</div>'}</div></section>
+      </div>`;
+    placeLabels();
+    S.liveHook = (x) => { const el = $('#lSrvs'); if (el) el.innerHTML = liveServers(x.servers); };
+    startLive();
+    clearInterval(S.feedPoll);
+    S.feedPoll = setInterval(async () => {
+      if (location.hash !== '#/uzivo') { clearInterval(S.feedPoll); S.liveHook = null; return; }
+      const x = await GET(`live/feed?after=${S.feedLast}`).catch(() => null); if (!x) return;
+      const st = $('#lStats'); if (st) st.innerHTML = liveStats(x.stats);
+      if (x.events.length) {
+        S.feedLast = x.events[0].id;
+        const l = $('#feedL'); if (!l) return;
+        if (!l.querySelector('.feed-i')) l.innerHTML = '';
+        l.insertAdjacentHTML('afterbegin', x.events.map((a) => feedItem(a, true)).join(''));
+        $$('.feed-i', l).slice(60).forEach((e) => e.remove());
+      }
+    }, 5000);
+  }
+
+  // ================================================================== ANALITIKA
+  async function pageAnalytics(days = S.anDays || 30) {
+    S.anDays = days;
+    const d = await GET(`analytics?days=${days}`);
+    const k = d.kpi, t = Date.now(), from = d.series[0]?.ts || t - days * 86400000;
+    const tile = (label, val, sub, icon, cls = '') => `<div class="stat"><div class="l"><span>${label}</span>${ic(icon)}</div><div class="v ${cls}">${val}</div><div class="s muted">${sub}</div></div>`;
+    const CH = {};
+    const chart = (title, key, o, now) => { CH[key] = { from, to: t, step: 86400000, ...o }; return `<section class="card p mchart"><div class="ch"><h2>${title}</h2><b class="mnow">${now}</b></div><div class="mbox" data-key="${key}"></div></section>`; };
+    const maxPlan = Math.max(1, ...d.plans.map((p) => p.n));
+    const hmax = Math.max(1, ...d.heat.flat());
+    const DAYS = ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned'];
+    const own = d.owners.direct + d.owners.resellers || 1;
+    $('#view').innerHTML = `${top('Analitika', 'Kako raste posao: kupci, zarada, zadržavanje', `<div class="seg">${[30, 90, 365].map((n) => `<button class="${days === n ? 'on' : ''}" data-a="anDays" data-n="${n}">${n === 365 ? '1 godina' : n + ' dana'}</button>`).join('')}</div>`)}
+      <section class="stats an5">
+        ${tile('Aktivni kupci', k.active, `${k.paying} plaćaju · ${k.online} online sada`, 'users')}
+        ${tile('Mjesečni prihod (procjena)', money(k.mrr), 'iz aktivnih pretplata', 'money', 'ok')}
+        ${tile('Prosjek po kupcu', money(k.arpu), 'mjesečno, samo plaćeni', 'user')}
+        ${tile('Odliv kupaca', `${k.churnPct}%`, `${k.churned} nije produžilo u ovom periodu`, 'down', k.churnPct > 20 ? 'warn' : '')}
+        ${tile('Vrijednost kupca', money(k.ltv), 'prosječno plaćeno po kupcu ukupno', 'credit')}
+      </section>
+      <section class="stats">
+        ${tile('Zarada u periodu', money(k.rev), `troškovi ${money(k.exp)}`, 'money')}
+        ${tile('Čista zarada', money(k.profit), 'zarada minus upisani troškovi', 'report', k.profit < 0 ? 'warn' : 'ok')}
+        ${tile('Novi kupci', k.newUsers, `u zadnjih ${days === 365 ? '12 mjeseci' : days + ' dana'}`, 'plus')}
+        ${tile('Produženja', k.renewals, 'kupci koji su produžili', 'refresh')}
+      </section>
+      <div class="mgrid">
+        ${chart('Aktivni kupci', 'active', { color: '#3ddc84', fmt: (v) => String(Math.round(v)) }, String(k.active))}
+        ${chart('Novi kupci po danu', 'new', { color: '#5b8cff', fmt: (v) => String(Math.round(v)) }, String(d.series[d.series.length - 1]?.new || 0) + ' danas')}
+        ${chart('Zarada po danu', 'rev', { color: '#ff5a6a', fmt: (v) => money(Math.round(v)) }, money(d.series[d.series.length - 1]?.rev || 0) + ' danas')}
+        <section class="card p"><div class="ch"><h2>${ic('users')}Ko prodaje</h2></div>
+          <div class="splitbar"><i style="width:${(d.owners.direct / own * 100).toFixed(1)}%"></i></div>
+          <div class="splitleg"><span><i class="a"></i>Ti direktno <b>${d.owners.direct}</b> (${Math.round(d.owners.direct / own * 100)}%)</span><span><i class="b"></i>Reselleri <b>${d.owners.resellers}</b> (${Math.round(d.owners.resellers / own * 100)}%)</span></div>
+          <div class="ch" style="margin-top:16px"><h2>${ic('layers')}Planovi aktivnih kupaca</h2></div>
+          ${d.plans.map((p) => `<div class="planrow"><span>${esc(p.name)}</span><div class="bar"><i style="width:${(p.n / maxPlan * 100).toFixed(1)}%"></i></div><b>${p.n}</b><small class="dim">${money(p.mrr)}/mj.</small></div>`).join('') || '<div class="muted" style="font-size:13px">Nema aktivnih kupaca.</div>'}
+        </section>
+      </div>
+      <div class="mgrid">
+        <section class="card p"><div class="ch"><h2>${ic('clock')}Kad kupci kupuju</h2><span class="dim" style="font-size:12px">dan u sedmici × sat</span></div>
+          <div class="heat">${d.heat.map((row, i) => `<span class="hl">${DAYS[i]}</span>${row.map((v, h) => `<i title="${DAYS[i]} ${h}:00 · ${v} ${v === 1 ? 'kupovina' : 'kupovina'}" style="--o:${v ? (0.18 + 0.82 * v / hmax).toFixed(2) : 0}"></i>`).join('')}`).join('')}
+            <span></span>${[0, 6, 12, 18].map((h) => `<span class="hh" style="grid-column:${h + 2} / span 6">${h}h</span>`).join('')}</div></section>
+        <section class="card p"><div class="ch"><h2>${ic('pin')}Odakle su kupci</h2></div>
+          ${d.countries.length ? d.countries.map((c) => `<div class="loc"><span class="ccb sm">${flag(c.cc)}</span><b style="font-weight:500">${esc(ccName(c.cc))}</b><span class="muted" style="font-size:12.5px">${c.pct}%</span><div class="bar"><i style="width:${c.pct}%"></i></div></div>`).join('') : '<div class="muted" style="font-size:13px">Još nema podataka.</div>'}</section>
+      </div>`;
+    const draw = () => $$('.mbox').forEach((el) => { el.innerHTML = metricChart(d.series, el.dataset.key, { ...CH[el.dataset.key], W: Math.max(260, Math.round(el.clientWidth)) }); });
+    draw();
+    S.chartRO?.disconnect();
+    if (window.ResizeObserver && $('.mbox')) { let w = 0; S.chartRO = new ResizeObserver((e) => { const nw = Math.round(e[0].contentRect.width); if (Math.abs(nw - w) > 8) { w = nw; draw(); } }); S.chartRO.observe($('.mbox')); }
+  }
+
+  // ================================================================== KUPONI
+  async function pageCoupons() {
+    const [list, plans] = await Promise.all([GET('coupons'), GET('plans')]);
+    S.coupons = list; S.plans = plans;
+    const t = Date.now();
+    const st = (c) => !c.active ? ['grey', 'ugašen'] : c.expires_at && t > c.expires_at ? ['bad', 'istekao'] : c.max_uses && c.used >= c.max_uses ? ['warn', 'iskorišten'] : ['ok', 'aktivan'];
+    const cols = '1.3fr 1fr .9fr 1fr 1fr .8fr';
+    const live = list.filter((c) => st(c)[1] === 'aktivan').length;
+    $('#view').innerHTML = `${top('Kuponi i akcije', `${list.length} kupona · ${live} aktivno`, `<button class="btn red" data-a="editCoupon">${ic('plus')}<span>Novi kupon</span></button>`)}
+      <div class="banner soft">${ic('tag')}<span style="flex:1;min-width:0">Kupac upiše kod pri kupovini na sajtu ili kod produženja na svojoj stranici i dobije popust (i gratis dane ako ih dodaš). Korištenje se broji tek kad uplata prođe.</span></div>
+      <section class="stats">
+        <div class="stat"><div class="l"><span>Aktivni kuponi</span>${ic('tag')}</div><div class="v">${live}</div><div class="s muted">od ukupno ${list.length}</div></div>
+        <div class="stat"><div class="l"><span>Iskorišteno</span>${ic('check')}</div><div class="v">${list.reduce((a, c) => a + c.used, 0)}</div><div class="s muted">puta ukupno</div></div>
+        <div class="stat"><div class="l"><span>Zarada sa kuponima</span>${ic('money')}</div><div class="v">${money(list.reduce((a, c) => a + c.revenue, 0))}</div><div class="s muted">uplate gdje je kupon korišten</div></div>
+        <div class="stat"><div class="l"><span>Dato popusta</span>${ic('down')}</div><div class="v">${money(list.reduce((a, c) => a + c.given, 0))}</div><div class="s muted">ukupno</div></div>
+      </section>
+      <section class="card wide" style="overflow:hidden"><div class="tbl">
+        ${trow(['Kod', 'Popust', 'Iskorišteno', 'Važi do', 'Zarada', 'Status'], true, cols)}
+        ${list.map((c) => { const [k, l] = st(c); return `<div class="tr click" data-a="editCoupon" data-id="${c.id}" style="grid-template-columns:${cols}">${[
+          `<b class="mono cpcode">${esc(c.code)}</b><small>${esc(c.note || (c.plan_ids.length ? 'samo: ' + c.plan_ids.map((id) => plans.find((p) => p.id === id)?.name || '#' + id).join(', ') : 'svi planovi'))}</small>`,
+          `<b>${c.kind === 'pct' ? c.value + '%' : money(c.value)}</b>${c.bonus_days ? `<small>+${c.bonus_days} dana gratis</small>` : ''}`,
+          `${c.used}${c.max_uses ? ' / ' + c.max_uses : ''}<small>${c.last_used ? 'zadnji put ' + ago(c.last_used) : 'još nije'}</small>`,
+          c.expires_at ? fmtDate(c.expires_at) : '<span class="dim">bez roka</span>',
+          money(c.revenue), `<span class="tag t-${k}">${l}</span>`,
+        ].map((x, i) => `<div class="cell${i === 0 ? ' first' : ''}" ${i ? `data-l="${['', 'Popust', 'Iskorišteno', 'Važi do', 'Zarada', 'Status'][i]}"` : ''}>${x}</div>`).join('')}</div>`; }).join('')
+          || `<div class="empty">Još nema kupona. <button class="btn sm red" data-a="editCoupon">Napravi prvi kupon</button></div>`}
+      </div></section>`;
+  }
+  async function editCoupon(id) {
+    const c = id ? S.coupons.find((x) => x.id === Number(id)) : null;
+    const plans = (S.plans || []).filter((p) => !p.trial && p.price > 0);
+    const gen = () => 'VPN' + Math.random().toString(36).slice(2, 7).toUpperCase();
+    const exp = c?.expires_at ? new Date(c.expires_at).toISOString().slice(0, 10) : '';
+    const r = await formLoop(`<h2>${c ? 'Uredi kupon' : 'Novi kupon'}</h2>
+      <div class="row2"><label class="field">Kod (kupac ga upisuje)<input class="input mono" name="code" required value="${esc(c?.code || gen())}" style="text-transform:uppercase"></label>
+        <label class="field">Vrsta popusta<select class="input" name="kind"><option value="pct" ${c?.kind !== 'fixed' ? 'selected' : ''}>Procenat (%)</option><option value="fixed" ${c?.kind === 'fixed' ? 'selected' : ''}>Iznos (${esc(money(0).replace(/[\d.,\s]/g, '') || '€')})</option></select></label></div>
+      <div class="row2"><label class="field">Popust<input class="input" name="value" required inputmode="decimal" value="${c?.value ?? 20}"></label>
+        <label class="field">Gratis dana uz kupovinu (opcionalno)<input class="input" name="bonus_days" inputmode="numeric" value="${c?.bonus_days || 0}"></label></div>
+      <div class="row2"><label class="field">Koliko puta se može iskoristiti (0 = neograničeno)<input class="input" name="max_uses" inputmode="numeric" value="${c?.max_uses || 0}"></label>
+        <label class="field">Važi do (prazno = bez roka)<input class="input" type="date" name="expires" value="${exp}"></label></div>
+      <div class="field">Važi za planove (ništa označeno = svi)<div class="chips">${plans.map((p) => `<label class="chip"><input type="checkbox" name="pl[]" value="${p.id}" ${c?.plan_ids.includes(p.id) ? 'checked' : ''} style="accent-color:var(--acc)">${esc(p.name)}</label>`).join('')}</div></div>
+      <label class="field">Bilješka (samo ti vidiš)<input class="input" name="note" value="${esc(c?.note || '')}" placeholder="npr. Black Friday 2026, Instagram objava"></label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="active" ${!c || c.active ? 'checked' : ''}>Aktivan</label>
+      <div class="dlg-actions">${c ? '<button class="btn danger" value="delete" formnovalidate>Obriši</button>' : ''}<span style="flex:1"></span><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
+    async (d) => {
+      if (d._btn === 'delete') { if (!(await confirmInline(`Obrisati kupon ${c.code}?`))) throw new Error('Odustao si od brisanja.'); return DEL('coupons/' + c.id); }
+      const body = { code: d.code, kind: d.kind, value: d.value, bonus_days: Number(d.bonus_days), max_uses: Number(d.max_uses), expires: d.expires, plan_ids: (d._many.pl || []).map(Number), note: d.note, active: d.active };
+      return c ? PUT('coupons/' + c.id, body) : POST('coupons', body);
+    });
+    if (r) { toast('Spremljeno.'); pageCoupons(); }
+  }
+
+  // ================================================================== KORPA
+  async function pageTrash() {
+    const list = await GET('trash');
+    const cols = '1.4fr 1fr 1.2fr 1fr 1.3fr';
+    $('#view').innerHTML = `${top('Korpa', `${list.length} obrisanih kupaca`)}
+      <div class="banner soft">${ic('trash')}<span style="flex:1;min-width:0">Obrisani kupci se čuvaju 30 dana. Vraćeni kupac ima isti link, ključ, dane i historiju, pa ne mora ništa ponovo podešavati.</span></div>
+      <section class="card wide" style="overflow:hidden"><div class="tbl">
+        ${trow(['Kupac', 'Plan', 'Obrisao', 'Briše se', ''], true, cols)}
+        ${list.map((u) => `<div class="tr" style="grid-template-columns:${cols}">${[
+          `<b>${esc(u.username)}</b><small>${esc(u.owner ? 'reseller · ' + u.owner : u.contact || 'tvoj kupac')}</small>`,
+          `${esc(u.plan || '—')}<small>${u.expires_at ? (u.expires_at > Date.now() ? 'još ' + daysTxt(Math.ceil((u.expires_at - Date.now()) / 86400000)).replace(/^za /, '') : 'istekao') : ''}</small>`,
+          `${esc(u.by || '—')}<small>${fmtDT(u.deleted_at)}${u.reason ? ' · ' + esc(u.reason) : ''}</small>`,
+          `<span class="${u.purge_at - Date.now() < 3 * 86400000 ? 'warn' : ''}">za ${Math.max(0, Math.ceil((u.purge_at - Date.now()) / 86400000))} dana</span>`,
+          `<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="btn sm red" data-a="trashRestore" data-id="${u.id}">${ic('refresh')}Vrati</button><button class="btn sm danger" data-a="trashDel" data-id="${u.id}" aria-label="Obriši zauvijek">${ic('trash')}</button></div>`,
+        ].map((x, i) => `<div class="cell${i === 0 ? ' first' : ''}" ${i && i < 4 ? `data-l="${['', 'Plan', 'Obrisao', 'Briše se'][i]}"` : ''}>${x}</div>`).join('')}</div>`).join('')
+          || '<div class="empty">Korpa je prazna. Kad obrišeš kupca, ovdje ga možeš vratiti 30 dana.</div>'}
+      </div></section>`;
+  }
+  async function trashRestore(id) {
+    const r = await POST(`trash/${id}/restore`);
+    toast(r.renamed ? `Vraćen kao ${r.username} (staro ime je bilo zauzeto).` : `${r.username} je vraćen.`);
+    pageTrash();
+  }
+  async function trashDel(id) {
+    if (!(await ask('Obriši zauvijek', 'Kupac se briše trajno i više se ne može vratiti.', 'Obriši zauvijek', true))) return;
+    await DEL('trash/' + id); toast('Obrisano zauvijek.'); pageTrash();
+  }
+
   // ================================================================== DETALJI SERVERA
   // mali grafikon jedne mjere kroz vrijeme; rupa u liniji = server se nije javljao
   function metricChart(series, key, { from, to, step, max, color, fmt, W = 520 }) {
@@ -1109,7 +1290,7 @@
     flush();
     const grid = [0, 0.5, 1].map((f) => `<path d="M${L} ${y(top * f).toFixed(0)}H${W - 8}" stroke="var(--line)" ${f ? 'stroke-dasharray="3 4"' : ''}/><text x="${L - 7}" y="${(y(top * f) + 4).toFixed(0)}" text-anchor="end" fill="var(--dim)" font-size="11">${esc(fmt(top * f))}</text>`).join('');
     const ticks = [];
-    const span = to - from, tstep = span > 2 * 86400000 ? 86400000 : 4 * 3600000;
+    const span = to - from, tstep = [4 * 3600000, 86400000, 7 * 86400000, 30 * 86400000].find((x) => span / x <= Math.max(4, Math.floor(W / 80))) || 30 * 86400000;
     for (let t = Math.ceil(from / tstep) * tstep; t <= to; t += tstep) {
       const d = new Date(t);
       ticks.push(`<text x="${x(t).toFixed(1)}" y="${H - 5}" text-anchor="middle" fill="var(--dim)" font-size="11">${span > 2 * 86400000 ? `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.` : fmtTime(t)}</text>`);
@@ -1742,7 +1923,7 @@
     const params = new URLSearchParams(qs || '');
     paintNav();
     if (path !== 'korisnici' && !path.startsWith('korisnik/')) S.sel.clear();
-    if (!['', 'serveri'].includes(path) && !path.startsWith('server/')) stopLive();
+    if (!['', 'serveri', 'uzivo'].includes(path) && !path.startsWith('server/')) stopLive();
     try {
       if (S.me.must2fa) { $('#view').innerHTML = top('Uključi 2FA', 'Obavezno za sve admine (postavka sigurnosti)'); return setup2fa(true); }
       if (isRes()) {
@@ -1758,6 +1939,10 @@
       if (path === 'korisnici') return await pageUsers(params);
       if (path.startsWith('korisnik/')) return await pageUser(Number(path.split('/')[1]));
       if (path === 'planovi') return await pagePlans();
+      if (path === 'uzivo' && can('dash')) return await pageLive();
+      if (path === 'analitika' && can('dash')) return await pageAnalytics();
+      if (path === 'kuponi' && can('plans')) return await pageCoupons();
+      if (path === 'korpa' && can('users')) return await pageTrash();
       if (path === 'serveri') return await pageServers();
       if (path.startsWith('server/') && can('servers')) return await pageServer(Number(path.split('/')[1]));
       if (path === 'reselleri') return await pageResellers();
@@ -1837,6 +2022,10 @@
     editPlan: (d) => editPlan(d.id).catch(fail),
     newServer: () => newServerPick().catch(fail),
     cloudNewIp: (d) => cloudNewIp(d.id).catch(fail),
+    anDays: (d) => pageAnalytics(Number(d.n)).catch(fail),
+    editCoupon: (d) => editCoupon(d.id).catch(fail),
+    trashRestore: (d) => trashRestore(d.id).catch(fail),
+    trashDel: (d) => trashDel(d.id).catch(fail),
     closeModal: () => { $('#modal').close(); location.hash = '#/postavke'; },
     install: async (d) => showInstall((await GET(`servers/${d.id}/install`)).install),
     editServer: (d) => editServer(d.id).catch(fail),
