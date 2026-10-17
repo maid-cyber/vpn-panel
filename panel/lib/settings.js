@@ -104,6 +104,10 @@ const SCHEMA = [
     { key: 'apps', type: 'multi', label: 'Preporučene aplikacije na stranici kupca', options: ['veltrix', 'hiddify', 'v2rayng', 'streisand', 'v2box', 'happ', 'shadowrocket'], labels: ['Veltrix VPN (naša)', 'Hiddify', 'v2rayNG', 'Streisand', 'V2Box', 'Happ', 'Shadowrocket'], def: 'veltrix,hiddify,v2rayng,streisand,v2box' },
     { key: 'msg_template', type: 'textarea', label: 'Poruka za kupca (dugme "Pošalji kupcu")', sub: 'Zamjene: {korisnik} {plan} {istice} {dana} {link} {brend} {podrska}', def: 'Zdravo! 👋\n\nTvoj {brend} je spreman ✅\nPlan: {plan}\nVrijedi do: {istice}\n\n1️⃣ Instaliraj aplikaciju Hiddify (iPhone, Android ili računar)\n2️⃣ Otvori ovaj link i klikni „Dodaj u Hiddify“, ili skeniraj QR kod:\n{link}\n3️⃣ Klikni dugme za spajanje i to je to.\n\nPomoć: {podrska}' },
   ] },
+  { id: 'sajt', title: 'Web sajt', desc: 'Javni sajt na glavnoj adresi servera: cijene i lokacije uživo, kupovina karticom.', rows: [
+    { key: 'site_on', type: 'toggle', label: 'Prikaži sajt na glavnoj adresi', sub: 'Isključeno: glavna adresa vraća "Not found" kao prije. Tajna adresa panela ostaje skrivena u oba slučaja.', def: true },
+    { key: 'app_repo', type: 'text', label: 'GitHub repozitorij aplikacija', sub: 'Odavde sajt uzima zadnji Android APK i Windows instalaciju', def: 'maid-cyber/veltrix-app', mono: true },
+  ] },
   { id: 'aplikacija', title: 'Veltrix aplikacija', desc: 'Funkcije u Android aplikaciji. Isključena funkcija se kupcu ne prikazuje; "Uključeno za nove" je početno stanje koje kupac može promijeniti.', rows: [
     { key: 'app_killswitch', type: 'toggle', label: 'Kill Switch', sub: 'Aplikacija vodi kupca da uključi "Uvijek uključen VPN" i "Blokiraj veze bez VPN-a" (Android ugrađeno). Internet ne radi dok VPN nije spojen.', def: true },
     { key: 'app_dns', type: 'toggle', label: 'DNS zaštita', sub: 'Kupac bira: filtrirani DNS servera (blokade iz Serveri i protokoli) ili šifrovani 1.1.1.1', def: true },

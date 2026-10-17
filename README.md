@@ -257,6 +257,14 @@ Izvorni kod i instalacije su u repozitoriju `maid-cyber/veltrix-app` (Releases).
 - **Pozovi prijatelja:** svaki kupac ima kod. Prijatelj ga upiše kod "Probaj besplatno"; kad prvi put plati, obojica dobiju gratis dane (Postavke → Veltrix aplikacija).
 - **Telegram:** ako Xray na serveru ne radi duže od 3 javljanja, stiže upozorenje, i ponovo kad proradi.
 
+## 17. Web sajt
+
+Na glavnoj adresi servera (npr. `http://IP/`) je javni sajt: funkcije, lokacije uživo, cijene iz Planova, preuzimanje aplikacija i pitanja, na bosanskom i engleskom. Tajna adresa panela se nigdje ne vidi.
+
+- **Kupovina:** kad je Stripe uključen, kupac izabere plan, upiše e-mail i plati karticom. Nalog se napravi sam, kupac odmah vidi link i QR kod, a link dobije i na e-mail (ako je SMTP podešen).
+- Bez Stripea dugme "Kupi" vodi na tvoj kontakt podrške.
+- Isključuje se u Postavke → Web sajt.
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

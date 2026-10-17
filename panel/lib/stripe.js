@@ -61,6 +61,10 @@ async function webhook(req, res) {
     const ses = ev.data.object;
     const rid = Number(ses.metadata?.reseller_id || ses.client_reference_id);
     if (ses.payment_status === 'paid' && ses.metadata?.purpose === 'renew') require('./growth').paidRenew(ses);
+    if (ses.payment_status === 'paid' && ses.metadata?.purpose === 'buy') {
+      const s0 = settings.load();
+      require('./site').paidBuy(ses, (s0.sub_url || s0.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`));
+    }
     if (ses.payment_status === 'paid' && rid && ses.metadata?.purpose === 'credit') {
       if (!one('SELECT id FROM transactions WHERE ext_id = ?', ses.id)) {      // svaka uplata samo jednom
         const id = core.addCredit({ username: 'Stripe' }, rid, { amount: (ses.amount_total || 0) / 100, method: 'Stripe (kartica)', note: `Stripe ${ses.id.slice(-10)}`, kind: 'topup' });

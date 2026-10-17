@@ -75,6 +75,15 @@ async function onRequest(req, res) {
       return await require('./lib/growth').trial(req, res, (s0.sub_url || s0.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`).replace(/\/+$/, ''));
     }
     if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
+    // javni sajt na glavnoj adresi (tajna adresa panela ostaje skrivena)
+    if (settings.get('site_on')) {
+      const site = require('./lib/site');
+      if (p === '/' && req.method === 'GET') return await site.page(req, res);
+      if (p === '/buy' && req.method === 'POST') return await site.buy(req, res);
+      if (p === '/buy/status' && req.method === 'GET') return site.status(req, res, url);
+      if (p === '/kupljeno' && req.method === 'GET') return site.bought(req, res);
+      if (p === '/assets/globe.js' || /^\/assets\/fonts\/[\w.-]+\.woff$/.test(p)) return serveStatic(res, p.slice(8));
+    }
 
     // dva ulaza: tajna admin adresa i (ako je uključeno) posebna adresa za resellere
     const s = settings.load();
