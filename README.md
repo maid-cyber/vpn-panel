@@ -279,6 +279,16 @@ Dugmad **Restartuj VPN**, **Test brzine**, **Ažuriraj agent** i **Restartuj ser
 
 **Korisnici → Online sada**: kupci koji su imali promet u zadnje 2 minute, sa zelenom tačkom i serverom na koji su spojeni. **Novi link** u detaljima kupca pravi novi link i nove ključeve (stari odmah prestaju raditi) i odmah pokaže QR i dugme "Pošalji kupcu".
 
+## 20. Hetzner: server u jedan klik i nova IP adresa
+
+1. U Hetzner Cloud Console otvori projekat → **Security → API Tokens → Generate API token**, dozvola **Read & Write**.
+2. Zalijepi token u panel: **Postavke → Hetzner**. Nikome ga ne šalji. Ako je token negdje procurio, obriši ga u Hetzneru i napravi novi.
+3. **Serveri → Dodaj server → Automatski na Hetzneru**: izaberi lokaciju i veličinu. Panel zakupi server (Ubuntu 24.04), instalira VPN preko cloud-init i doda ga. Za 3–5 minuta server je online.
+
+U meniju **⋯** servera napravljenog preko panela je **Nova IP adresa**: server se ugasi, dobije novu IPv4 od Hetznera, stara se obriše i server se upali (1–2 minute bez VPN-a). Aplikacije kupaca same preuzmu novu adresu. Kod brisanja možeš izabrati **Obriši i na Hetzneru**, pa naplata prestaje odmah.
+
+Panel mora imati javnu adresu (Postavke → Općenito → Adresa panela) da bi se novi server mogao javiti.
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

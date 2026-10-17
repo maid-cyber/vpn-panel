@@ -122,6 +122,7 @@ CREATE INDEX IF NOT EXISTS server_events_s ON server_events(server_id, ts);
 CREATE TABLE IF NOT EXISTS server_cmds (id INTEGER PRIMARY KEY, server_id INTEGER NOT NULL, cmd TEXT NOT NULL, by TEXT, created_at INTEGER NOT NULL, sent_at INTEGER, done_at INTEGER, ok INTEGER, result TEXT);
 CREATE INDEX IF NOT EXISTS server_cmds_s ON server_cmds(server_id, id);`);
 // vlastiti brend resellera (white-label)
+addCol('servers', 'hz_id', 'INTEGER');
 addCol('admins', 'brand_color', "TEXT DEFAULT ''");
 addCol('admins', 'brand_logo', "TEXT DEFAULT ''");
 addCol('admins', 'brand_welcome', "TEXT DEFAULT ''");

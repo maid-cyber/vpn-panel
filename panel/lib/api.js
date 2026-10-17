@@ -151,6 +151,7 @@ function serverView(sv, forReseller) {
     vless_port: sv.vless_port, wg_port: sv.wg_port, ss_port: sv.ss_port, sni: sv.sni, xray_ok: sv.xray_ok, wg_ok: sv.wg_ok,
     xray_version: forReseller ? '' : sv.xray_version, last_error: forReseller ? '' : sv.last_error,
     synced: !!sv.applied_hash, tags: vpn.serverTags(sv),
+    hz: forReseller ? false : !!sv.hz_id, hz_job: forReseller || !sv.hz_id ? null : require('./hetzner').jobOf(sv.id),
   };
 }
 function serversList(forReseller) {
@@ -414,8 +415,7 @@ function installCommand(c, sv) {
   const base = (settings.get('panel_url') || `${c.proto}://${c.req.headers.host}`).replace(/\/+$/, '');
   return `curl -fsSL ${base}/install/${sv.token} | sudo bash`;
 }
-route('POST', 'servers', 'servers', (c) => {
-  const b = c.body;
+function createPanelServer(b) {
   const name = String(b.name || '').trim();
   if (!name) fail(400, 'Upiši ime servera.');
   const rk = vpn.realityKeys(), wk = vpn.wgKeys();
@@ -424,9 +424,24 @@ route('POST', 'servers', 'servers', (c) => {
   name, String(b.city || ''), String(b.country || '').toUpperCase().slice(0, 2), String(b.host || '').trim(), crypto.randomBytes(18).toString('base64url'),
   Number(b.capacity) || 400, String(b.provider || ''), Number(b.cost) || 0, Number(b.vless_port) || 443, Number(b.wg_port) || 51820,
   String(b.sni || '').trim() || vpn.pickSni(), rk.priv, rk.pub, vpn.shortId(), wk.priv, wk.pub, now());
-  const sv = one('SELECT * FROM servers WHERE id = ?', Number(r.lastInsertRowid));
-  log(c.auth.me.username, 'Novi server', name);
+  return Number(r.lastInsertRowid);
+}
+route('POST', 'servers', 'servers', (c) => {
+  const sv = one('SELECT * FROM servers WHERE id = ?', createPanelServer(c.body));
+  log(c.auth.me.username, 'Novi server', sv.name);
   return { id: sv.id, install: installCommand(c, sv) };
+});
+// ---------- Hetzner: server u jedan klik
+const hetzner = require('./hetzner');
+route('GET', 'hetzner/options', 'servers', async () => hetzner.options());
+route('POST', 'hetzner/servers', 'servers', async (c) => {
+  const base = (settings.get('panel_url') || `${c.proto}://${c.req.headers.host}`).replace(/\/+$/, '');
+  return hetzner.create(c.body, base, createPanelServer, c.auth.me.username);
+});
+route('POST', 'servers/:id/new-ip', 'servers', async (c) => {
+  const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
+  if (!sv) fail(404, 'Server ne postoji.');
+  return hetzner.newIp(sv, c.auth.me.username);
 });
 route('GET', 'servers/:id/install', 'servers', (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
@@ -499,9 +514,11 @@ route('POST', 'servers/:id/locate', 'servers', async (c) => {
   run('UPDATE servers SET city = ?, country = ?, lat = ?, lon = ? WHERE id = ?', g.city || sv.city, g.cc, g.lat, g.lon, sv.id);
   return { ok: true, ...g };
 });
-route('DELETE', 'servers/:id', 'servers', (c) => {
+route('DELETE', 'servers/:id', 'servers', async (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
   if (!sv) fail(404, 'Server ne postoji.');
+  if (all('SELECT * FROM chains').some((ch) => vpn.chainHops(ch).includes(sv.id))) fail(400, 'Server je dio lanca. Prvo obriši ili izmijeni lanac.');
+  if (c.query.hetzner === '1' && sv.hz_id) await hetzner.destroy(sv, c.auth.me.username);
   run('UPDATE users SET last_server = NULL WHERE last_server = ?', sv.id);
   const used = all('SELECT * FROM chains').filter((c) => vpn.chainHops(c).includes(sv.id));
   if (used.length) fail(400, `Server je dio lanca: ${used.map((c) => c.name).join(', ')}. Prvo obriši ili izmijeni lanac.`);

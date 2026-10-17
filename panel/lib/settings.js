@@ -51,6 +51,11 @@ const SCHEMA = [
     { key: 'sub_smart', type: 'toggle', label: 'Automatski skloni kupce sa servera koji ne radi ili je pun', sub: 'Pretplata ne nudi offline i popunjene servere, aplikacija se sama prebaci', def: true },
     { key: 'xray_autoupdate', type: 'toggle', label: 'Automatsko ažuriranje Xraya na serverima', sub: 'Jednom sedmično, noću između 3 i 5 h', def: true },
   ] },
+  { id: 'hetzner', title: 'Hetzner (server u jedan klik)', desc: 'Panel sam zakupi server na Hetzneru, instalira VPN i doda ga. Token napravi u Hetzner Cloud Console → tvoj projekat → Security → API Tokens → Generate (Read & Write).', rows: [
+    { key: 'hz_token', type: 'secret', label: 'Hetzner API token (Read & Write)', sub: 'Čuva se samo u panelu i nikad se ne prikazuje cijeli. Ne šalji ga nikome.', def: '' },
+    { key: 'hz_ssh_key', type: 'text', label: 'Ime SSH ključa u Hetzneru (opcionalno)', sub: 'Ako ga upišeš, ulaziš na nove servere svojim ključem. Ako ne, Hetzner ti root šifru pošalje na e-mail.', def: '' },
+    { key: 'hz_capacity', type: 'number', label: 'Kapacitet novog servera (maksimalno spojenih)', def: 400 },
+  ] },
   { id: 'reselleri', title: 'Reselleri', desc: 'Pravila za preprodavače.', rows: [
     { key: 'res_portal', type: 'toggle', label: 'Poseban panel za resellere', sub: 'Reselleri se prijavljuju na svojoj adresi i nikad ne vide tvoju tajnu admin adresu. Na admin adresi se reseller ne može prijaviti.', def: true },
     { key: 'reseller_path', type: 'text', label: 'Adresa panela za resellere', sub: 'Ovu adresu šalješ resellerima, npr. /reseller ili /partner', def: '/reseller', mono: true },
