@@ -20,6 +20,7 @@
     user: 'M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
     plus: 'M12 5v14M5 12h14', search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5',
     menu: 'M4 7h16M4 12h16M4 17h16', bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4', logout: 'M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3',
+    edit: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
     copy: 'M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2', down: 'M12 3v12M7 10l5 5 5-5M4 20h16',
     refresh: 'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5', more: 'M5 12h.01M12 12h.01M19 12h.01', back: 'M15 18l-6-6 6-6',
     key: 'M15 7a4 4 0 1 1-3.9 4.9L3 20v-3h3v-3h3l1.1-1.1A4 4 0 0 1 15 7z', credit: 'M3 6h18v12H3zM3 10h18M7 15h3',
@@ -105,7 +106,9 @@
   const stTag = (s) => `<span class="tag ${ST[s]?.[1] || 't-grey'}">${ST[s]?.[0] || s}</span>`;
   const SRV = { online: 'Online', offline: 'Offline', pending: 'Čeka instalaciju', disabled: 'Ugašen', maintenance: 'Održavanje' };
   const srvStatus = (s) => `<span class="status s-${s.warn ? 'warn' : s.status}">${s.warn ? 'Skoro pun' : SRV[s.status] || s.status}</span>`;
-  const flag = (cc) => esc((cc || '—').toUpperCase());
+  // okrugla zastava (assets/flags/xx.png); za nepoznatu državu ostaju slova
+  const FLAGS = new Set('ad ae af ag ai al am ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bl bm bn bo bq br bs bt bv bw by bz ca cc cd cf cg ch ci ck cl cm cn co cp cr cu cv cw cx cy cz de dg dj dk dm do dz ec ee eg eh er es et eu fi fj fk fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hm hn hr ht hu ic id ie il im in io iq ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pc pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug um un us uy uz va vc ve vg vi vn vu wf ws xk xx ye yt za zm zw'.split(' '));
+  const flag = (cc) => { const k = String(cc || '').toLowerCase(); return FLAGS.has(k) ? `<img class="flg" src="assets/flags/${k}.png" alt="${k.toUpperCase()}" loading="lazy">` : esc((cc || '—').toUpperCase()); };
   const daysTxt = (d) => d > 1 ? `za ${d} dana` : d === 1 ? 'sutra' : d === 0 ? 'danas' : `prije ${-d} d`;
   const copy = (text) => navigator.clipboard.writeText(text).then(() => toast('Kopirano.'), () => {
     const ta = document.createElement('textarea'); ta.value = text; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Kopirano.');
@@ -426,7 +429,7 @@
     const map = $('#map'); if (!map) return;
     const box = map.getBoundingClientRect(); if (!box.width) return;
     const mks = [...map.querySelectorAll('.mk')].sort((a, b) => a.offsetTop - b.offsetTop || a.offsetLeft - b.offsetLeft);
-    const dots = mks.map((m) => { const r = m.getBoundingClientRect(); return { left: r.left - 8, right: r.left + 8, top: r.top - 8, bottom: r.top + 8 }; });
+    const dots = mks.map((m) => { const r = m.getBoundingClientRect(); return { left: r.left - 16, right: r.left + 16, top: r.top - 14, bottom: r.top + 14, m }; });
     const hit = (a, b) => a.left < b.right + 3 && a.right + 3 > b.left && a.top < b.bottom + 3 && a.bottom + 3 > b.top;
     const placed = [];
     for (const m of mks) {
@@ -436,7 +439,7 @@
         m.className = 'mk' + (s ? ' ' + s.split(' ').map((c) => 'mk-' + c).join(' ') : '');
         const r = sp.getBoundingClientRect();
         const out = Math.max(0, box.left - r.left) + Math.max(0, r.right - box.right) + Math.max(0, box.top - r.top) + Math.max(0, r.bottom - box.bottom);
-        const score = placed.filter((p) => hit(r, p)).length * 1000 + dots.filter((d) => hit(r, d)).length * 100 + out;
+        const score = placed.filter((p) => hit(r, p)).length * 1000 + dots.filter((d) => d.m !== m && hit(r, d)).length * 100 + out;
         if (score < bestScore) { bestScore = score; best = { s, r }; }
         if (score === 0) break;
       }
@@ -990,7 +993,6 @@
     const on = servers.filter((s) => s.status === 'online'), off = servers.filter((s) => s.status === 'offline');
     const cap = servers.filter((s) => s.enabled).reduce((a, s) => a + s.capacity, 0), conn = on.reduce((a, s) => a + s.online, 0);
     const tm = servers.reduce((a, s) => a + (s.traffic_month || 0), 0), cost = servers.filter((s) => s.enabled).reduce((a, s) => a + (s.cost || 0), 0);
-    const meter = (l, v) => `<div><small><span>${l}</span><span>${v == null ? '—' : Math.round(v) + '%'}</span></small><div class="bar"><i class="${v >= 80 ? 'w' : ''}" style="width:${v || 0}%"></i></div></div>`;
     $('#view').innerHTML = `${top('Serveri', `${servers.length} servera · ${on.length} online`, `<button class="btn hide-m" data-a="reload">${ic('refresh')}Osvježi</button>${can('servers') ? `<button class="btn red" data-a="newServer">${ic('plus')}<span>Dodaj server</span></button>` : ''}`)}
       <section class="stats">
         <div class="stat"><div class="l"><span>Online</span>${ic('server')}</div><div class="v">${on.length} / ${servers.filter((s) => s.enabled).length}</div><div class="s ${off.length ? 'bad' : 'ok'}">${off.length ? off.map((s) => esc(s.name)).join(', ') + ' ne odgovara' : 'svi rade'}</div></div>
@@ -999,29 +1001,42 @@
         <div class="stat"><div class="l"><span>Trošak servera</span>${ic('money')}</div><div class="v">${money(cost)}</div><div class="s muted">mjesečno</div></div>
       </section>
       ${chainsHtml(chains, servers)}
-      ${servers.length ? `<section class="grid-auto">${servers.map((s) => `<article class="card srv ${s.status === 'offline' ? 'off' : ''}">
-        <div style="display:flex;gap:12px;align-items:flex-start"><span class="cc">${flag(s.country)}</span>
-          <div style="flex:1;min-width:0"><b style="font-size:15px">${esc(s.name)}</b><div class="muted" style="font-size:12.5px">${esc([s.city, s.provider, s.host].filter(Boolean).join(' · ')) || 'čeka prvo javljanje'}</div></div>
-          <span data-live-srv="${s.id}">${srvStatus(s)}</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${(s.tags || []).map((t) => `<span class="tag t-info">${esc(TAG_LABEL[t] || t)}</span>`).join('')}${S.me && s.xray_ok ? '<span class="tag t-grey">VLESS Reality</span>' : ''}${s.wg_ok ? '<span class="tag t-grey">WireGuard</span>' : ''}${s.status === 'pending' ? '<span class="tag t-warn">nije instaliran</span>' : ''}${s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}</div>
-        <div class="meters">${meter('CPU', s.status === 'online' ? s.cpu : null)}${meter('RAM', s.status === 'online' ? s.ram : null)}${meter('Popunjeno', s.capacity ? s.online / s.capacity * 100 : 0)}</div>
-        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--soft);font-size:13px;padding-top:10px;border-top:1px solid var(--row)">
-          <span><b>${s.online}</b> / ${s.capacity} spojeno</span><span>${bytes(s.traffic_month)} / mj.</span><span class="dim">${s.last_seen ? 'javio se ' + ago(s.last_seen) : 'nije se javio'}</span></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${s.status === 'pending' ? `<button class="btn sm red" style="flex:1" data-a="install" data-id="${s.id}">Komanda za instalaciju</button>` : ''}
-          <button class="btn sm" style="flex:1" data-a="editServer" data-id="${s.id}">Uredi</button>
-          <button class="btn sm warnb" style="flex:1" data-a="srvAct" data-act="maintenance" data-id="${s.id}">${s.maintenance ? 'Završi održavanje' : 'Održavanje'}</button>
-          <button class="btn sm" style="flex:1" data-a="srvMore" data-id="${s.id}">${ic('more')}<span class="sr">Više</span></button>
-        </div></article>`).join('')}</section>`
+      ${servers.length ? `<section class="srvgrid">${servers.map(srvCard).join('')}</section>`
       : `<section class="card p" style="text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center"><h2>Dodaj svoj prvi VPN server</h2>
           <p class="muted" style="max-width:520px;margin:0">Zakupi VPS (Ubuntu 22.04 ili 24.04), klikni "Dodaj server", pa zalijepi jednu komandu u server. Panel sve ostalo uradi sam.</p>
           <button class="btn red" data-a="newServer">${ic('plus')}Dodaj server</button></section>`}`;
     startLive();
   }
+  // kartica servera: zastava, ime, država i hoster, IP sa kopiranjem, protokoli, opterećenje, akcije
+  function srvCard(s) {
+    const live = s.status === 'online';
+    const fill = s.capacity ? s.online / s.capacity * 100 : 0;
+    const lvl = (v) => v == null ? '' : v >= 85 ? 'bad' : v >= 65 ? 'w' : '';
+    const m = (label, v, txt) => `<div class="sm-m"><div class="sm-l"><span>${label}</span><b class="${lvl(v)}">${txt ?? (v == null ? '—' : Math.round(v) + '%')}</b></div><div class="sm-bar"><i class="${lvl(v)}" style="width:${Math.min(100, Math.max(v ? 2 : 0, v || 0)).toFixed(1)}%"></i></div></div>`;
+    const country = s.country ? ccName(s.country) : '';
+    const sub = [country, s.provider].filter(Boolean).join(' · ') || 'čeka prvo javljanje';
+    const proto = (ok, name) => ok == null ? '' : `<span class="pchip ${ok ? 'ok' : 'bad'}" title="${ok ? 'radi' : 'ne radi'}"><i></i>${name}</span>`;
+    return `<article class="card srv2 ${s.status === 'offline' ? 'off' : ''} ${s.status === 'disabled' ? 'dis' : ''} ${s.maintenance ? 'mnt' : ''}">
+      <header>
+        <span class="srvflag">${s.country ? flag(s.country) : ic('server')}<i class="dot s-${s.warn ? 'warn' : s.status}"></i></span>
+        <div class="srv-t"><b title="${esc(s.name)}">${esc(s.city && s.city !== s.name ? s.name : s.city || s.name)}</b><span>${esc(sub)}</span></div>
+        <span data-live-srv="${s.id}">${srvStatus(s)}</span>
+      </header>
+      ${s.host ? `<button class="iprow" data-a="copy" data-v="${esc(s.host)}" title="Kopiraj IP adresu"><span class="mono">${esc(s.host)}</span>${ic('copy')}</button>` : ''}
+      <div class="chips">${(s.tags || []).map((t) => `<span class="tag t-info">${esc(TAG_LABEL[t] || t)}</span>`).join('')}${s.xray_ok ? proto(true, 'VLESS Reality') : ''}${s.wg_ok ? proto(true, 'WireGuard') : ''}${s.status === 'pending' ? '<span class="tag t-warn">nije instaliran</span>' : ''}${s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}</div>
+      <div class="srv-m">${m('CPU', live ? s.cpu : null)}${m('RAM', live ? s.ram : null)}${m('Spojeno', fill, `${s.online}<small>/${s.capacity}</small>`)}</div>
+      <div class="srv-f"><span>${ic('down')}${bytes(s.traffic_month)} <small>ovaj mjesec</small></span><span class="dim">${s.last_seen ? 'javio se ' + ago(s.last_seen) : 'nije se javio'}</span></div>
+      <div class="srv-a">
+        ${s.status === 'pending' ? `<button class="btn sm red" data-a="install" data-id="${s.id}">Komanda za instalaciju</button>` : ''}
+        <button class="btn sm" data-a="editServer" data-id="${s.id}">${ic('edit')}Uredi</button>
+        <button class="btn sm warnb" data-a="srvAct" data-act="maintenance" data-id="${s.id}">${s.maintenance ? 'Završi održavanje' : 'Održavanje'}</button>
+        <button class="btn sm icon" data-a="srvMore" data-id="${s.id}" aria-label="Više">${ic('more')}</button>
+      </div></article>`;
+  }
   const TAG_LABEL = { p2p: 'P2P / Torrent', streaming: 'Streaming', gaming: 'Gaming', special: 'Specijalni' };
   // ---------- Double VPN / Multihop
   function chainsHtml(chains, servers) {
-    const flagName = (h) => { const sv = servers.find((x) => x.id === h); return sv ? `<span class="tag t-grey">${esc(sv.country || '')} ${esc(sv.name)}</span>` : '<span class="tag t-bad">obrisan</span>'; };
+    const flagName = (h) => { const sv = servers.find((x) => x.id === h); return sv ? `<span class="tag t-grey hop">${sv.country ? flag(sv.country) : ""} ${esc(sv.name)}</span>` : '<span class="tag t-bad">obrisan</span>'; };
     return `<section class="card p">
       <div class="ch" style="margin-bottom:8px"><h2>${ic('link')}Double VPN i Multihop</h2>${can('servers') ? `<button class="btn sm red" data-a="editChain">${ic('plus')}Novi lanac</button>` : ''}</div>
       <p class="muted" style="margin:0 0 12px;font-size:13px">Promet kupca ide kroz 2 servera (Double VPN) ili 3–4 servera (Multihop). Kupac vidi lanac kao posebnu lokaciju u aplikaciji. Sajtovi vide IP zadnjeg servera.</p>
