@@ -279,15 +279,21 @@ Dugmad **Restartuj VPN**, **Test brzine**, **Ažuriraj agent** i **Restartuj ser
 
 **Korisnici → Online sada**: kupci koji su imali promet u zadnje 2 minute, sa zelenom tačkom i serverom na koji su spojeni. **Novi link** u detaljima kupca pravi novi link i nove ključeve (stari odmah prestaju raditi) i odmah pokaže QR i dugme "Pošalji kupcu".
 
-## 20. Hetzner: server u jedan klik i nova IP adresa
+## 20. Server u jedan klik: Hetzner, DigitalOcean, Vultr, OVH, Contabo
 
-1. U Hetzner Cloud Console otvori projekat → **Security → API Tokens → Generate API token**, dozvola **Read & Write**.
-2. Zalijepi token u panel: **Postavke → Hetzner**. Nikome ga ne šalji. Ako je token negdje procurio, obriši ga u Hetzneru i napravi novi.
-3. **Serveri → Dodaj server → Automatski na Hetzneru**: izaberi lokaciju i veličinu. Panel zakupi server (Ubuntu 24.04), instalira VPN preko cloud-init i doda ga. Za 3–5 minuta server je online.
+Upiši ključ hostera u **Postavke → Hosteri** (samo za hostere koje koristiš). Ključevi se čuvaju samo u panelu i nikad se ne prikazuju cijeli. Ako je ključ negdje procurio, obriši ga kod hostera i napravi novi.
 
-U meniju **⋯** servera napravljenog preko panela je **Nova IP adresa**: server se ugasi, dobije novu IPv4 od Hetznera, stara se obriše i server se upali (1–2 minute bez VPN-a). Aplikacije kupaca same preuzmu novu adresu. Kod brisanja možeš izabrati **Obriši i na Hetzneru**, pa naplata prestaje odmah.
+| Hoster | Gdje se pravi ključ | Naplata | Nova IP adresa |
+|---|---|---|---|
+| Hetzner | Cloud Console → projekat → Security → API Tokens (Read & Write) | po satu | ista mašina, nova IPv4 (1–2 min) |
+| DigitalOcean | API → Tokens → Generate New Token (Read & Write) | po satu | novi server, stari se briše (3–5 min) |
+| Vultr | Account → API → Enable API, dozvoli IP panela u Access Control | po satu | novi server, stari se briše (3–5 min) |
+| OVHcloud | eu.api.ovh.com/createToken (GET, POST, DELETE na /cloud/*) + ID Public Cloud projekta | po satu (Public Cloud) | novi server, stari se briše |
+| Contabo | my.contabo.com → API (Client ID, Secret, API User, API Password) | **mjesečni ugovor** | ne (napravi novi, obriši stari) |
 
-Panel mora imati javnu adresu (Postavke → Općenito → Adresa panela) da bi se novi server mogao javiti.
+**Serveri → Dodaj server** → izaberi hostera → lokacija i veličina → **Zakupi i instaliraj**. Panel zakupi server (Ubuntu 24.04), instalira VPN preko cloud-init i doda ga; za par minuta je online. Kod brisanja biraš **Samo iz panela** ili **Obriši i kod hostera** (naplata prestaje; kod Contaba se otkazuje ugovor).
+
+OVH klasični "VPS" se ne može naručiti preko API-ja (ide kroz korpu i plaćanje), zato panel koristi OVH Public Cloud. Panel mora imati javnu adresu (Postavke → Općenito → Adresa panela).
 
 ## Šta još nije gotovo
 

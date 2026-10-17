@@ -1228,11 +1228,11 @@
         <span data-live-srv="${s.id}">${srvStatus(s)}</span>
       </header>
       ${s.host ? `<button class="iprow" data-a="copy" data-v="${esc(s.host)}" title="Kopiraj IP adresu"><span class="mono">${esc(s.host)}</span>${ic('copy')}</button>` : ''}
-      <div class="chips">${(s.tags || []).map((t) => `<span class="tag t-info">${esc(TAG_LABEL[t] || t)}</span>`).join('')}${s.xray_ok ? proto(true, 'VLESS Reality') : ''}${s.wg_ok ? proto(true, 'WireGuard') : ''}${s.status === 'pending' ? `<span class="tag t-warn">${s.hz ? 'Hetzner instalira (3–5 min)…' : 'nije instaliran'}</span>` : ''}${s.hz_job && !s.hz_job.done ? `<span class="tag t-warn">${esc(s.hz_job.step)}…</span>` : s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}${s.hz_job?.done && !s.hz_job.ok ? `<span class="tag t-bad" title="${esc(s.hz_job.error || '')}">nova IP nije uspjela</span>` : ''}</div>
+      <div class="chips">${(s.tags || []).map((t) => `<span class="tag t-info">${esc(TAG_LABEL[t] || t)}</span>`).join('')}${s.xray_ok ? proto(true, 'VLESS Reality') : ''}${s.wg_ok ? proto(true, 'WireGuard') : ''}${s.status === 'pending' ? `<span class="tag t-warn">${s.cloud ? 'instalira se (par minuta)…' : 'nije instaliran'}</span>` : ''}${s.cloud_job && !s.cloud_job.done ? `<span class="tag t-warn">${esc(s.cloud_job.step)}…</span>` : s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}${s.cloud_job?.done && !s.cloud_job.ok ? `<span class="tag t-bad" title="${esc(s.cloud_job.error || '')}">nova IP nije uspjela</span>` : ''}</div>
       <div class="srv-m">${m('CPU', live ? s.cpu : null)}${m('RAM', live ? s.ram : null)}${m('Spojeno', fill, `${s.online}<small>/${s.capacity}</small>`)}</div>
       <div class="srv-f"><span>${ic('down')}${bytes(s.traffic_month)} <small>ovaj mjesec</small></span><span class="dim">${s.last_seen ? 'javio se ' + ago(s.last_seen) : 'nije se javio'}</span></div>
       <div class="srv-a">
-        ${s.status === 'pending' && !s.hz ? `<button class="btn sm red" data-a="install" data-id="${s.id}">Komanda za instalaciju</button>` : ''}
+        ${s.status === 'pending' && !s.cloud ? `<button class="btn sm red" data-a="install" data-id="${s.id}">Komanda za instalaciju</button>` : ''}
         <a class="btn sm" href="#/server/${s.id}">${ic('chart')}Detalji</a>
         <button class="btn sm" data-a="editServer" data-id="${s.id}">${ic('edit')}Uredi</button>
         <button class="btn sm icon" data-a="srvMore" data-id="${s.id}" aria-label="Više">${ic('more')}</button>
@@ -1272,46 +1272,58 @@
     if (r) { toast('Lanac spremljen. Serveri ga preuzmu za par sekundi.'); pageServers(); }
   }
 
-  // ---------- Hetzner: server u jedan klik
+  // ---------- server u jedan klik kod hostera
+  const HOST_ICON = { hetzner: 'H', digitalocean: 'DO', vultr: 'V', ovh: 'OVH', contabo: 'C' };
+  const LOCN = { DE: 'Njemačka', FI: 'Finska', US: 'SAD', SG: 'Singapur', NL: 'Holandija', GB: 'V. Britanija', FR: 'Francuska', CA: 'Kanada', PL: 'Poljska', IN: 'Indija', AU: 'Australija', JP: 'Japan', IT: 'Italija' };
   async function newServerPick() {
-    let o = null;
-    try { o = await GET('hetzner/options'); } catch (e) { toast(e.message, true); }
-    S.hzOn = !!o?.configured;
-    if (!o?.configured || !o.types?.length) return newServer(true);
+    let list = [];
+    try { list = await GET('cloud'); } catch { /* bez hostera */ }
+    const on = list.filter((p) => p.configured);
+    S.hzOn = on.length > 0;
+    if (!on.length) return newServer(true);
     const r = await modal(`<h2>Dodaj server</h2>
       <div class="pickgrid">
-        <button class="pick" value="hz"><span class="pick-i">${ic('bolt')}</span><b>Automatski na Hetzneru</b><small>Izabereš lokaciju i veličinu, panel sam zakupi server, instalira VPN i doda ga. Traje 3–5 minuta.</small></button>
-        <button class="pick" value="manual"><span class="pick-i">${ic('server')}</span><b>Ručno (bilo koji VPS)</b><small>Imaš server kod drugog hostera: dobiješ komandu koju zalijepiš u server.</small></button>
+        ${on.map((p) => `<button class="pick" value="${esc(p.id)}"><span class="pick-i hl">${esc(HOST_ICON[p.id] || p.name[0])}</span><b>${esc(p.name)}</b><small>Panel sam zakupi server, instalira VPN i doda ga. Naplata: ${esc(p.billing)}.</small></button>`).join('')}
+        <button class="pick" value="manual"><span class="pick-i">${ic('server')}</span><b>Ručno (bilo koji VPS)</b><small>Server kod bilo kojeg hostera: dobiješ komandu koju zalijepiš u server.</small></button>
       </div>
-      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button></div>`);
+      ${list.length > on.length ? `<small class="dim">Ostali hosteri (${esc(list.filter((p) => !p.configured).map((p) => p.name).join(', '))}) se uključuju upisom ključa u <a href="#/postavke" data-a="closeModal">Postavke → Hosteri</a>.</small>` : ''}
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button></div>`, { wide: on.length > 1 });
     if (!r) return;
     r.close();
     if (r.data._btn === 'manual') return newServer(true);
-    if (r.data._btn === 'hz') return hzNewServer(o);
+    const p = on.find((x) => x.id === r.data._btn);
+    if (p) return cloudNewServer(p);
   }
-  async function hzNewServer(o) {
-    const LOCN = { DE: 'Njemačka', FI: 'Finska', US: 'SAD', SG: 'Singapur' };
-    const locs = o.locations.filter((l) => o.types.some((t) => t.prices[l.name] != null));
-    const typeOpts = (loc) => o.types.filter((t) => t.prices[loc] != null).map((t, i) => `<option value="${esc(t.name)}" ${i === 0 ? 'selected' : ''}>${esc(t.name.toUpperCase())} · ${t.cores} vCPU · ${t.memory} GB RAM · ${t.disk} GB · ${money(t.prices[loc])}/mj.</option>`).join('');
-    const first = locs[0]?.name || '';
-    // promjena lokacije mijenja ponudu veličina (cijene se razlikuju po lokaciji)
+  async function cloudNewServer(p) {
+    toast(`Učitavam ponudu od ${p.name}…`);
+    const o = await GET(`cloud/${p.id}/options`);
+    const cur = o.currency || '€';
+    const price = (v) => v == null ? '' : ` · ${cur === '€' ? money(v) : cur + Number(v).toFixed(2)}/mj.`;
+    const locs = o.locations.filter((l) => o.types.some((t) => l.id in t.prices));
+    const spec = (t) => [t.cores ? `${t.cores} vCPU` : '', t.mem ? `${t.mem} GB RAM` : '', t.disk ? `${t.disk} GB` : ''].filter(Boolean).join(' · ');
+    const typeOpts = (loc) => o.types.filter((t) => loc in t.prices).map((t, i) => `<option value="${esc(t.id)}" ${i === 0 ? 'selected' : ''}>${esc(t.label)}${spec(t) && t.label !== spec(t) ? ' · ' + esc(spec(t)) : ''}${price(t.prices[loc])}</option>`).join('');
+    const first = locs[0]?.id || '';
     const form = $('#modalForm');
-    form.onchange = (e) => { if (e.target.name === 'location') { const t = $('#hzType'); if (t) t.innerHTML = typeOpts(e.target.value); } };
-    const r = await formLoop(`<h2>Novi server na Hetzneru</h2>
-      <p class="muted" style="margin:0">Panel zakupi server, instalira VPN i doda ga na listu. Server se pojavi kao "čeka instalaciju" i za 3–5 minuta postane online.</p>
-      <div class="field">Lokacija<div class="locpick">${locs.map((l) => `<label class="locopt"><input type="radio" name="location" value="${esc(l.name)}" ${l.name === first ? 'checked' : ''}>${flag(l.cc)}<span><b>${esc(l.city)}</b><small>${esc(LOCN[l.cc] || ccName(l.cc))}</small></span></label>`).join('')}</div></div>
-      <label class="field">Veličina servera<select class="input" name="type" id="hzType">${typeOpts(first)}</select><small class="dim">Za VPN je dovoljan najmanji ponuđeni (2 vCPU podnese 300–500 kupaca). U Evropi je uključeno 20 TB prometa mjesečno, u SAD-u i Singapuru znatno manje, pa tamo prati potrošnju.</small></label>
-      <div class="row2"><label class="field">Ime servera (opcionalno)<input class="input" name="name" placeholder="npr. DE Falkenstein 2"></label>
+    form.onchange = (e) => { if (e.target.name === 'location') { const t = $('#cloudType'); if (t) t.innerHTML = typeOpts(e.target.value); } };
+    const r = await formLoop(`<h2>Novi server · ${esc(p.name)}</h2>
+      <p class="muted" style="margin:0">Panel zakupi server, instalira VPN i doda ga na listu. Server se pojavi kao "čeka instalaciju" i za par minuta postane online.</p>
+      <div class="field">Lokacija<div class="locpick">${locs.map((l) => `<label class="locopt"><input type="radio" name="location" value="${esc(l.id)}" ${l.id === first ? 'checked' : ''}>${l.cc ? flag(l.cc) : ic('globe')}<span><b>${esc(l.city || l.id)}</b><small>${esc(LOCN[l.cc] || (l.cc ? ccName(l.cc) : l.label || ''))}</small></span></label>`).join('')}</div></div>
+      <label class="field">Veličina servera<select class="input" name="type" id="cloudType">${typeOpts(first)}</select><small class="dim">Za VPN je dovoljan najmanji ponuđeni sa 2 vCPU (podnese 300–500 kupaca).</small></label>
+      <div class="row2"><label class="field">Ime servera (opcionalno)<input class="input" name="name" placeholder="npr. DE Frankfurt 2"></label>
         <label class="field">Maksimalno spojenih<input class="input" name="capacity" value="400" inputmode="numeric"></label></div>
-      <div class="banner" style="background:var(--card2);color:var(--soft);border-color:var(--line)">${ic('money')}<span style="flex:1;min-width:0">Hetzner naplaćuje po satu dok server postoji. Kad ga obrišeš iz panela uz "Obriši i na Hetzneru", naplata prestaje.</span></div>
+      <div class="banner ${p.id === 'contabo' ? '' : 'soft'}">${ic('money')}<span style="flex:1;min-width:0">${esc(o.note || '')} ${p.id === 'contabo' ? '' : 'Kad server obrišeš iz panela uz "Obriši i kod hostera", naplata prestaje.'}</span></div>
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">${ic('bolt')}Zakupi i instaliraj</button></div>`,
-    (d) => POST('hetzner/servers', { location: d.location, type: d.type, name: d.name, capacity: Number(d.capacity) }));
+    (d) => POST(`cloud/${p.id}/servers`, { location: d.location, type: d.type, name: d.name, capacity: Number(d.capacity) }), { wide: locs.length > 6 });
     form.onchange = null;
-    if (r) { toast(`Server zakupljen (${r.ip || 'IP stiže'}). Instalacija traje 3–5 minuta, server će sam postati online.`); if (location.hash.startsWith('#/serveri')) pageServers(); }
+    if (r) { toast(`Server zakupljen${r.ip ? ` (${r.ip})` : ''}. Instalacija traje par minuta, server će sam postati online.`); if (location.hash.startsWith('#/serveri')) pageServers(); }
   }
-  async function hzNewIp(id) {
+  async function cloudNewIp(id) {
     const s = S.servers.find((x) => x.id === Number(id));
-    if (!(await ask('Nova IP adresa', `${s?.name || 'Server'} se gasi, dobija novu IP adresu od Hetznera i pali se ponovo. Kupci na ovom serveru nemaju VPN oko 1–2 minute, a aplikacije same preuzmu novu adresu. Stara adresa se briše.`, 'Promijeni IP', true))) return;
+    const swap = s?.cloud === 'hetzner';
+    const text = swap
+      ? `${s.name} se gasi, dobija novu IP adresu i pali se ponovo. Kupci na ovom serveru nemaju VPN oko 1–2 minute, a aplikacije same preuzmu novu adresu. Stara adresa se briše.`
+      : `Hoster ne može promijeniti IP postojećem serveru, pa panel pravi novi server na istoj lokaciji i briše stari. Kupci na ovom serveru nemaju VPN oko 3–5 minuta (dok se novi instalira), a aplikacije same preuzmu novu adresu.`;
+    if (!(await ask('Nova IP adresa', text, swap ? 'Promijeni IP' : 'Zamijeni server', true))) return;
     await POST(`servers/${id}/new-ip`);
     toast('Mijenjam IP adresu. Prati status na kartici servera.');
     pageServers();
@@ -1320,7 +1332,7 @@
       if (!location.hash.startsWith('#/serveri')) return clearInterval(S.hzPoll);
       const list = await GET('servers').catch(() => null); if (!list) return;
       const x = list.find((v) => v.id === Number(id));
-      if (!x?.hz_job || x.hz_job.done) { clearInterval(S.hzPoll); if (x?.hz_job) toast(x.hz_job.ok ? `Nova IP adresa: ${x.host}` : `Promjena IP nije uspjela: ${x.hz_job.error}`, !x.hz_job.ok); }
+      if (!x?.cloud_job || x.cloud_job.done) { clearInterval(S.hzPoll); if (x?.cloud_job) toast(x.cloud_job.ok ? `Nova IP adresa: ${x.host}` : `Promjena IP nije uspjela: ${x.cloud_job.error}`, !x.cloud_job.ok); }
       pageServers();
     }, 5000);
   }
@@ -1336,7 +1348,7 @@
         <div class="row2"><label class="field">IP ili domena (prazno = sam se javi)<input class="input" name="host"></label><label class="field">Grad / država (npr. Frankfurt / DE)<input class="input" name="loc"></label></div>
         <div class="row2"><label class="field">VLESS port<input class="input" name="vless_port" value="443"></label><label class="field">WireGuard port<input class="input" name="wg_port" value="51820"></label></div>
         <label class="field">Shadowsocks port<input class="input" name="ss_port" value="8388"></label></div></details>
-      ${S.hzOn ? '' : `<small class="dim">Savjet: upiši Hetzner API token u <a href="#/postavke" data-a="closeModal">Postavke → Hetzner</a> i panel će sam zakupljivati i instalirati servere.</small>`}
+      ${S.hzOn ? '' : `<small class="dim">Savjet: upiši ključ hostera (Hetzner, DigitalOcean, Vultr, OVH, Contabo) u <a href="#/postavke" data-a="closeModal">Postavke → Hosteri</a> i panel će sam zakupljivati i instalirati servere.</small>`}
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Dodaj i prikaži komandu</button></div>`,
     (d) => { const [city, cc] = String(d.loc || '').split('/').map((x) => x.trim()); return POST('servers', { name: d.name, capacity: Number(d.capacity), provider: d.provider, cost: Number(String(d.cost || 0).replace(',', '.')), host: d.host, city, country: cc, vless_port: Number(d.vless_port), wg_port: Number(d.wg_port), ss_port: Number(d.ss_port) }); });
     if (r) { showInstall(r.install, true); if (location.hash.startsWith('#/serveri')) pageServers(); }
@@ -1374,7 +1386,7 @@
         <div class="mini"><small>Xray (VLESS / SS)</small><b class="${s.xray_ok ? 'ok' : 'bad'}">${s.xray_ok ? 'radi' : !s.enabled ? 'ugašen' : 'ne radi'}</b></div><div class="mini"><small>WireGuard</small><b class="${s.wg_ok ? 'ok' : 'bad'}">${s.wg_ok ? 'radi' : !s.enabled ? 'ugašen' : 'ne radi'}</b></div></div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <button class="btn" value="install">Prikaži komandu za instalaciju</button>
-        ${s.hz ? `<button class="btn" value="newip" ${s.hz_job && !s.hz_job.done ? 'disabled' : ''}>${ic('refresh')}Nova IP adresa (Hetzner)</button>` : ''}
+        ${s.cloud && s.cloud !== 'contabo' ? `<button class="btn" value="newip" ${s.cloud_job && !s.cloud_job.done ? 'disabled' : ''}>${ic('refresh')}Nova IP adresa${s.cloud === 'hetzner' ? '' : ' (zamjena servera)'}</button>` : ''}
         <button class="btn" value="locate">Odredi lokaciju iz IP adrese</button>
         <button class="btn warnb" value="maintenance">${s.maintenance ? 'Završi održavanje' : 'Stavi na održavanje (kupci ga ne biraju automatski)'}</button>
         <button class="btn warnb" value="toggle">${s.enabled ? 'Ugasi server (kupci ga ne vide)' : 'Upali server'}</button>
@@ -1384,13 +1396,14 @@
     r.close();
     try {
       if (r.data._btn === 'install') return showInstall((await GET(`servers/${id}/install`)).install);
-      if (r.data._btn === 'newip') return hzNewIp(id);
+      if (r.data._btn === 'newip') return cloudNewIp(id);
       if (r.data._btn === 'delete') {
-        if (s.hz) {
-          const q = await modal(`<h2>Obriši server</h2><p class="muted" style="margin:0">${esc(s.name)} je zakupljen preko Hetznera. Ako ga obrišeš i na Hetzneru, server se uništava i naplata prestaje odmah. To se ne može vratiti.</p>
-            <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn" value="panel">Samo iz panela</button><button class="btn danger" value="hz">Obriši i na Hetzneru</button></div>`);
+        if (s.cloud) {
+          const ct = s.cloud === 'contabo';
+          const q = await modal(`<h2>Obriši server</h2><p class="muted" style="margin:0">${esc(s.name)} je zakupljen preko panela (${esc(s.provider || s.cloud)}). ${ct ? 'Brisanje kod Contaba otkazuje ugovor: server radi do kraja plaćenog mjeseca, pa se gasi.' : 'Ako ga obrišeš i kod hostera, server se uništava i naplata prestaje odmah. To se ne može vratiti.'}</p>
+            <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn" value="panel">Samo iz panela</button><button class="btn danger" value="cloud">${ct ? 'Obriši i otkaži kod Contaba' : 'Obriši i kod hostera'}</button></div>`);
           if (!q) return; q.close();
-          await DEL(`servers/${id}${q.data._btn === 'hz' ? '?hetzner=1' : ''}`);
+          await DEL(`servers/${id}${q.data._btn === 'cloud' ? '?cloud=1' : ''}`);
         } else {
           if (!(await ask('Obriši server', `${s.name} se briše iz panela. Na samom serveru ugasi agenta ili obriši VPS.`, 'Obriši', true))) return;
           await DEL('servers/' + id);
@@ -1823,7 +1836,7 @@
     bulk: () => bulk().catch(fail),
     editPlan: (d) => editPlan(d.id).catch(fail),
     newServer: () => newServerPick().catch(fail),
-    hzNewIp: (d) => hzNewIp(d.id).catch(fail),
+    cloudNewIp: (d) => cloudNewIp(d.id).catch(fail),
     closeModal: () => { $('#modal').close(); location.hash = '#/postavke'; },
     install: async (d) => showInstall((await GET(`servers/${d.id}/install`)).install),
     editServer: (d) => editServer(d.id).catch(fail),

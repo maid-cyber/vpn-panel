@@ -123,6 +123,12 @@ CREATE TABLE IF NOT EXISTS server_cmds (id INTEGER PRIMARY KEY, server_id INTEGE
 CREATE INDEX IF NOT EXISTS server_cmds_s ON server_cmds(server_id, id);`);
 // vlastiti brend resellera (white-label)
 addCol('servers', 'hz_id', 'INTEGER');
+// server zakupljen preko panela kod hostera (Hetzner, DigitalOcean, Vultr, OVH, Contabo)
+addCol('servers', 'cloud', 'TEXT');
+addCol('servers', 'cloud_id', 'TEXT');
+addCol('servers', 'cloud_loc', "TEXT DEFAULT ''");
+addCol('servers', 'cloud_type', "TEXT DEFAULT ''");
+db.exec("UPDATE servers SET cloud = 'hetzner', cloud_id = CAST(hz_id AS TEXT) WHERE hz_id IS NOT NULL AND cloud IS NULL");
 addCol('admins', 'brand_color', "TEXT DEFAULT ''");
 addCol('admins', 'brand_logo', "TEXT DEFAULT ''");
 addCol('admins', 'brand_welcome', "TEXT DEFAULT ''");

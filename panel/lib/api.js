@@ -151,7 +151,7 @@ function serverView(sv, forReseller) {
     vless_port: sv.vless_port, wg_port: sv.wg_port, ss_port: sv.ss_port, sni: sv.sni, xray_ok: sv.xray_ok, wg_ok: sv.wg_ok,
     xray_version: forReseller ? '' : sv.xray_version, last_error: forReseller ? '' : sv.last_error,
     synced: !!sv.applied_hash, tags: vpn.serverTags(sv),
-    hz: forReseller ? false : !!sv.hz_id, hz_job: forReseller || !sv.hz_id ? null : require('./hetzner').jobOf(sv.id),
+    cloud: forReseller ? null : sv.cloud || null, cloud_job: forReseller || !sv.cloud ? null : require('./cloud').jobOf(sv.id),
   };
 }
 function serversList(forReseller) {
@@ -431,17 +431,16 @@ route('POST', 'servers', 'servers', (c) => {
   log(c.auth.me.username, 'Novi server', sv.name);
   return { id: sv.id, install: installCommand(c, sv) };
 });
-// ---------- Hetzner: server u jedan klik
-const hetzner = require('./hetzner');
-route('GET', 'hetzner/options', 'servers', async () => hetzner.options());
-route('POST', 'hetzner/servers', 'servers', async (c) => {
-  const base = (settings.get('panel_url') || `${c.proto}://${c.req.headers.host}`).replace(/\/+$/, '');
-  return hetzner.create(c.body, base, createPanelServer, c.auth.me.username);
-});
+// ---------- server u jedan klik kod hostera (Hetzner, DigitalOcean, Vultr, OVH, Contabo)
+const cloud = require('./cloud');
+const panelPublic = (c) => (settings.get('panel_url') || `${c.proto}://${c.req.headers.host}`).replace(/\/+$/, '');
+route('GET', 'cloud', 'servers', () => cloud.list());
+route('GET', 'cloud/:p/options', 'servers', async (c) => cloud.options(c.params.p));
+route('POST', 'cloud/:p/servers', 'servers', async (c) => cloud.create(c.params.p, c.body, panelPublic(c), createPanelServer, c.auth.me.username));
 route('POST', 'servers/:id/new-ip', 'servers', async (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
   if (!sv) fail(404, 'Server ne postoji.');
-  return hetzner.newIp(sv, c.auth.me.username);
+  return cloud.newIp(sv, panelPublic(c), c.auth.me.username);
 });
 route('GET', 'servers/:id/install', 'servers', (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
@@ -518,7 +517,7 @@ route('DELETE', 'servers/:id', 'servers', async (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
   if (!sv) fail(404, 'Server ne postoji.');
   if (all('SELECT * FROM chains').some((ch) => vpn.chainHops(ch).includes(sv.id))) fail(400, 'Server je dio lanca. Prvo obriši ili izmijeni lanac.');
-  if (c.query.hetzner === '1' && sv.hz_id) await hetzner.destroy(sv, c.auth.me.username);
+  if ((c.query.cloud === '1' || c.query.hetzner === '1') && sv.cloud_id) await cloud.destroy(sv, c.auth.me.username);
   run('UPDATE users SET last_server = NULL WHERE last_server = ?', sv.id);
   const used = all('SELECT * FROM chains').filter((c) => vpn.chainHops(c).includes(sv.id));
   if (used.length) fail(400, `Server je dio lanca: ${used.map((c) => c.name).join(', ')}. Prvo obriši ili izmijeni lanac.`);
