@@ -17,7 +17,7 @@ import threading
 import time
 import urllib.request
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
@@ -378,8 +378,14 @@ def apply_xray(cfg):
         return True
     if not DRY:
         tmp = XRAY_CONF[:-5] + ".test.json"   # Xray prepoznaje format po nastavku .json
+        # provjera bez log fajlova: test radi kao root, a pristupni log u /dev/shm pripada korisniku Xraya,
+        # pa ga Linux zaštita ne da otvoriti (permission denied) iako je konfiguracija ispravna
+        test_cfg = json.loads(text)
+        if isinstance(test_cfg.get("log"), dict):
+            test_cfg["log"] = {**test_cfg["log"], "access": "none"}
+            test_cfg["log"].pop("error", None)
         with open(tmp, "w") as f:
-            f.write(text)
+            json.dump(test_cfg, f)
         test = subprocess.run([XRAY_BIN, "run", "-test", "-c", tmp], capture_output=True, text=True, timeout=30)
         os.unlink(tmp)
         if test.returncode != 0:
