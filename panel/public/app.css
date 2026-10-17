@@ -432,3 +432,49 @@ body { background: radial-gradient(900px 500px at 12% -10%, rgba(47, 107, 255, .
 .srv-a .btn.red { flex: 1 1 100%; }
 .srv-a:has(.btn.red) { flex-wrap: wrap; }
 @media (max-width: 520px) { .srv2 { padding: 15px; } .sm-m { padding: 9px; } .sm-l b { font-size: 17px; } }
+
+/* ---------- mapa: spajanja uživo */
+.map svg.flows { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.flows g, .flows circle { pointer-events: auto; }
+.flows .fbase { fill: none; stroke: #ff6b7a; stroke-opacity: .38; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.flows .fbeam { fill: none; stroke: #ffd0d5; stroke-linecap: round; vector-effect: non-scaling-stroke;
+  stroke-dasharray: 18 82; stroke-dashoffset: 100; filter: drop-shadow(0 0 4px #ff5a6a) drop-shadow(0 0 1px #fff); animation: fbeam linear infinite; }
+.flows .fsrc { fill: #ff8a96; filter: drop-shadow(0 0 4px #ff5a6a); vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: fsrc 2s ease-out infinite; }
+@keyframes fbeam { to { stroke-dashoffset: 0; } }
+@keyframes fsrc { 0% { opacity: 1; } 70% { opacity: .35; } 100% { opacity: 1; } }
+.flowleg { display: inline-flex; align-items: center; gap: 6px; }
+.flowleg i { width: 14px; height: 2px; border-radius: 2px; background: var(--acc-hi); box-shadow: 0 0 6px var(--acc-hi); }
+@media (prefers-reduced-motion: reduce) { .flows .fbeam { animation: none; stroke-dasharray: none; stroke-opacity: .5; } .flows .fsrc { animation: none; } }
+
+/* ---------- Moj brend (reseller) */
+.brandwrap { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, .9fr); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .brandwrap { grid-template-columns: minmax(0, 1fr); } }
+.note { border-radius: 10px; padding: 10px 12px; font-size: 13px; background: var(--card2); border: 1px solid var(--line); }
+.note.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.logoedit { display: flex; gap: 16px; align-items: center; }
+.logoprev { width: 76px; height: 76px; border-radius: 18px; flex: none; background: var(--card2); border: 1px dashed var(--line2); display: grid; place-items: center; overflow: hidden; }
+.logoprev img { width: 100%; height: 100%; object-fit: contain; }
+.logoprev span { width: 100%; height: 100%; display: grid; place-items: center; color: #fff; font: 800 30px var(--display); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; box-shadow: 0 0 0 1px var(--line2) inset; cursor: pointer; padding: 0; position: relative; }
+.sw.on { border-color: var(--text); box-shadow: 0 0 0 3px var(--card) inset; }
+.sw.custom { background: conic-gradient(#f43f5e, #f59e0b, #22c55e, #06b6d4, #6366f1, #d946ef, #f43f5e); overflow: hidden; }
+.sw.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.brandprev { position: sticky; top: 16px; }
+.phone { margin: 4px auto 0; width: 290px; max-width: 100%; border-radius: 34px; padding: 10px; background: #0d0d12; border: 1px solid var(--line2); box-shadow: 0 30px 60px -30px rgba(0,0,0,.9); }
+.phone-in { border-radius: 26px; background: #0a0a0d; color: #f2f2f5; padding: 18px 14px 20px; display: flex; flex-direction: column; gap: 10px; min-height: 470px; font-size: 13px; }
+.pv-h { display: flex; align-items: center; gap: 9px; }
+.pv-h img { width: 34px; height: 34px; object-fit: contain; border-radius: 8px; }
+.pv-h i { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: #fff; }
+.pv-h i svg { width: 19px; height: 19px; }
+.pv-h b { font: 700 18px var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-note { background: #15151c; border: 1px solid #22222b; border-radius: 10px; padding: 9px 10px; font-size: 12px; }
+.pv-card { background: #121218; border: 1px solid #22222b; border-radius: 13px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.pv-card small { color: #a5a5b2; display: block; font-size: 11px; }
+.pv-ok { color: #3ddc84; font-weight: 600; font-size: 12px; }
+.pv-row { display: flex; justify-content: space-between; border-top: 1px solid #22222b; padding-top: 7px; }
+.pv-bar { height: 6px; border-radius: 3px; background: #22222b; overflow: hidden; } .pv-bar i { display: block; height: 100%; }
+.pv-qr { width: 96px; height: 96px; margin: 4px auto; border-radius: 8px; background: #fff repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0 / 16px 16px; border: 6px solid #fff; }
+.pv-btn { display: block; text-align: center; border-radius: 10px; padding: 10px; font-weight: 600; color: #fff; }
+.pv-btn.o { border: 1px solid #2c2c37; background: none; }
+.pv-sup { text-align: center; color: #a5a5b2; }

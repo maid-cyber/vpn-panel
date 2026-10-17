@@ -97,6 +97,9 @@ route('GET', 'me', null, (c) => {
     res_path: !isRes(me) && s.res_portal ? s.reseller_path : null, portal: c.portal,
     msg_template: s.msg_template, support: s.support_contact,
     mail_on: mail.configured(), stripe: !!(s.stripe_on && s.stripe_secret), cbot: !!(s.cbot_on && s.cbot_token), proto_ss: !!s.proto_ss,
+    wl: isRes(me) ? !!s.res_whitelabel : undefined,
+    cust_brand: isRes(me) && s.res_whitelabel && me.brand ? me.brand : s.brand,
+    cust_support: (isRes(me) && s.res_whitelabel && me.brand ? me.contact : s.support_contact) || '',
     brand: s.brand, currency: s.currency, timezone: s.timezone, accent: s.accent, theme: s.theme, maintenance: !!s.maintenance,
     pay: isRes(me) ? { methods: s.pay_methods, usdt: s.pay_usdt, iban: s.pay_iban, paypal: s.pay_paypal, min: s.res_min_topup } : null,
   };
@@ -199,7 +202,7 @@ route('GET', 'dash', 'dash', (c) => {
     counts, weekNew, revMonth: core.round2(revMonth), revPrev: core.round2(revPrev),
     online: servers.filter((s) => s.status === 'online').length, serversTotal: servers.filter((s) => s.enabled).length,
     connected: servers.reduce((s, x) => s + (x.status === 'online' ? x.online : 0), 0),
-    servers, series, days,
+    servers, series, days, flows: require('./nodes').liveFlows(),
     countries: countries.slice(0, 8).map((r) => ({ cc: r.cc, n: r.n, pct: ctotal ? Math.round(r.n / ctotal * 100) : 0 })),
     revToday: core.round2(sum(dayStart(t, 0), t + 1)), revYesterday: core.round2(sum(dayStart(t, 1), dayStart(t, 0))),
     protocols: { vless: !!settings.get('proto_vless'), ss: !!settings.get('proto_ss'), wg: !!settings.get('proto_wg') },
@@ -541,7 +544,7 @@ route('DELETE', 'levels/:id', 'resellers', (c) => {
 
 route('GET', 'resellers', 'resellers', () => {
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-  return all(`SELECT a.id, a.username, a.credit, a.level_id, l.name AS level, l.discount, a.user_limit, a.contact, a.email, a.brand, a.note, a.disabled, a.pending, a.created_at, a.last_login,
+  return all(`SELECT a.id, a.username, a.credit, a.level_id, l.name AS level, l.discount, a.user_limit, a.contact, a.email, a.brand, a.brand_color, (a.brand_logo != '') AS has_logo, a.note, a.disabled, a.pending, a.created_at, a.last_login,
       (SELECT COUNT(*) FROM users u WHERE u.owner_id = a.id) AS users,
       (SELECT COALESCE(SUM(amount),0) FROM transactions x WHERE x.reseller_id = a.id AND x.type = 'topup' AND x.ts >= ?) AS month
     FROM admins a LEFT JOIN levels l ON l.id = a.level_id WHERE a.role = 'reseller' ORDER BY a.pending DESC, month DESC, a.username`, monthStart);
@@ -569,6 +572,7 @@ route('PUT', 'resellers/:id', 'resellers', (c) => {
     run('UPDATE admins SET pass_hash = ? WHERE id = ?', auth.hashPassword(b.password), r.id);
     run('DELETE FROM sessions WHERE admin_id = ?', r.id);
   }
+  if (b.brand_logo === '') run("UPDATE admins SET brand_logo = '' WHERE id = ?", r.id);
   log(c.auth.me.username, 'Reseller izmijenjen', r.username);
   return { ok: true };
 });
@@ -627,6 +631,29 @@ route('GET', 'transactions', 'finance', (c) => {
   if (q.from) { where.push('t.ts >= ?'); args.push(Number(q.from)); }
   return all(`SELECT t.*, a.username AS reseller, u.username AS user FROM transactions t LEFT JOIN admins a ON a.id = t.reseller_id LEFT JOIN users u ON u.id = t.user_id
     ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY t.id DESC LIMIT 500`, ...args);
+});
+// ---------- vlastiti brend resellera
+const brandOut = (a) => ({ on: !!settings.get('res_whitelabel'), brand: a.brand || '', contact: a.contact || '', color: a.brand_color || '', logo: a.brand_logo || '', welcome: a.brand_welcome || '', hide_app: !!a.brand_hide_app, default_brand: settings.get('brand') });
+function cleanLogo(v) {
+  const m = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(v || ''));
+  if (!m) fail(400, 'Logo mora biti PNG, JPG ili WEBP slika.');
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length > 120 * 1024) fail(400, 'Logo je prevelik (najviše 120 KB).');
+  const sig = { png: [0x89, 0x50, 0x4e, 0x47], jpeg: [0xff, 0xd8, 0xff], webp: [0x52, 0x49, 0x46, 0x46] }[m[1]];
+  if (!sig.every((b, i) => buf[i] === b)) fail(400, 'Fajl nije ispravna slika.');
+  return `data:image/${m[1]};base64,${buf.toString('base64')}`;
+}
+route('GET', 'res/brand', 'res', (c) => brandOut(one('SELECT * FROM admins WHERE id = ?', c.auth.me.id)));
+route('PUT', 'res/brand', 'res', (c) => {
+  const b = c.body, me = one('SELECT * FROM admins WHERE id = ?', c.auth.me.id);
+  const name = String(b.brand ?? me.brand).trim().slice(0, 40);
+  const color = String(b.color ?? me.brand_color ?? '').trim();
+  if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) fail(400, 'Boja mora biti u obliku #RRGGBB.');
+  const logo = b.logo === undefined ? me.brand_logo : b.logo ? cleanLogo(b.logo) : '';
+  run('UPDATE admins SET brand = ?, contact = ?, brand_color = ?, brand_logo = ?, brand_welcome = ?, brand_hide_app = ? WHERE id = ?',
+    name, String(b.contact ?? me.contact).trim().slice(0, 80), color.toLowerCase(), logo, String(b.welcome ?? me.brand_welcome ?? '').trim().slice(0, 300), b.hide_app === undefined ? me.brand_hide_app : (b.hide_app ? 1 : 0), me.id);
+  log(me.username, 'Brend izmijenjen', name || '(bez imena)');
+  return brandOut(one('SELECT * FROM admins WHERE id = ?', me.id));
 });
 route('GET', 'res/transactions', 'res', (c) => all('SELECT t.*, u.username AS user FROM transactions t LEFT JOIN users u ON u.id = t.user_id WHERE t.reseller_id = ? ORDER BY t.id DESC LIMIT 300', c.auth.me.id));
 route('POST', 'transactions', 'finance', (c) => {
@@ -831,7 +858,7 @@ route('GET', 'live', 'any', (c) => {
   const push = () => {
     const forRes = isRes(c.auth.me);
     const servers = serversList(forRes).map((s) => ({ id: s.id, name: s.name, city: s.city, country: s.country, lat: s.lat, lon: s.lon, status: s.status, warn: s.warn, online: forRes ? undefined : s.online, cpu: forRes ? undefined : s.cpu, ram: forRes ? undefined : s.ram, net: forRes ? undefined : s.net }));
-    res.write(`data: ${JSON.stringify({ t: now(), servers })}\n\n`);
+    res.write(`data: ${JSON.stringify({ t: now(), servers, flows: forRes ? undefined : require('./nodes').liveFlows() })}\n\n`);
   };
   push();
   const iv = setInterval(push, 5000);

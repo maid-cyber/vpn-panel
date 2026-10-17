@@ -6,7 +6,30 @@ const { one, all, run, now, log, dayKey } = require('./db');
 const settings = require('./settings');
 const vpn = require('./vpn');
 const { fail, send, readBody, clientIp } = require('./http');
-const { notify, geoIp } = require('./notify');
+const { notify, geoIp, geoCached } = require('./notify');
+
+// mapa uživo: približna lokacija spojenih kupaca po serveru (zaokruženo na ~100 km, samo u memoriji, ništa se ne sprema)
+const LIVE = new Map();
+function flowsFromIps(ips) {
+  const m = new Map();
+  for (const ip of ips) {
+    const g = geoCached(ip);
+    if (!g || g.lat == null || g.lon == null) continue;
+    const lat = Math.round(g.lat), lon = Math.round(g.lon), k = `${lat}:${lon}`;
+    const e = m.get(k) || { cc: g.cc || '', lat, lon, n: 0 };
+    e.n++; m.set(k, e);
+  }
+  return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 40);
+}
+/** Spajanja uživo: [{server, cc, lat, lon, n}] za servere koji su se javili u zadnjih 90 s. */
+function liveFlows() {
+  const t = now(), out = [];
+  for (const [server, v] of LIVE) {
+    if (t - v.t > 90000) { LIVE.delete(server); continue; }
+    for (const f of v.flows) out.push({ server, ...f });
+  }
+  return out;
+}
 
 const AGENT_FILE = path.join(__dirname, '..', '..', 'agent', 'agent.py');
 const agentVersion = () => {
@@ -173,10 +196,11 @@ async function handle(req, res, p) {
       geoIp(ip).then((g) => { if (g?.cc) run('INSERT INTO countries (day, cc, n) VALUES (?, ?, 1) ON CONFLICT(day, cc) DO UPDATE SET n = n + 1', dayKey(t, tz), g.cc); });
     }
     if (lastIps.size > 20000) lastIps.clear();
+    LIVE.set(sv.id, { t, flows: flowsFromIps(ips) });
     const cfg = vpn.nodeConfig(one('SELECT * FROM servers WHERE id = ?', sv.id));
     return send(res, 200, { hash: cfg.hash, interval: Number(settings.get('heartbeat_sec') || 15), agent_version: agentVersion(), xray_update: !!settings.get('xray_autoupdate'), devices: settings.get('device_limit') !== 'iskljuceno' });
   }
   fail(404, 'Nepoznato.');
 }
 
-module.exports = { handle, installScript };
+module.exports = { handle, installScript, liveFlows, flowsFromIps };

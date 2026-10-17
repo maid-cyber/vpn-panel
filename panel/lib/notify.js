@@ -62,4 +62,7 @@ async function geoIp(ip) {
   } catch { return null; }
 }
 
-module.exports = { telegram, telegramFile, notify, webhook, geoIp };
+// samo iz keša (bez upita prema vani): za mapu uživo, da ne trošimo limit ip-api
+function geoCached(ip) { return geoCache.get(String(ip || '').replace(/^::ffff:/, '')) || null; }
+
+module.exports = { telegram, telegramFile, notify, webhook, geoIp, geoCached };

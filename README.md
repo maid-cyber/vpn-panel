@@ -265,6 +265,12 @@ Na glavnoj adresi servera (npr. `http://IP/`) je javni sajt: funkcije, lokacije 
 - Bez Stripea dugme "Kupi" vodi na tvoj kontakt podrške.
 - Isključuje se u Postavke → Web sajt.
 
+## 18. Mapa spajanja uživo i vlastiti brend za resellere
+
+**Mapa uživo (Dashboard → Mapa servera):** crvene linije idu od približne lokacije spojenih kupaca do servera na koji su spojeni. Lokacija je zaokružena na oko 100 km, drži se samo u memoriji i ništa se ne sprema. Linije se pojave kad je uključeno ograničenje uređaja (Postavke → Korisnici), jer tada serveri javljaju adrese spojenih kupaca.
+
+**Vlastiti brend (white-label):** uključi u Postavke → Reselleri → "Vlastiti brend za resellere". Reseller tada u meniju **Moj brend** upiše ime, kontakt, boju, poruku dobrodošlice i učita logo, uz pregled uživo. Njegovi kupci na svojoj stranici, u aplikacijama (ime profila) i u podsjetnicima vide njegov brend. Može sakriti i Veltrix aplikaciju, pa kupci vide samo Hiddify i druge. Admin može ukloniti neprikladan logo u Reselleri → Uredi.
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

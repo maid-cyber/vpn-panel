@@ -115,6 +115,11 @@ addCol('users', 'ref_code', 'TEXT');
 addCol('users', 'referred_by', 'INTEGER');
 addCol('users', 'paid_once', 'INTEGER DEFAULT 0');
 addCol('users', 'trial_device', 'TEXT');
+// vlastiti brend resellera (white-label)
+addCol('admins', 'brand_color', "TEXT DEFAULT ''");
+addCol('admins', 'brand_logo', "TEXT DEFAULT ''");
+addCol('admins', 'brand_welcome', "TEXT DEFAULT ''");
+addCol('admins', 'brand_hide_app', 'INTEGER DEFAULT 0');
 db.exec(`CREATE TABLE IF NOT EXISTS trials (id INTEGER PRIMARY KEY AUTOINCREMENT, device TEXT, ip TEXT, ts INTEGER, user_id INTEGER);
 CREATE INDEX IF NOT EXISTS trials_device ON trials(device); CREATE INDEX IF NOT EXISTS trials_ip ON trials(ip);
 CREATE UNIQUE INDEX IF NOT EXISTS users_ref ON users(ref_code);`);

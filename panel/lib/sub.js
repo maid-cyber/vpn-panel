@@ -46,7 +46,11 @@ function page(u, link, s, owner, botName, reqUrl) {
   const color = { active: '#3ddc84', expiring: '#f5a524', grace: '#f5a524', expired: '#ff4d5e', limited: '#ff8a4d', disabled: '#9a9aa8', devices: '#ff8a4d' }[st];
   const wl = s.res_whitelabel && owner?.brand;
   const support = (wl ? owner.contact : s.support_contact) || '';
-  const apps = String(s.apps || 'hiddify').split(',').filter((k) => APPS[k]);
+  const apps = String(s.apps || 'hiddify').split(',').filter((k) => APPS[k] && !(wl && owner.brand_hide_app && k === 'veltrix'));
+  if (!apps.length) apps.push('hiddify');
+  // boja i logo resellera (white-label); boja je provjerena pri spremanju, ovdje još jednom
+  const acc = wl && /^#[0-9a-f]{6}$/i.test(owner.brand_color || '') ? owner.brand_color : '#d81f35';
+  const logo = wl && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(owner.brand_logo || '') ? owner.brand_logo : '';
   const pname = wl ? owner.brand : (s.sub_name || s.brand);
   const used = u.traffic_up + u.traffic_down, pct = u.traffic_limit ? Math.min(100, used / u.traffic_limit * 100) : 0;
   const days = Math.ceil((u.expires_at - now()) / vpn.DAY);
@@ -60,7 +64,7 @@ function page(u, link, s, owner, botName, reqUrl) {
   return `<!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${brand} · moj nalog</title><meta name="robots" content="noindex">
 <style>
-:root{--bg:#0a0a0d;--card:#121218;--line:#22222b;--text:#f2f2f5;--muted:#a5a5b2;--red:#e5233a}
+:root{--bg:#0a0a0d;--card:#121218;--line:#22222b;--text:#f2f2f5;--muted:#a5a5b2;--red:${acc}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:520px;margin:0 auto;padding:22px 16px 40px;display:flex;flex-direction:column;gap:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
@@ -69,13 +73,14 @@ h1{margin:0;font-size:22px}h2{margin:0 0 10px;font-size:16px}.muted{color:var(--
 .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--red)}
 .qr{background:#fff;border-radius:12px;padding:10px;width:220px;margin:6px auto 12px;display:block}
 .btn{display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:12px;border:1px solid #2c2c37;color:var(--text);text-decoration:none;font-weight:600;background:none;font:inherit;cursor:pointer;width:100%}
-.btn.red{background:#d81f35;border:0;color:#fff}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn.red{background:var(--red);border:0;color:#fff}.logo{width:40px;height:40px;border-radius:10px;object-fit:contain}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .link{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-all;text-align:center}
 details{border-top:1px solid var(--line);padding:10px 0}details:first-of-type{border-top:0}summary{cursor:pointer;font-weight:600}
 .badge{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:14px}.dot{width:9px;height:9px;border-radius:50%}
 .note{background:#1d1810;border:1px solid #3d3216;color:#f5c46a;border-radius:12px;padding:12px;font-size:14px}
 </style></head><body><main>
-<div style="display:flex;align-items:center;gap:10px"><svg width="34" height="38" viewBox="0 0 200 224" aria-hidden="true">${wl ? PLAIN : MARK}</svg><h1>${brand}</h1></div>
+<div style="display:flex;align-items:center;gap:10px">${logo ? `<img class="logo" src="${logo}" alt="">` : `<svg width="34" height="38" viewBox="0 0 200 224" aria-hidden="true">${wl ? PLAIN.replace('#E3172B', acc) : MARK}</svg>`}<h1>${brand}</h1></div>
+${wl && owner.brand_welcome ? `<div class="note" style="background:#15151c;border-color:var(--line);color:var(--text)">${esc(owner.brand_welcome)}</div>` : ''}
 ${s.sub_announce ? `<div class="note">${esc(s.sub_announce)}</div>` : ''}
 ${s.maintenance ? `<div class="note">${esc(s.maintenance_msg)}</div>` : ''}
 <section class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="muted">Nalog</div><div style="font-weight:700;font-size:18px">${esc(u.username)}</div></div>
@@ -106,7 +111,7 @@ ${apps.map((k, n) => k === 'veltrix'
 ${botName ? `<section class="card"><h2>Podsjetnici na Telegram</h2><p class="muted" style="margin-top:0">${u.tg_chat ? 'Telegram je povezan ✓ Javit ćemo ti prije isteka.' : 'Poveži Telegram i javit ćemo ti prije nego nalog istekne. Možeš i pitati za stanje naloga.'}</p>
 <a class="btn" href="https://t.me/${esc(botName)}?start=${esc(u.sub_token)}">${u.tg_chat ? 'Otvori bota' : 'Poveži Telegram'}</a></section>` : ''}
 ${wg.length ? `<section class="card"><h2>WireGuard (rezervna opcija)</h2><p class="muted" style="margin-top:0">Za službenu WireGuard aplikaciju. Preuzmi fajl ili skeniraj QR u aplikaciji.</p>
-${wg.map((sv) => `<div class="row"><span>${vpn.FLAGS(sv.country)} ${esc(sv.city || sv.name)}</span><span><a href="${esc(link)}/wg/${sv.id}" style="color:#ff5a6a">Preuzmi</a> · <a href="${esc(link)}/wg/${sv.id}?qr=1" style="color:#ff5a6a">QR</a></span></div>`).join('')}</section>` : ''}
+${wg.map((sv) => `<div class="row"><span>${vpn.FLAGS(sv.country)} ${esc(sv.city || sv.name)}</span><span><a href="${esc(link)}/wg/${sv.id}" style="color:var(--red)">Preuzmi</a> · <a href="${esc(link)}/wg/${sv.id}?qr=1" style="color:var(--red)">QR</a></span></div>`).join('')}</section>` : ''}
 ${support ? `<p class="muted" style="text-align:center">Podrška: ${esc(support)}</p>` : ''}
 </main></body></html>`;
 }
@@ -181,7 +186,7 @@ async function handle(req, res, p) {
   const ua = String(req.headers['user-agent'] || '');
   const wantsHtml = /text\/html/.test(String(req.headers.accept || '')) && /Mozilla/.test(ua) && !APP_UA.test(ua);
   countCountry(req).catch(() => {});
-  const owner = u.owner_id ? one('SELECT brand, contact FROM admins WHERE id = ?', u.owner_id) : null;
+  const owner = u.owner_id ? one('SELECT brand, contact, brand_color, brand_logo, brand_welcome, brand_hide_app FROM admins WHERE id = ?', u.owner_id) : null;
   const wl = s.res_whitelabel && owner?.brand;
   if (wantsHtml && s.customer_page) return send(res, 200, page(u, link, s, owner, await cbot.username().catch(() => null), req.url), { 'content-type': 'text/html; charset=utf-8' });
 

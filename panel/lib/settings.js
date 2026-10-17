@@ -56,7 +56,7 @@ const SCHEMA = [
     { key: 'reseller_path', type: 'text', label: 'Adresa panela za resellere', sub: 'Ovu adresu šalješ resellerima, npr. /reseller ili /partner', def: '/reseller', mono: true },
     { key: 'res_signup', type: 'toggle', label: 'Reselleri se mogu sami registrovati', sub: 'Na njihovoj adresi se pojavi "Registruj se". Ti odobravaš svaki nalog.', def: false },
     { key: 'res_auto_level', type: 'toggle', label: 'Automatski podigni nivo resellera', sub: 'Svakog 1. u mjesecu prema kupljenom kreditu prošlog mjeseca (preporučena kupovina kod nivoa)', def: false },
-    { key: 'res_whitelabel', type: 'toggle', label: 'White-label: kupci resellera vide njegov brend', sub: 'Ime brenda i kontakt iz profila resellera, u aplikaciji i na stranici kupca', def: false },
+    { key: 'res_whitelabel', type: 'toggle', label: 'Vlastiti brend za resellere (white-label)', sub: 'Reseller u meniju "Moj brend" upiše ime, logo, boju i kontakt. Njegovi kupci to vide umjesto tvog brenda', def: false },
     { key: 'res_trials_day', type: 'number', label: 'Reseller smije napraviti probnih naloga dnevno', def: 10 },
     { key: 'res_can_delete', type: 'toggle', label: 'Reseller smije brisati korisnike', sub: 'Ako ne, može ih samo ugasiti', def: false },
     { key: 'res_negative', type: 'number', label: 'Reseller smije u minus do (€)', sub: '0 = ne može praviti korisnike bez kredita', def: 0 },

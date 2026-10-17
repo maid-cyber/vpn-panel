@@ -313,7 +313,7 @@
 
   // ------------------------------------------------------------------ okvir
   function navItems() {
-    if (isRes()) return [{ label: 'Moj panel', items: [['dash', 'Pregled', ''], ['users', 'Moji korisnici', 'korisnici'], ['credit', 'Kredit i uplate', 'kredit']] }];
+    if (isRes()) return [{ label: 'Moj panel', items: [['dash', 'Pregled', ''], ['users', 'Moji korisnici', 'korisnici'], ['credit', 'Kredit i uplate', 'kredit'], ...(S.me?.wl ? [['shield', 'Moj brend', 'brend']] : [])] }];
     const g = [{ label: 'Pregled', items: [['dash', 'Dashboard', '']] }];
     const u = [];
     if (can('users')) u.push(['users', 'Korisnici', 'korisnici', S.badges?.users]);
@@ -380,7 +380,7 @@
         const off = d.servers.filter((s) => s.status === 'offline').length;
         const badge = `${d.servers.filter((s) => s.status === 'online').length}/${d.servers.filter((s) => s.status !== 'disabled').length}`;
         if (S.badges && S.badges.servers !== badge) { S.badges.servers = badge; paintNav(); }
-        updateMap(d.servers);
+        updateMap(d.servers, d.flows);
         $$('[data-live-srv]').forEach((el) => { const s = d.servers.find((x) => x.id === Number(el.dataset.liveSrv)); if (s) el.outerHTML = `<span data-live-srv="${s.id}">${srvStatus(s)}</span>`; });
         const lt = $('#liveTime'); if (lt) lt.textContent = 'osvježeno ' + fmtTime(d.t);
         void off;
@@ -418,10 +418,30 @@
       return `<div class="mk" style="left:${(x / 7.2).toFixed(2)}%;top:${(y / 3.6).toFixed(2)}%" title="${esc(g.map((v) => v.name).join(', '))}"><b style="background:${c}"></b><i style="background:${c};box-shadow:0 0 10px ${c}"></i><span>${esc(s.city || s.name)}${g.length > 1 ? ` ×${g.length}` : ''}</span></div>`;
     }).join('');
   }
-  const mapHtml = (servers) => `<div class="map" id="map"><svg viewBox="0 0 720 360" preserveAspectRatio="none" aria-hidden="true">
+  // spajanja uživo: luk od približne lokacije kupca do servera, sa svjetlom koje putuje po luku
+  function flowsSvg(flows, servers) {
+    const by = new Map(servers.filter((s) => s.lat != null && s.status !== 'disabled').map((s) => [s.id, s]));
+    const list = (flows || []).filter((f) => by.has(f.server)).slice(0, 60);
+    const max = Math.max(1, ...list.map((f) => f.n));
+    return list.map((f, i) => {
+      const sv = by.get(f.server), [x1, y1] = P(f.lon, f.lat), [x2, y2] = P(sv.lon, sv.lat);
+      const d = Math.hypot(x2 - x1, y2 - y1), w = (1.4 + 1.8 * f.n / max).toFixed(2), dur = (2.2 + d / 140).toFixed(2), delay = ((i * 0.37) % 2).toFixed(2);
+      const t = `${esc(ccName(f.cc) || f.cc)} → ${esc(sv.city || sv.name)} · ${f.n} ${f.n === 1 ? 'kupac' : 'kupaca'}`;
+      const src = `<circle class="fsrc" cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="${(2.4 + 2 * f.n / max).toFixed(1)}" style="animation-delay:${delay}s"><title>${t}</title></circle>`;
+      if (d < 4) return src;
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - Math.min(90, d * 0.32);
+      const path = `M${x1.toFixed(1)} ${y1.toFixed(1)}Q${mx.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+      return `<g><title>${t}</title><path class="fbase" d="${path}" style="stroke-width:${w}"/><path class="fbeam" d="${path}" pathLength="100" style="stroke-width:${(+w + 0.6).toFixed(2)};animation-duration:${dur}s;animation-delay:-${delay}s"/>${src}</g>`;
+    }).join('');
+  }
+  const flowCount = (flows) => (flows || []).reduce((a, f) => a + f.n, 0);
+  const mapHtml = (servers, flows) => `<div class="map" id="map"><svg viewBox="0 0 720 360" preserveAspectRatio="none" aria-hidden="true">
     <defs><pattern id="dg" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.25" fill="var(--map-dot)"/></pattern></defs>
-    <path d="${LAND_D}" fill="url(#dg)"/></svg><div id="mapMk">${markers(servers)}</div></div>`;
-  function updateMap(servers) { const m = $('#mapMk'); if (m) { m.innerHTML = markers(servers); placeLabels(); } }
+    <path d="${LAND_D}" fill="url(#dg)"/></svg><svg class="flows" id="mapFlows" viewBox="0 0 720 360" preserveAspectRatio="none">${flowsSvg(flows, servers)}</svg><div id="mapMk">${markers(servers)}</div></div>`;
+  function updateMap(servers, flows) {
+    const m = $('#mapMk'); if (m) { m.innerHTML = markers(servers); placeLabels(); }
+    const f = $('#mapFlows'); if (f && flows) { f.innerHTML = flowsSvg(flows, servers); const n = $('#flowN'); if (n) n.textContent = flowCount(flows); }
+  }
   // oznake gradova koji su blizu (npr. Falkenstein i Helsinki) ne smiju se preklapati:
   // svaka oznaka uzme prvo slobodno mjesto oko svoje tačke
   const SPOTS = ['', 'sb', 'sl', 'sb sl', 'sr', 'sl2', 'sb2', 'sb2 sl'];
@@ -590,10 +610,10 @@
           <div class="mapwrap">
             <div class="regions">${Object.keys(CONT_NAME).map((k) => `<div class="${k === mainCont && cont[k] ? 'on' : ''}"><span>${CONT_NAME[k]}</span><b>${cont[k]}</b></div>`).join('')}
               <span class="pill" style="margin-top:8px;align-self:flex-start">${d.online} ${d.online === 1 ? 'server' : 'servera'} online</span></div>
-            <div style="min-width:0">${mapHtml(d.servers)}</div>
+            <div style="min-width:0">${mapHtml(d.servers, d.flows)}</div>
           </div>
           <div class="protos"><span class="${d.protocols.vless ? 'on' : 'off'}">VLESS Reality</span><span class="${d.protocols.ss ? 'on' : 'off'}">Shadowsocks 2022</span><span class="${d.protocols.wg ? 'on' : 'off'}">WireGuard</span>
-            <span style="margin-left:auto" class="dim">${d.servers.some((s) => s.lat == null) ? 'Server se pojavi na mapi kad se prvi put javi panelu.' : 'Spojeno sada: ' + d.connected}</span></div>
+            <span style="margin-left:auto" class="dim">${d.servers.some((s) => s.lat == null) ? 'Server se pojavi na mapi kad se prvi put javi panelu.' : `<span class="flowleg"><i></i>Linije uživo: <b id="flowN">${flowCount(d.flows)}</b></span> · spojeno sada: ${d.connected}`}</span></div>
         </section>
         <section class="card p" style="min-width:0">
           <div class="ch"><h2>${ic('pin')}Korisnici po lokacijama</h2><span class="pill">Live</span></div>
@@ -875,7 +895,7 @@
   // ---- slanje pristupa kupcu (WhatsApp, Telegram, Viber, e-mail, QR slika)
   function customerMessage(u) {
     const t = S.me.msg_template || 'Tvoj {brend}: {link}';
-    const map = { korisnik: u.username, plan: u.plan || '', istice: fmtDate(u.expires_at), dana: String(Math.max(0, u.days_left)), link: u.sub_link, brend: S.me.brand, podrska: S.me.support || '' };
+    const map = { korisnik: u.username, plan: u.plan || '', istice: fmtDate(u.expires_at), dana: String(Math.max(0, u.days_left)), link: u.sub_link, brend: S.me.cust_brand || S.me.brand, podrska: S.me.cust_support ?? S.me.support ?? '' };
     return t.replace(/\{(\w+)\}/g, (m, k) => map[k] ?? m).replace(/\n*Pomoć: *$/, '').trim();
   }
   async function qrPng(u) {
@@ -890,14 +910,14 @@
     g.fillStyle = '#E3172B'; g.fillRect(0, 0, W, 14);
     g.drawImage(img, 90, 110, 720, 720);
     g.fillStyle = '#111114'; g.textAlign = 'center';
-    g.font = '800 46px "Inter Display", Inter, sans-serif'; g.fillText(S.me.brand.toUpperCase(), W / 2, 80);
+    g.font = '800 46px "Inter Display", Inter, sans-serif'; g.fillText((S.me.cust_brand || S.me.brand).toUpperCase(), W / 2, 80);
     g.font = '600 30px Inter, sans-serif'; g.fillText('Skeniraj u aplikaciji Hiddify', W / 2, 900);
     g.fillStyle = '#5d5d6b'; g.font = '400 26px Inter, sans-serif';
     g.fillText(`${u.plan || ''} · vrijedi do ${fmtDate(u.expires_at)}`, W / 2, 950);
     if (S.me.support) g.fillText('Pomoć: ' + S.me.support, W / 2, 995);
     const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = `${S.me.brand.replace(/\W+/g, '-')}-${u.username}.png`;
+    a.href = URL.createObjectURL(blob); a.download = `${(S.me.cust_brand || S.me.brand).replace(/\W+/g, '-')}-${u.username}.png`;
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
@@ -914,7 +934,7 @@
       ['WhatsApp', `https://wa.me/${phone}?text=${enc(msg)}`, phone ? `na ${contact}` : 'izaberi kontakt'],
       ['Telegram', tg ? `https://t.me/${tg}` : `https://t.me/share/url?url=${enc(u.sub_link)}&text=${enc(textNoLink)}`, tg ? `otvori chat sa @${tg} pa zalijepi poruku` : 'izaberi kontakt'],
       ['Viber', `viber://forward?text=${enc(msg)}`, 'izaberi kontakt'],
-      ['E-mail', `mailto:${mail}?subject=${enc(S.me.brand + ' pristup')}&body=${enc(msg)}`, mail || 'upiši adresu'],
+      ['E-mail', `mailto:${mail}?subject=${enc((S.me.cust_brand || S.me.brand) + ' pristup')}&body=${enc(msg)}`, mail || 'upiši adresu'],
     ];
     const r = await modal(`<h2>Pošalji kupcu · ${esc(u.username)}</h2>
       <p class="muted" style="margin:0">Poruka ima link na stranicu kupca, gdje su QR kod i dugmad za aplikacije. Tekst poruke mijenjaš u Postavke → Pretplata.</p>
@@ -985,6 +1005,78 @@
     if (r) { toast('Spremljeno.'); pagePlans(); }
   }
   const confirmInline = (q) => Promise.resolve(window.confirm(q));
+
+  // ================================================================== MOJ BREND (reseller, white-label)
+  const BRAND_COLORS = ['#d81f35', '#ff6a00', '#f5b301', '#16a34a', '#0ea5a4', '#2563eb', '#7c3aed', '#db2777', '#111827'];
+  async function pageBrand() {
+    const b = await GET('res/brand');
+    S.brand = { ...b };
+    $('#view').innerHTML = `${top('Moj brend', 'Tvoji kupci vide tvoje ime, logo i boju umjesto ' + esc(b.default_brand))}
+      <div class="brandwrap">
+        <section class="card p" style="display:flex;flex-direction:column;gap:14px">
+          <form id="brandForm" style="display:flex;flex-direction:column;gap:14px">
+            <div class="logoedit"><span class="logoprev" id="logoPrev"></span>
+              <div style="display:flex;flex-direction:column;gap:8px;min-width:0"><b>Logo</b><span class="muted" style="font-size:12.5px">PNG, JPG ili WEBP. Najbolje kvadratni, sa providnom pozadinom.</span>
+                <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn sm">${ic('plus')}Učitaj logo<input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" hidden></label><button type="button" class="btn sm" data-a="brandLogoDel">Ukloni</button></div></div></div>
+            <label class="field">Ime brenda (kupci ga vide)<input class="input" name="brand" maxlength="40" value="${esc(b.brand)}" placeholder="npr. BalkanVPN"></label>
+            <label class="field">Kontakt za podršku<input class="input" name="contact" maxlength="80" value="${esc(b.contact)}" placeholder="npr. @balkanvpn ili +387 61 …"></label>
+            <div class="field">Boja brenda
+              <div class="swatches">${BRAND_COLORS.map((c) => `<button type="button" class="sw" data-a="brandColor" data-c="${c}" style="background:${c}" aria-label="Boja ${c}"></button>`).join('')}
+                <label class="sw custom" title="Svoja boja"><input type="color" id="brandColorIn" value="${esc(b.color || '#d81f35')}"></label></div></div>
+            <label class="field">Poruka dobrodošlice (opcionalno)<textarea class="input" name="welcome" maxlength="300" rows="3" placeholder="npr. Hvala što koristiš BalkanVPN! Za pomoć piši na Telegram.">${esc(b.welcome)}</textarea></label>
+            <label class="list-item" style="cursor:pointer"><span><b>Sakrij aplikaciju ${esc(b.default_brand)}</b><small class="muted" style="display:block">Kupci vide samo Hiddify i ostale aplikacije, bez tuđeg imena</small></span><input type="checkbox" class="cb" name="hide_app" ${b.hide_app ? 'checked' : ''}></label>
+            ${b.on ? '' : '<div class="note warn">Administrator još nije uključio vlastiti brend. Možeš sve pripremiti, a kupci će ga vidjeti čim ga uključi.</div>'}
+            <div style="display:flex;gap:10px"><button class="btn red" type="submit" style="flex:1">Spremi brend</button></div>
+          </form>
+        </section>
+        <section class="card p brandprev"><div class="ch"><h2>${ic('user')}Ovako kupac vidi svoj nalog</h2></div><div class="phone"><div class="phone-in" id="brandPrev"></div></div></section>
+      </div>`;
+    const f = $('#brandForm');
+    const paint = () => {
+      const d = Object.fromEntries(new FormData(f));
+      Object.assign(S.brand, { brand: d.brand, contact: d.contact, welcome: d.welcome, hide_app: !!d.hide_app });
+      const x = S.brand, acc = x.color || '#d81f35', name = x.brand || x.default_brand;
+      $('#logoPrev').innerHTML = x.logo ? `<img src="${x.logo}" alt="">` : `<span style="background:${acc}">${esc((name || '?')[0].toUpperCase())}</span>`;
+      $$('.sw[data-c]').forEach((el) => el.classList.toggle('on', el.dataset.c === acc));
+      $('#brandPrev').innerHTML = `<div class="pv-h">${x.logo ? `<img src="${x.logo}" alt="">` : `<i style="background:${acc}">${ic('shield')}</i>`}<b>${esc(name)}</b></div>
+        ${x.welcome ? `<div class="pv-note">${esc(x.welcome)}</div>` : ''}
+        <div class="pv-card"><div style="display:flex;justify-content:space-between;align-items:center"><span><small>Nalog</small><b>kupac123</b></span><span class="pv-ok">● Aktivan</span></div>
+          <div class="pv-row"><small>Ističe</small><span>za 30 dana</span></div><div class="pv-bar"><i style="width:38%;background:${acc}"></i></div></div>
+        <div class="pv-card"><b>Spoji se u 3 koraka</b><div class="pv-qr"></div>
+          <span class="pv-btn" style="background:${acc}">Otvori u ${x.hide_app ? 'Hiddify' : esc(x.default_brand)}</span><span class="pv-btn o">Kopiraj link</span></div>
+        ${x.contact ? `<small class="pv-sup">Podrška: ${esc(x.contact)}</small>` : ''}`;
+    };
+    f.oninput = paint;
+    $('#brandColorIn').oninput = (e) => { S.brand.color = e.target.value; paint(); };
+    $('#logoFile').onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try { S.brand.logo = await shrinkLogo(file); paint(); toast('Logo učitan. Klikni Spremi brend.'); } catch (err) { fail(err); }
+    };
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      try { const r = await PUT('res/brand', { brand: S.brand.brand, contact: S.brand.contact, color: S.brand.color, logo: S.brand.logo, welcome: S.brand.welcome, hide_app: S.brand.hide_app }); S.brand = { ...r }; S.me.cust_brand = r.on && r.brand ? r.brand : S.me.brand; S.me.cust_support = r.on && r.brand ? r.contact : S.me.support; toast('Brend spremljen. Kupci ga vide odmah.'); paint(); } catch (err) { fail(err); }
+    };
+    paint();
+  }
+  // logo: smanji na najviše 256 px i pretvori u PNG (ili WEBP ako je PNG prevelik)
+  function shrinkLogo(file) {
+    return new Promise((resolve, reject) => {
+      if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return reject(new Error('Logo mora biti PNG, JPG ili WEBP slika.'));
+      if (file.size > 8 * 1024 * 1024) return reject(new Error('Slika je prevelika (najviše 8 MB).'));
+      const img = new Image(), url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const k = Math.min(1, 256 / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        let out = cv.toDataURL('image/png');
+        if (out.length > 150000) out = cv.toDataURL('image/webp', 0.9);
+        if (out.length > 160000) return reject(new Error('Logo je i dalje prevelik. Probaj jednostavniju sliku.'));
+        resolve(out);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Ne mogu pročitati sliku.')); };
+      img.src = url;
+    });
+  }
 
   // ================================================================== SERVERI
   async function pageServers() {
@@ -1199,11 +1291,12 @@
       <label class="field">Limit korisnika<input class="input" name="user_limit" value="${r.user_limit}" inputmode="numeric"></label></div>
       <div class="row2"><label class="field">Kontakt<input class="input" name="contact" value="${esc(r.contact)}" placeholder="Telegram, WhatsApp"></label><label class="field">E-mail (za fakture)<input class="input" name="email" type="email" value="${esc(r.email || '')}"></label></div>
       <label class="field">Njegov brend (opcionalno, za white-label)<input class="input" name="brand" value="${esc(r.brand)}"></label>
+      ${r.has_logo ? `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="clear_logo">Ukloni logo koji je reseller učitao${r.brand_color ? ` <span class="sw" style="width:16px;height:16px;display:inline-block;background:${esc(r.brand_color)}"></span>` : ''}</label>` : ''}
       <label class="field">Bilješka<input class="input" name="note" value="${esc(r.note)}"></label>
       <div class="dlg-actions">${id ? '<button class="btn danger" value="delete" formnovalidate>Obriši</button>' : ''}<span style="flex:1"></span><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
     async (d) => {
       if (d._btn === 'delete') { if (!confirm('Obrisati resellera?')) throw new Error('Odustao si.'); return DEL('resellers/' + id); }
-      const body = { level_id: d.level_id ? Number(d.level_id) : null, user_limit: Number(d.user_limit), contact: d.contact, email: d.email, brand: d.brand, note: d.note, password: d.password || undefined };
+      const body = { level_id: d.level_id ? Number(d.level_id) : null, user_limit: Number(d.user_limit), contact: d.contact, email: d.email, brand: d.brand, note: d.note, password: d.password || undefined, ...(d.clear_logo ? { brand_logo: '' } : {}) };
       if (id) return PUT('resellers/' + id, body);
       const out = await POST('resellers', { ...body, username: d.username });
       return { ...out, _login: { username: d.username, password: d.password } };
@@ -1466,6 +1559,7 @@
         if (path.startsWith('korisnik/')) return await pageUser(Number(path.split('/')[1]));
         if (path === 'kredit') { await pageCredit(params); const f = $('#stripeForm'); if (f) f.onsubmit = async (e) => { e.preventDefault(); try { const r = await POST('res/stripe', { amount: Number(String(new FormData(f).get('amount')).replace(',', '.')) }); location.href = r.url; } catch (err) { fail(err); } }; return; }
         if (path === 'profil') return await pageProfile();
+        if (path === 'brend' && S.me.wl) return await pageBrand();
         location.hash = '#/'; return;
       }
       if (path === '') return await pageDash();
@@ -1527,7 +1621,7 @@
     mailCustomer: async (d, el) => {
       const to = $('#custMail').value.trim();
       el.disabled = true;
-      try { await POST(R(`users/${d.id}/send-mail`), { to, text: $('#custMsg').value, subject: `${S.me.brand} · tvoj VPN pristup` }); toast('E-mail poslan na ' + to); }
+      try { await POST(R(`users/${d.id}/send-mail`), { to, text: $('#custMsg').value, subject: `${S.me.cust_brand || S.me.brand} · tvoj VPN pristup` }); toast('E-mail poslan na ' + to); }
       catch (e) { fail(e); } finally { el.disabled = false; }
     },
     broadcast: () => broadcast().catch(fail),
@@ -1562,6 +1656,8 @@
       $$('.tr.sel').forEach((x) => x.classList.remove('sel')); el.classList.add('sel');
       resDetail(S.selRes, $('#rDetail'));
     },
+    brandColor: (d) => { S.brand.color = d.c; const i = $('#brandColorIn'); if (i) i.value = d.c; $('#brandForm').oninput(); },
+    brandLogoDel: () => { S.brand.logo = ''; $('#brandForm').oninput(); },
     newReseller: () => editReseller().catch(fail),
     editReseller: (d) => editReseller(d.id).catch(fail),
     impersonate: async (d) => { try { await POST(`resellers/${d.id}/impersonate`); S.me = null; location.hash = '#/'; await boot(); } catch (e) { fail(e); } },
