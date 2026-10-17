@@ -328,6 +328,13 @@ body { background: radial-gradient(900px 500px at 12% -10%, rgba(47, 107, 255, .
 .map { background: radial-gradient(ellipse at 50% 40%, rgba(47, 107, 255, .10), transparent 70%), var(--card2); border: 1px solid var(--line); }
 .mk span { top: -34px; left: 14px; font-size: 13px; font-weight: 600; color: var(--text); background: rgba(8, 14, 32, .9); border: 1px solid var(--line2); padding: 4px 10px; border-radius: 8px; }
 .mk i { width: 12px; height: 12px; left: -6px; top: -6px; border: 2px solid rgba(255,255,255,.7); }
+/* položaji oznake kad je mjesto zauzeto (raspoređuje placeLabels u app.js) */
+.mk.mk-sb span { top: 12px; }
+.mk.mk-sl span { left: auto; right: 14px; }
+.mk.mk-sr span { left: 16px; top: -15px; }
+.mk.mk-sl2 span { left: auto; right: 16px; top: -15px; }
+.mk.mk-sb2 span { top: 44px; }
+.mk:hover { z-index: 3; }
 .protos { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
 .protos span { display: inline-flex; align-items: center; gap: 6px; } .protos span.on { color: var(--soft); } .protos span.on::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 .protos span.off { opacity: .5; text-decoration: line-through; }

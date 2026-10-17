@@ -403,15 +403,47 @@
   const LAND_D = LAND.map((poly) => poly.map(([lo, la], i) => (i ? 'L' : 'M') + P(lo, la).map((v) => v.toFixed(1)).join(' ')).join('') + 'Z').join('');
   const mapColor = (s) => s.status === 'online' ? (s.warn ? '#f5a524' : '#3ddc84') : s.status === 'offline' ? '#ff4d5e' : '#8b8b98';
   function markers(servers) {
-    return servers.filter((s) => s.lat != null && s.lon != null && s.status !== 'disabled').map((s) => {
-      const [x, y] = P(s.lon, s.lat), c = mapColor(s);
-      return `<div class="mk" style="left:${(x / 7.2).toFixed(2)}%;top:${(y / 3.6).toFixed(2)}%" title="${esc(s.name)}"><b style="background:${c}"></b><i style="background:${c};box-shadow:0 0 10px ${c}"></i><span>${esc(s.city || s.name)}</span></div>`;
+    // više servera u istom gradu = jedna tačka i jedna oznaka ("Falkenstein ×2")
+    const groups = new Map();
+    for (const s of servers.filter((s) => s.lat != null && s.lon != null && s.status !== 'disabled')) {
+      const k = `${Math.round(s.lat * 2)}:${Math.round(s.lon * 2)}:${s.city || s.name}`;
+      groups.set(k, [...(groups.get(k) || []), s]);
+    }
+    const rank = (s) => s.status === 'offline' ? 3 : s.warn ? 2 : s.status === 'online' ? 1 : 0;
+    return [...groups.values()].map((g) => {
+      const s = g.reduce((a, b) => (rank(b) > rank(a) ? b : a)), c = mapColor(s), [x, y] = P(s.lon, s.lat);
+      return `<div class="mk" style="left:${(x / 7.2).toFixed(2)}%;top:${(y / 3.6).toFixed(2)}%" title="${esc(g.map((v) => v.name).join(', '))}"><b style="background:${c}"></b><i style="background:${c};box-shadow:0 0 10px ${c}"></i><span>${esc(s.city || s.name)}${g.length > 1 ? ` ×${g.length}` : ''}</span></div>`;
     }).join('');
   }
   const mapHtml = (servers) => `<div class="map" id="map"><svg viewBox="0 0 720 360" preserveAspectRatio="none" aria-hidden="true">
     <defs><pattern id="dg" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.25" fill="var(--map-dot)"/></pattern></defs>
     <path d="${LAND_D}" fill="url(#dg)"/></svg><div id="mapMk">${markers(servers)}</div></div>`;
-  function updateMap(servers) { const m = $('#mapMk'); if (m) m.innerHTML = markers(servers); }
+  function updateMap(servers) { const m = $('#mapMk'); if (m) { m.innerHTML = markers(servers); placeLabels(); } }
+  // oznake gradova koji su blizu (npr. Falkenstein i Helsinki) ne smiju se preklapati:
+  // svaka oznaka uzme prvo slobodno mjesto oko svoje tačke
+  const SPOTS = ['', 'sb', 'sl', 'sb sl', 'sr', 'sl2', 'sb2', 'sb2 sl'];
+  function placeLabels() {
+    const map = $('#map'); if (!map) return;
+    const box = map.getBoundingClientRect(); if (!box.width) return;
+    const mks = [...map.querySelectorAll('.mk')].sort((a, b) => a.offsetTop - b.offsetTop || a.offsetLeft - b.offsetLeft);
+    const dots = mks.map((m) => { const r = m.getBoundingClientRect(); return { left: r.left - 8, right: r.left + 8, top: r.top - 8, bottom: r.top + 8 }; });
+    const hit = (a, b) => a.left < b.right + 3 && a.right + 3 > b.left && a.top < b.bottom + 3 && a.bottom + 3 > b.top;
+    const placed = [];
+    for (const m of mks) {
+      const sp = m.querySelector('span'); if (!sp) continue;
+      let best = null, bestScore = Infinity;
+      for (const s of SPOTS) {
+        m.className = 'mk' + (s ? ' ' + s.split(' ').map((c) => 'mk-' + c).join(' ') : '');
+        const r = sp.getBoundingClientRect();
+        const out = Math.max(0, box.left - r.left) + Math.max(0, r.right - box.right) + Math.max(0, box.top - r.top) + Math.max(0, r.bottom - box.bottom);
+        const score = placed.filter((p) => hit(r, p)).length * 1000 + dots.filter((d) => hit(r, d)).length * 100 + out;
+        if (score < bestScore) { bestScore = score; best = { s, r }; }
+        if (score === 0) break;
+      }
+      m.className = 'mk' + (best.s ? ' ' + best.s.split(' ').map((c) => 'mk-' + c).join(' ') : '');
+      placed.push(best.r);
+    }
+  }
 
   // ------------------------------------------------------------------ grafikon
   function barsChart(series, valueKey, lineKey) {
@@ -589,6 +621,9 @@
     drawChart();
     S.chartRO?.disconnect();
     if (window.ResizeObserver && $('#chartBox')) { let w = 0; S.chartRO = new ResizeObserver((e) => { const nw = Math.round(e[0].contentRect.width); if (Math.abs(nw - w) > 8) { w = nw; drawChart(); } }); S.chartRO.observe($('#chartBox')); }
+    placeLabels();
+    S.mapRO?.disconnect();
+    if (window.ResizeObserver && $('#map')) { let w = 0; S.mapRO = new ResizeObserver((e) => { const nw = Math.round(e[0].contentRect.width); if (Math.abs(nw - w) > 4) { w = nw; placeLabels(); } }); S.mapRO.observe($('#map')); }
     startLive();
   }
   const SRVCOLS = '1.5fr 1fr .7fr 1.4fr 1fr 1fr';
