@@ -159,6 +159,25 @@ function serversList(forReseller) {
   return rows.map((sv) => serverView(sv, forReseller));
 }
 
+// "Prvi koraci": šta još treba podesiti prije prodaje (nestane kad je sve gotovo ili kad ga sakriješ)
+function setupSteps(c) {
+  const s = settings.load();
+  if (s.setup_hide) return null;
+  const me = c.auth.admin || c.auth.me;
+  const steps = [
+    { k: 'https', label: 'HTTPS adresa panela', hint: 'Postavke → Općenito → Adresa panela', href: 'postavke', done: /^https:\/\//.test(s.panel_url || '') },
+    { k: 'server', label: 'Bar jedan server online', hint: 'Serveri → Dodaj server', href: 'serveri', done: !!one("SELECT id FROM servers WHERE enabled = 1 AND last_seen > ?", now() - 300000) },
+    { k: 'plans', label: 'Planovi sa cijenama', hint: 'Planovi → bar jedan plaćeni plan', href: 'planovi', done: !!one('SELECT id FROM plans WHERE active = 1 AND trial = 0 AND price > 0') },
+    { k: 'pay', label: 'Način plaćanja', hint: 'Postavke → Plaćanja (USDT, IBAN, PayPal ili Stripe)', href: 'postavke', done: !!((s.stripe_on && s.stripe_secret) || s.pay_usdt || s.pay_iban || s.pay_paypal) },
+    { k: 'support', label: 'Kontakt podrške za kupce', hint: 'Postavke → Pretplata i aplikacije', href: 'postavke', done: !!s.support_contact },
+    { k: 'tg', label: 'Telegram obavještenja', hint: 'Postavke → Obavještenja', href: 'postavke', done: !!s.tg_token },
+    { k: 'trial', label: 'Probni nalog u aplikaciji', hint: 'Postavke → Veltrix aplikacija', href: 'postavke', done: !!s.app_trial },
+    { k: '2fa', label: 'Dvostruka zaštita prijave (2FA)', hint: 'Moj profil → 2FA', href: 'profil', done: !!me?.totp_on },
+    { k: 'user', label: 'Prvi kupac', hint: 'Korisnici → Novi korisnik', href: 'korisnici', done: !!one('SELECT id FROM users LIMIT 1') },
+  ];
+  return steps.every((x) => x.done) ? null : steps;
+}
+
 // početak dana (lokalno vrijeme servera) prije `back` dana
 function dayStart(t, back) { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - back); return d.getTime(); }
 
@@ -205,7 +224,7 @@ route('GET', 'dash', 'dash', (c) => {
     counts, weekNew, revMonth: core.round2(revMonth), revPrev: core.round2(revPrev),
     online: servers.filter((s) => s.status === 'online').length, serversTotal: servers.filter((s) => s.enabled).length,
     connected: servers.reduce((s, x) => s + (x.status === 'online' ? x.online : 0), 0),
-    servers, series, days, flows: require('./nodes').liveFlows(),
+    servers, series, days, flows: require('./nodes').liveFlows(), setup: setupSteps(c),
     countries: countries.slice(0, 8).map((r) => ({ cc: r.cc, n: r.n, pct: ctotal ? Math.round(r.n / ctotal * 100) : 0 })),
     revToday: core.round2(sum(dayStart(t, 0), t + 1)), revYesterday: core.round2(sum(dayStart(t, 1), dayStart(t, 0))),
     protocols: { vless: !!settings.get('proto_vless'), ss: !!settings.get('proto_ss'), wg: !!settings.get('proto_wg') },
@@ -298,6 +317,11 @@ route('GET', 'coupons', 'plans', () => coupons.listAll());
 route('POST', 'coupons', 'plans', (c) => coupons.create(c.body, c.auth.me.username));
 route('PUT', 'coupons/:id', 'plans', (c) => coupons.update(c.params.id, c.body, c.auth.me.username));
 route('DELETE', 'coupons/:id', 'plans', (c) => coupons.remove(c.params.id, c.auth.me.username));
+
+// ============================== uvoz kupaca iz drugih panela ==============================
+const importer = require('./importer');
+route('POST', 'import/preview', 'users', async (c) => importer.preview(await readBody(c.req, 64 << 20, true)));
+route('POST', 'import/commit', 'users', (c) => importer.commit(c.body.token, c.body, c.auth.me.username));
 
 // ============================== korpa ==============================
 route('GET', 'trash', 'users', (c) => {
@@ -1030,6 +1054,6 @@ async function handle(c, sub) {
   fail(404, 'Nepoznata akcija.');
 }
 // rawBody za restore (zadnji argument route)
-for (const r of routes) if (r.fn.length === 1 && r.re.source.includes('restore')) r.rawBody = true;
+for (const r of routes) if (r.fn.length === 1 && (r.re.source.includes('backups\\/restore') || r.re.source.includes('import\\/preview'))) r.rawBody = true;
 
 module.exports = { handle, serverView, VERSION };

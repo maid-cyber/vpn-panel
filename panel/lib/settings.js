@@ -14,6 +14,7 @@ const SCHEMA = [
     { key: 'timezone', type: 'select', label: 'Vremenska zona', options: ['Europe/Sarajevo', 'Europe/Berlin', 'Europe/Vienna', 'Europe/London', 'America/New_York', 'UTC'], def: 'Europe/Sarajevo' },
     { key: 'currency', type: 'select', label: 'Valuta', options: ['EUR', 'USD', 'BAM', 'CHF'], def: 'EUR' },
     { key: 'theme', type: 'chips', label: 'Tema panela', options: ['tamna', 'svijetla'], def: 'tamna' },
+    { key: 'setup_hide', type: 'toggle', label: 'Sakrij "Prvi koraci" na dashboardu', def: false },
   ] },
   { id: 'sigurnost', title: 'Sigurnost i pristup', desc: 'Ko može ući u panel i kako.', rows: [
     { key: 'admin_path', type: 'text', label: 'Tajna putanja panela', sub: 'Panel se otvara samo na ovoj putanji, sve ostalo vraća 404. Poslije promjene otvori novu adresu.', def: '', mono: true },

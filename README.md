@@ -302,6 +302,11 @@ OVH klasični "VPS" se ne može naručiti preko API-ja (ide kroz korpu i plaćan
 - **Prodaja → Kuponi i akcije**: kodovi za popust u % ili iznosu, sa gratis danima, rokom, brojem korištenja i ograničenjem na planove. Kupac ih upisuje na sajtu i kod produženja na svojoj stranici. Polje za kod se pojavi samo dok postoji aktivan kupon.
 - **Korisnici → Korpa**: obrisani kupci (i oni koje panel sam obriše jer su dugo istekli) čuvaju se 30 dana i vraćaju jednim klikom sa istim linkom, ključem, danima i historijom.
 
+## 22. Prvi koraci i uvoz kupaca iz drugih panela
+
+- **Dashboard → Prvi koraci prije prodaje**: lista sa kvačicama (HTTPS, server online, planovi, način plaćanja, kontakt podrške, Telegram, probni nalog, 2FA, prvi kupac). Klik vodi na mjesto gdje se to podešava. Nestane kad je sve gotovo ili klikom na "Sakrij" (vraća se u Postavke → Općenito).
+- **Korisnici → Uvoz**: kupci iz **3x-ui / x-ui** (x-ui.db), **Marzbana** (db.sqlite3), **Hiddify Managera** (backup .json) ili bilo kojeg panela preko **CSV-a** (`korisnik;uuid;ističe;GB;bilješka`). Prvo vidiš pregled, pa biraš plan, vlasnika (ti ili reseller) i da li uvoziš samo aktivne. Kupci zadržavaju UUID, datum isteka, limit i potrošen promet; postojeći (isto ime ili UUID) se preskaču. Novi link im pošalji preko "Poruka svima".
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

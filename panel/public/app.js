@@ -568,6 +568,9 @@
         ${can('users') ? `<button class="btn red" data-a="newUser">${ic('plus')}<span>Novi korisnik</span></button>` : ''}
       </header>
 
+      ${d.setup && can('settings') ? `<section class="card p setup" id="setupCard"><div class="ch"><h2>${ic('check')}Prvi koraci prije prodaje</h2><span style="display:flex;gap:10px;align-items:center"><b class="setup-n">${d.setup.filter((x) => x.done).length} / ${d.setup.length}</b><button class="btn sm" data-a="setupHide">Sakrij</button></span></div>
+        <div class="setup-bar"><i style="width:${(d.setup.filter((x) => x.done).length / d.setup.length * 100).toFixed(0)}%"></i></div>
+        <div class="setup-l">${d.setup.map((x) => `<a class="setup-i ${x.done ? 'done' : ''}" href="#/${x.href}"><span class="setup-c">${x.done ? ic('check') : ''}</span><span><b>${esc(x.label)}</b>${x.done ? '' : `<small>${esc(x.hint)}</small>`}</span></a>`).join('')}</div></section>` : ''}
       <section class="kpis">
         ${kpi('#3ddc84', 'users', 'Aktivni korisnici', active, `+${todayNew} danas`, 'ok', d.series.map((x) => x.users))}
         ${kpi('#a855f7', 'clock', 'Ističu uskoro', d.counts.expiring, d.counts.expiring ? '<a href="#/korisnici?status=expiring">Pogledaj listu →</a>' : 'nema', 'warn', null, 'users')}
@@ -704,6 +707,7 @@
       ${top(isRes() ? 'Moji korisnici' : 'Korisnici', `${d.counts.all} korisnika`, `
         ${!isRes() ? `<button class="btn hide-m" data-a="bulk" ${S.sel.size ? '' : 'disabled'}>Masovne akcije${S.sel.size ? ` (${S.sel.size})` : ''}</button>
         <a class="btn hide-m" href="api/users.csv">${ic('down')}Izvoz CSV</a>
+        <button class="btn hide-m" data-a="importUsers">${ic('plus')}Uvoz</button>
         <button class="btn hide-m" data-a="broadcast">${ic('send')}Poruka svima</button>` : ''}
         <button class="btn red" data-a="newUser">${ic('plus')}<span>Novi korisnik</span></button>`)}
       <div class="chips">${chips.map(([k, l, n]) => `<button type="button" class="chip ${q.status === k ? 'on' : ''}" data-a="uStatus" data-k="${k}">${l}<span>${n}</span></button>`).join('')}</div>
@@ -877,6 +881,43 @@
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
     (d) => PUT(R('users/' + id), { note: d.note, contact: d.contact, email: d.email }));
     if (ok) refreshUser();
+  }
+  // ---------- uvoz kupaca iz drugih panela
+  document.addEventListener('change', (e) => { if (e.target.id === 'impFile') { const f = e.target.files[0]; $('#modal').close(); setTimeout(() => importPreview(f).catch(fail), 50); } });
+  document.addEventListener('dragover', (e) => { if (e.target.closest?.('#impDrop')) { e.preventDefault(); e.target.closest('#impDrop').classList.add('over'); } });
+  document.addEventListener('drop', (e) => { const z = e.target.closest?.('#impDrop'); if (!z) return; e.preventDefault(); const f = e.dataTransfer.files[0]; $('#modal').close(); setTimeout(() => importPreview(f).catch(fail), 50); });
+  async function importUsers() {
+    const r = await modal(`<h2>Uvoz kupaca iz drugog panela</h2>
+      <p class="muted" style="margin:0">Podržani fajlovi:</p>
+      <div class="impsrc"><span><b>3x-ui / x-ui</b><small>x-ui.db (Backup → Export DB)</small></span><span><b>Marzban</b><small>db.sqlite3</small></span><span><b>Hiddify Manager</b><small>backup .json</small></span><span><b>Bilo koji panel</b><small>CSV: korisnik;uuid;ističe;GB</small></span></div>
+      <label class="dropzone" id="impDrop">${ic('down')}<b>Izaberi fajl</b><small>ili ga prevuci ovdje</small><input type="file" id="impFile" hidden></label>
+      <div class="err" id="impErr" style="color:var(--bad);font-size:13px"></div>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button></div>`);
+    void r;
+  }
+  async function importPreview(file) {
+    if (!file) return;
+    if (file.size > 60 * 1024 * 1024) return toast('Fajl je prevelik (najviše 60 MB).', true);
+    let p;
+    try {
+      toast('Čitam fajl…');
+      const res = await fetch('api/import/preview', { method: 'POST', headers: { 'x-requested-with': 'panel' }, body: file, credentials: 'same-origin' });
+      p = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(p.error || 'Greška ' + res.status);
+    } catch (e) { const el = $('#impErr'); if (el) el.textContent = e.message; else fail(e); return; }
+    const [plans, resellers] = await Promise.all([GET('plans').catch(() => []), can('resellers') ? GET('resellers').catch(() => []) : Promise.resolve([])]);
+    const r = await formLoop(`<h2>Uvoz iz ${esc(p.source)}</h2>
+      <div class="mini-grid"><div class="mini"><small>Pronađeno kupaca</small><b>${p.total}</b></div><div class="mini"><small>Aktivni</small><b class="ok">${p.active}</b></div>
+        <div class="mini"><small>Istekli</small><b>${p.expired}</b></div><div class="mini"><small>Već postoje (preskačem)</small><b class="${p.taken ? 'warn' : ''}">${p.taken}</b></div></div>
+      <div class="impsample">${p.sample.map((u) => `<span><b>${esc(u.username)}</b><small>${u.expires ? fmtDate(u.expires) : 'bez isteka'} · ${u.limit ? bytes(u.limit) : '∞'}${u.disabled ? ' · ugašen' : ''}</small></span>`).join('')}${p.total > p.sample.length ? `<span class="dim">… i još ${p.total - p.sample.length}</span>` : ''}</div>
+      <div class="row2"><label class="field">Plan za uvezene kupce<select class="input" name="plan_id"><option value="">Bez plana</option>${plans.filter((x) => x.active).map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></label>
+        <label class="field">Vlasnik<select class="input" name="owner_id"><option value="">Moji kupci</option>${resellers.map((x) => `<option value="${x.id}">reseller · ${esc(x.username)}</option>`).join('')}</select></label></div>
+      <label class="field">Kupci bez datuma isteka dobiju (dana)<input class="input" name="no_expiry_days" value="30" inputmode="numeric"></label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="only_active" checked>Uvezi samo aktivne (bez isteklih i ugašenih)</label>
+      <div class="banner soft">${ic('send')}<span style="flex:1;min-width:0">Kupci zadržavaju UUID, datum isteka, limit i potrošen promet. Novi link dobijaju od ovog panela (drugi serveri i ključevi), pa im ga pošalji preko "Poruka svima" ili pojedinačno.</span></div>
+      <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">${ic('plus')}Uvezi kupce</button></div>`,
+    (d) => POST('import/commit', { token: p.token, plan_id: d.plan_id || null, owner_id: d.owner_id || null, no_expiry_days: Number(d.no_expiry_days), only_active: d.only_active }));
+    if (r) { toast(`Uvezeno ${r.added} kupaca${r.skipped ? `, preskočeno ${r.skipped}` : ''}.`); if (location.hash.startsWith('#/korisnici')) pageUsers(new URLSearchParams()); }
   }
   async function userAction(id, act) {
     const u = S.lastUser;
@@ -2023,6 +2064,8 @@
     newServer: () => newServerPick().catch(fail),
     cloudNewIp: (d) => cloudNewIp(d.id).catch(fail),
     anDays: (d) => pageAnalytics(Number(d.n)).catch(fail),
+    importUsers: () => importUsers().catch(fail),
+    setupHide: async () => { try { await PUT('settings', { setup_hide: true }); const el = $('#setupCard'); if (el) el.remove(); toast('Sakriveno. Vraćaš ga u Postavke → Općenito.'); } catch (e) { fail(e); } },
     editCoupon: (d) => editCoupon(d.id).catch(fail),
     trashRestore: (d) => trashRestore(d.id).catch(fail),
     trashDel: (d) => trashDel(d.id).catch(fail),
