@@ -1718,12 +1718,15 @@
       <label class="field">Njegov brend (opcionalno, za white-label)<input class="input" name="brand" value="${esc(r.brand)}"></label>
       ${r.has_logo ? `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="clear_logo">Ukloni logo koji je reseller učitao${r.brand_color ? ` <span class="sw" style="width:16px;height:16px;display:inline-block;background:${esc(r.brand_color)}"></span>` : ''}</label>` : ''}
       <label class="field">Bilješka<input class="input" name="note" value="${esc(r.note)}"></label>
+      ${!id && S.me.mail_on ? `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="send_mail" checked>Pošalji mu pristup na e-mail (link panela, nivo, cijene, prvi koraci)</label>
+      <label style="display:flex;gap:8px;align-items:center;margin-left:26px"><input type="checkbox" class="cb" name="mail_password">Upiši i šifru u e-mail</label>` : ''}
       <div class="dlg-actions">${id ? '<button class="btn danger" value="delete" formnovalidate>Obriši</button>' : ''}<span style="flex:1"></span><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
     async (d) => {
       if (d._btn === 'delete') { if (!confirm('Obrisati resellera?')) throw new Error('Odustao si.'); return DEL('resellers/' + id); }
       const body = { level_id: d.level_id ? Number(d.level_id) : null, user_limit: Number(d.user_limit), contact: d.contact, email: d.email, brand: d.brand, note: d.note, password: d.password || undefined, ...(d.clear_logo ? { brand_logo: '' } : {}) };
       if (id) return PUT('resellers/' + id, body);
-      const out = await POST('resellers', { ...body, username: d.username });
+      const out = await POST('resellers', { ...body, username: d.username, send_mail: !!d.send_mail, mail_password: !!d.mail_password });
+      if (out.mailed) toast(`Pristup poslan na ${d.email}.`);
       return { ...out, _login: { username: d.username, password: d.password } };
     });
     if (!ok) return;

@@ -731,7 +731,11 @@ route('POST', 'resellers', 'resellers', (c) => {
   const r = run(`INSERT INTO admins (username, pass_hash, role, level_id, user_limit, contact, email, brand, note, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
     username, auth.hashPassword(b.password), 'reseller', lvl?.id || null, Number(b.user_limit) || lvl?.max_users || 150, String(b.contact || ''), core.cleanEmail(b.email), String(b.brand || ''), String(b.note || ''), now());
   log(c.auth.me.username, 'Novi reseller', username);
-  return { id: Number(r.lastInsertRowid) };
+  const id = Number(r.lastInsertRowid);
+  const nr = one('SELECT * FROM admins WHERE id = ?', id);
+  const mailed = !!(nr.email && b.send_mail !== false && mail.configured() && settings.get('mail_resellers') !== false);
+  if (mailed) require('./resmail').welcome(nr, b.mail_password ? b.password : '', `${c.proto}://${c.req.headers.host}`);
+  return { id, mailed };
 });
 route('PUT', 'resellers/:id', 'resellers', (c) => {
   const r = one("SELECT * FROM admins WHERE id = ? AND role = 'reseller'", Number(c.params.id));
@@ -753,11 +757,7 @@ route('POST', 'resellers/:id/approve', 'resellers', (c) => {
   if (!r) fail(404, 'Reseller ne postoji.');
   run('UPDATE admins SET pending = 0, disabled = 0 WHERE id = ?', r.id);
   log(c.auth.me.username, 'Reseller odobren', r.username);
-  if (r.email && mail.configured()) {
-    const s = settings.load();
-    const url = `${(s.panel_url || `${c.proto}://${c.req.headers.host}`).replace(/\/+$/, '')}${s.reseller_path}/`;
-    mail.sendMail({ to: r.email, subject: `${s.brand}: nalog odobren`, text: `Zdravo ${r.username}, tvoj reseller nalog je odobren.\nPrijava: ${url}` }).catch(() => {});
-  }
+  if (r.email) require('./resmail').approved(one('SELECT * FROM admins WHERE id = ?', r.id), `${c.proto}://${c.req.headers.host}`);
   return { ok: true };
 });
 route('POST', 'res/stripe', 'res', async (c) => {

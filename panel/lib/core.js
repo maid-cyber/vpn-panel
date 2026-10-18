@@ -52,7 +52,11 @@ function chargeReseller(reseller, plan, userId, what) {
   run('INSERT INTO transactions (ts, type, amount, credit_delta, reseller_id, user_id, actor, note) VALUES (?,?,?,?,?,?,?,?)',
     now(), 'credit_use', 0, -price, reseller.id, userId, reseller.username, `${what} · ${plan.name}`);
   const after = fresh.credit - price;
-  if (after < 10 && fresh.credit >= 10) notify('n_lowcredit', `Reselleru ${reseller.username} ostalo je €${after.toFixed(2)} kredita.`);
+  if (after < 10 && fresh.credit >= 10) {
+    notify('n_lowcredit', `Reselleru ${reseller.username} ostalo je €${after.toFixed(2)} kredita.`);
+    const rr = one('SELECT * FROM admins WHERE id = ?', reseller.id);
+    if (rr?.email) setImmediate(() => require('./resmail').lowCredit(rr));
+  }
   return price;
 }
 
@@ -233,9 +237,8 @@ ${vat ? `<tr><td>PDV ${vat}%</td><td class="r">${cur}${(t.amount - net).toFixed(
 function mailInvoice(txId) {
   const t = one(INVOICE_SELECT, txId);
   if (!t || !t.remail || !settings.get('mail_invoices') || !mail.configured()) return;
-  mail.sendMail({ to: t.remail, subject: `Faktura ${t.invoice_no} · ${settings.get('brand')}`, text: `Hvala na uplati. Kredit: +${t.credit_delta}. Faktura ${t.invoice_no} je u prilogu ove poruke (HTML).`, html: invoiceHtml(t, true) })
-    .then(() => log('sistem', 'Faktura poslana mailom', `${t.invoice_no} → ${t.reseller}`))
-    .catch((e) => log('sistem', 'Faktura nije poslana mailom', e.message, 'warn'));
+  // lijep e-mail u izgledu panela (iznos, novo stanje kredita, stavke fakture)
+  require('./resmail').credit(t).then((ok) => { if (ok) log('sistem', 'Faktura poslana mailom', `${t.invoice_no} → ${t.reseller}`); });
 }
 
 function addCredit(actor, resellerId, body) {

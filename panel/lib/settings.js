@@ -118,6 +118,7 @@ const SCHEMA = [
     { key: 'smtp_from', type: 'text', label: 'E-mail: pošiljalac', sub: 'npr. Veltrix VPN <info@tvojadomena.com>', def: '' },
     { key: 'mail_welcome', type: 'toggle', label: 'Kupcu automatski pošalji pristup na e-mail', sub: 'Kad napraviš kupca sa e-mailom (ti ili reseller): link, plan, datum isteka i 3 koraka za spajanje', def: true },
     { key: 'mail_newlink', type: 'toggle', label: 'Pošalji kupcu e-mail kad mu daš novi link', def: true },
+    { key: 'mail_resellers', type: 'toggle', label: 'E-mailovi resellerima', sub: 'Pristup kad napraviš reseller nalog, nalog odobren, faktura za dopunu kredita i upozorenje kad padne ispod €10', def: true },
   ] },
   { id: 'pretplata', title: 'Pretplata i aplikacije', desc: 'Šta kupac vidi u aplikaciji i na svojoj stranici.', rows: [
     { key: 'sub_name', type: 'text', label: 'Ime profila u aplikaciji', sub: 'Prazno = ime brenda', def: '' },

@@ -342,3 +342,14 @@ Aplikacije se same ažuriraju preko panela (`/app/config` i `/download/…`), pa
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.
 - **Panel na engleskom:** još ne postoji.
 - **iPhone aplikacija:** treba Apple Developer nalog. Do tada iPhone kupci koriste Hiddify ili Streisand.
+
+## 26. E-mailovi resellerima
+
+Reselleri dobijaju e-mailove u istom tamnom Veltrix izgledu kao kupci:
+
+- **Novi reseller**: link panela, korisničko ime, nivo, popust, kredit, cijene sa popustom i 3 koraka za početak. Šifra ide u e-mail samo ako u formi označiš "Upiši i šifru u e-mail".
+- **Nalog odobren**: kad odobriš resellera koji se sam registrovao.
+- **Faktura**: nakon svake dopune kredita (iznos, novo stanje, PDV ako je uključen).
+- **Malo kredita**: kad kredit padne ispod €10.
+
+Uključuješ i isključuješ u **Postavke → Obavještenja → E-mailovi resellerima**. Treba podešen SMTP (sekcija 22).
