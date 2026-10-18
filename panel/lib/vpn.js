@@ -49,9 +49,16 @@ function serverAllowed(plan, serverId) {
   const l = planServers(plan);
   return !l.length || l.includes(serverId);
 }
+// Dedicated IP: server vide i koriste samo kupci kojima je dodijeljen (plan tu ne odlučuje)
+const dedicatedIds = (sv) => String(sv?.dedicated_to || '').split(',').map(Number).filter(Boolean);
+const isDedicated = (sv) => String(sv?.tags || '').split(',').includes('dedicated');
+function userCanUse(u, plan, sv) {
+  if (isDedicated(sv)) return dedicatedIds(sv).includes(u.id);
+  return serverAllowed(plan, sv.id);
+}
 
 // ---------- oznake servera i lanci (Double VPN / Multihop) ----------
-const TAGS = ['p2p', 'streaming', 'gaming', 'special'];
+const TAGS = ['p2p', 'streaming', 'gaming', 'static', 'dedicated', 'obfuscated', 'special'];
 const serverTags = (sv) => String(sv?.tags || '').split(',').map((x) => x.trim()).filter((x) => TAGS.includes(x));
 // UUID "prenosnika" između servera u lancu: izveden iz tajne lanca, isti na svim serverima
 function relayUuid(chain) {
@@ -83,7 +90,7 @@ function nodeConfig(server) {
   const plans = Object.fromEntries(all('SELECT * FROM plans').map((p) => [p.id, p]));
   const t = now();
   const users = all('SELECT id, uuid, wg_pub, disabled, blocked_until, expires_at, traffic_limit, traffic_up, traffic_down, plan_id FROM users')
-    .filter((u) => CAN_CONNECT.has(userStatus(u, t)) && serverAllowed(plans[u.plan_id], server.id));
+    .filter((u) => CAN_CONNECT.has(userStatus(u, t)) && userCanUse(u, plans[u.plan_id], server));
   const s = settings.load();
 
   let xray = null;
@@ -152,7 +159,7 @@ function addChains(xray, server, users, plans) {
     }
     const exit = hops[hops.length - 1], next = hops[i + 1];
     const clients = i === 0
-      ? users.filter((u) => serverAllowed(plans[u.plan_id], exit.id)).map((u) => ({ id: u.uuid, email: `u${u.id}`, flow: 'xtls-rprx-vision' }))
+      ? users.filter((u) => userCanUse(u, plans[u.plan_id], exit)).map((u) => ({ id: u.uuid, email: `u${u.id}`, flow: 'xtls-rprx-vision' }))
       : [relay];
     const tag = `chain${c.id}`;
     xray.inbounds.push({
@@ -173,14 +180,14 @@ function addChains(xray, server, users, plans) {
 function chainsForUser(u) {
   const plan = u.plan_id ? one('SELECT * FROM plans WHERE id = ?', u.plan_id) : null;
   return all('SELECT * FROM chains WHERE enabled = 1 ORDER BY id').map((c) => ({ c, hops: chainServers(c) }))
-    .filter(({ c, hops }) => chainUsable(c, hops) && serverAllowed(plan, hops[hops.length - 1].id));
+    .filter(({ c, hops }) => chainUsable(c, hops) && userCanUse(u, plan, hops[hops.length - 1]));
 }
 
 // ---------- linkovi za kupca ----------
 function serversForUser(u) {
   const plan = u.plan_id ? one('SELECT * FROM plans WHERE id = ?', u.plan_id) : null;
   const list = all('SELECT * FROM servers WHERE enabled = 1 AND maintenance = 0 ORDER BY country, name')
-    .filter((sv) => serverAllowed(plan, sv.id) && sv.host);
+    .filter((sv) => userCanUse(u, plan, sv) && sv.host);
   const s = settings.load();
   if (!s.sub_smart) return list;
   // skloni servere koji ne rade ili su puni; ako ne ostane nijedan, daj sve
@@ -214,5 +221,5 @@ function subLinks(u) {
 
 module.exports = {
   realityKeys, wgKeys, shortId, uuid, subToken, wgIp, pickSni, userStatus, CAN_CONNECT,
-  nodeConfig, serversForUser, chainsForUser, chainKind, chainHops, chainServers, chainUsable, serverTags, TAGS, relayUuid, vlessLink, ssLink, wgConfig, subLinks, filterDns, planServers, FLAGS, DAY,
+  nodeConfig, serversForUser, chainsForUser, userCanUse, dedicatedIds, isDedicated, chainKind, chainHops, chainServers, chainUsable, serverTags, TAGS, relayUuid, vlessLink, ssLink, wgConfig, subLinks, filterDns, planServers, FLAGS, DAY,
 };

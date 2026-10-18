@@ -151,6 +151,7 @@ function serverView(sv, forReseller) {
     vless_port: sv.vless_port, wg_port: sv.wg_port, ss_port: sv.ss_port, sni: sv.sni, xray_ok: sv.xray_ok, wg_ok: sv.wg_ok,
     xray_version: forReseller ? '' : sv.xray_version, last_error: forReseller ? '' : sv.last_error,
     synced: !!sv.applied_hash, tags: vpn.serverTags(sv),
+    dedicated: forReseller ? [] : vpn.dedicatedIds(sv).map((id) => one('SELECT id, username FROM users WHERE id = ?', id)).filter(Boolean),
     cloud: forReseller ? null : sv.cloud || null, cloud_job: forReseller || !sv.cloud ? null : require('./cloud').jobOf(sv.id),
   };
 }
@@ -559,6 +560,12 @@ route('PUT', 'servers/:id', 'servers', (c) => {
   const b = c.body;
   run(`UPDATE servers SET ss_port = ? WHERE id = ?`, Number(b.ss_port ?? sv.ss_port) || 8388, sv.id);
   if (b.tags !== undefined) run('UPDATE servers SET tags = ? WHERE id = ?', (Array.isArray(b.tags) ? b.tags : String(b.tags).split(',')).filter((x) => vpn.TAGS.includes(x)).join(','), sv.id);
+  if (b.dedicated_users !== undefined) {
+    // korisnička imena (zarezom) -> ID-jevi kupaca koji imaju ovaj server kao Dedicated IP
+    const names = String(b.dedicated_users).split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+    const ids = names.map((n) => { const u = one('SELECT id FROM users WHERE username = ?', n); if (!u) fail(400, `Kupac "${n}" ne postoji.`); return u.id; });
+    run('UPDATE servers SET dedicated_to = ? WHERE id = ?', [...new Set(ids)].join(','), sv.id);
+  }
   run(`UPDATE servers SET name=?, city=?, country=?, host=?, capacity=?, provider=?, cost=?, vless_port=?, wg_port=?, sni=?, lat=?, lon=? WHERE id = ?`,
     String(b.name ?? sv.name), String(b.city ?? sv.city), String(b.country ?? sv.country).toUpperCase().slice(0, 2), String(b.host ?? sv.host).trim(),
     Number(b.capacity ?? sv.capacity), String(b.provider ?? sv.provider), Number(b.cost ?? sv.cost), Number(b.vless_port ?? sv.vless_port),

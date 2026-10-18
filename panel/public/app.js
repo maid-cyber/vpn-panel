@@ -1369,7 +1369,7 @@
       <section class="card p srvhead">
         <span class="srvflag big">${s.country ? flag(s.country) : ic('server')}<i class="dot s-${s.warn ? 'warn' : s.status}"></i></span>
         <div class="srvhead-t"><span data-live-srv="${s.id}">${srvStatus(s)}</span>
-          <div class="chips">${(s.tags || []).map((x) => `<span class="tag t-info">${esc(TAG_LABEL[x] || x)}</span>`).join('')}${s.xray_ok ? '<span class="pchip ok"><i></i>VLESS Reality</span>' : ''}${s.wg_ok ? '<span class="pchip ok"><i></i>WireGuard</span>' : ''}<span class="tag t-grey">agent ${esc(s.version || '—')}</span>${s.xray_version ? `<span class="tag t-grey">Xray ${esc(s.xray_version)}</span>` : ''}</div></div>
+          <div class="chips">${(s.tags || []).map((x) => tagChip(s, x)).join('')}${s.xray_ok ? '<span class="pchip ok"><i></i>VLESS Reality</span>' : ''}${s.wg_ok ? '<span class="pchip ok"><i></i>WireGuard</span>' : ''}<span class="tag t-grey">agent ${esc(s.version || '—')}</span>${s.xray_version ? `<span class="tag t-grey">Xray ${esc(s.xray_version)}</span>` : ''}</div></div>
         <div class="srvcmds">${Object.entries(CMD_BTN).map(([k, [icn, l, , cls]]) => `<button class="btn sm ${cls}" data-a="srvCmd" data-id="${s.id}" data-cmd="${k}" ${s.status !== 'online' && k !== 'update_agent' ? 'disabled' : ''}>${ic(icn)}${l}</button>`).join('')}
           <button class="btn sm" data-a="editServer" data-id="${s.id}">${ic('edit')}Uredi</button><button class="btn sm warnb" data-a="srvAct" data-act="maintenance" data-id="${s.id}" data-back="1">${s.maintenance ? 'Završi održavanje' : 'Održavanje'}</button></div>
       </section>
@@ -1451,7 +1451,7 @@
         <span data-live-srv="${s.id}">${srvStatus(s)}</span>
       </header>
       ${s.host ? `<button class="iprow" data-a="copy" data-v="${esc(s.host)}" title="Kopiraj IP adresu"><span class="mono">${esc(s.host)}</span>${ic('copy')}</button>` : ''}
-      <div class="chips">${(s.tags || []).map((t) => `<span class="tag t-info">${esc(TAG_LABEL[t] || t)}</span>`).join('')}${s.xray_ok ? proto(true, 'VLESS Reality') : ''}${s.wg_ok ? proto(true, 'WireGuard') : ''}${s.status === 'pending' ? `<span class="tag t-warn">${s.cloud ? 'instalira se (par minuta)…' : 'nije instaliran'}</span>` : ''}${s.cloud_job && !s.cloud_job.done ? `<span class="tag t-warn">${esc(s.cloud_job.step)}…</span>` : s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}${s.cloud_job?.done && !s.cloud_job.ok ? `<span class="tag t-bad" title="${esc(s.cloud_job.error || '')}">nova IP nije uspjela</span>` : ''}</div>
+      <div class="chips">${(s.tags || []).map((t) => tagChip(s, t)).join('')}${s.xray_ok ? proto(true, 'VLESS Reality') : ''}${s.wg_ok ? proto(true, 'WireGuard') : ''}${s.status === 'pending' ? `<span class="tag t-warn">${s.cloud ? 'instalira se (par minuta)…' : 'nije instaliran'}</span>` : ''}${s.cloud_job && !s.cloud_job.done ? `<span class="tag t-warn">${esc(s.cloud_job.step)}…</span>` : s.maintenance ? '<span class="tag t-warn">održavanje</span>' : ''}${s.cloud_job?.done && !s.cloud_job.ok ? `<span class="tag t-bad" title="${esc(s.cloud_job.error || '')}">nova IP nije uspjela</span>` : ''}</div>
       <div class="srv-m">${m('CPU', live ? s.cpu : null)}${m('RAM', live ? s.ram : null)}${m('Spojeno', fill, `${s.online}<small>/${s.capacity}</small>`)}</div>
       <div class="srv-f"><span>${ic('down')}${bytes(s.traffic_month)} <small>ovaj mjesec</small></span><span class="dim">${s.last_seen ? 'javio se ' + ago(s.last_seen) : 'nije se javio'}</span></div>
       <div class="srv-a">
@@ -1461,7 +1461,8 @@
         <button class="btn sm icon" data-a="srvMore" data-id="${s.id}" aria-label="Više">${ic('more')}</button>
       </div></article>`;
   }
-  const TAG_LABEL = { p2p: 'P2P / Torrent', streaming: 'Streaming', gaming: 'Gaming', special: 'Specijalni' };
+  const TAG_LABEL = { p2p: 'P2P / Torrent', streaming: 'Streaming', gaming: 'Gaming', static: 'Statička IP', dedicated: 'Dedicated IP', obfuscated: 'Zaštita od blokada', special: 'Specijalni' };
+  const tagChip = (s, x) => `<span class="tag t-info">${esc(TAG_LABEL[x] || x)}${x === 'dedicated' && s.dedicated?.length ? ' · ' + esc(s.dedicated.map((u) => u.username).join(', ')) : ''}</span>`;
   // ---------- Double VPN / Multihop
   function chainsHtml(chains, servers) {
     const flagName = (h) => { const sv = servers.find((x) => x.id === h); return sv ? `<span class="tag t-grey hop">${sv.country ? flag(sv.country) : ""} ${esc(sv.name)}</span>` : '<span class="tag t-bad">obrisan</span>'; };
@@ -1584,6 +1585,7 @@
       <div class="dlg-actions"><button class="btn" type="button" data-a="copy" data-v="${esc(cmd)}">${ic('copy')}Kopiraj komandu</button><button class="btn red" value="cancel">Gotovo</button></div>`);
     if (r) r.close();
   }
+  document.addEventListener('change', (e) => { if (e.target?.name === 'tag_dedicated') { const f = document.getElementById('dedField'); if (f) f.style.display = e.target.checked ? '' : 'none'; } });
   async function editServer(id) {
     const s = S.servers.find((x) => x.id === Number(id)) || (await GET('servers')).find((x) => x.id === Number(id));
     const r = await formLoop(`<h2>Uredi · ${esc(s.name)}</h2>
@@ -1594,7 +1596,9 @@
       <div class="row2"><label class="field">VLESS port<input class="input" name="vless_port" value="${s.vless_port}"></label><label class="field">WireGuard port<input class="input" name="wg_port" value="${s.wg_port}"></label></div>
       <label class="field">Shadowsocks port<input class="input" name="ss_port" value="${s.ss_port || 8388}"></label>
       <div class="field">Oznake (kupac ih vidi kao kategorije u aplikaciji)<div class="chips">${Object.entries(TAG_LABEL).map(([k, l]) => `<label class="chip"><input type="checkbox" name="tag_${k}" ${(s.tags || []).includes(k) ? 'checked' : ''} style="accent-color:var(--acc)">${l}</label>`).join('')}</div>
-        <small class="dim">P2P: na ovom serveru torrent je dozvoljen čak i kad je "Blokada torrenta" uključena.</small></div>
+        <small class="dim">P2P: torrent je dozvoljen i kad je "Blokada torrenta" uključena. Statička IP: adresa servera se ne mijenja. Zaštita od blokada: za zemlje i mreže koje blokiraju VPN.</small></div>
+      <label class="field" id="dedField" style="${(s.tags || []).includes('dedicated') ? '' : 'display:none'}">Dedicated IP: kupci koji dobijaju ovaj server (korisnička imena, zarezom)<input class="input" name="dedicated_users" value="${esc((s.dedicated || []).map((u) => u.username).join(', '))}" placeholder="npr. emir_k">
+        <small class="dim">Server i njegovu IP adresu vide i koriste samo ovi kupci, niko drugi. Plan kupca tu ne odlučuje.</small></label>
       <p class="dim" style="margin:0;font-size:12.5px">Promjena porta ili SNI-ja mijenja linkove kupaca: aplikacije ih same osvježe preko pretplate.</p>
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Spremi</button></div>`,
     (d) => PUT('servers/' + id, { ...d, tags: Object.keys(TAG_LABEL).filter((k) => d['tag_' + k]), capacity: Number(d.capacity), cost: Number(String(d.cost).replace(',', '.')), vless_port: Number(d.vless_port), wg_port: Number(d.wg_port), ss_port: Number(d.ss_port) }));

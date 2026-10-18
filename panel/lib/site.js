@@ -44,7 +44,8 @@ function siteData(d) {
   const s = settings.load();
   const plans = all('SELECT id, name, days, price, traffic_gb, devices FROM plans WHERE active = 1 AND trial = 0 AND price > 0 ORDER BY sort, id');
   const off = Number(s.offline_sec || 45) * 1000, t = now();
-  const servers = all("SELECT country, city, name, last_seen, maintenance FROM servers WHERE enabled = 1 AND host != '' AND country != ''");
+  const servers = all("SELECT country, city, name, last_seen, maintenance, tags FROM servers WHERE enabled = 1 AND host != '' AND country != ''")
+    .filter((sv) => !String(sv.tags || '').split(',').includes('dedicated'));
   const byCountry = new Map();
   for (const sv of servers) {
     const cc = String(sv.country || '').toUpperCase() || '—';
