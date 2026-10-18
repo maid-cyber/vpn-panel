@@ -60,7 +60,8 @@ function siteData(d) {
     countries: [...byCountry.values()].map((c) => ({ cc: c.cc, cities: [...c.cities], online: c.online })),
     servers: servers.length, protocols: { vless: !!s.proto_vless, ss: !!s.proto_ss, wg: !!s.proto_wg },
     blocks: { ads: !!s.block_ads, malware: !!s.block_malware },
-    apk: d.apk, exe: d.exe, releases: d.page,
+    // preuzimanje ide sa tvoje adrese (panel skine sa GitHuba i čuva kod sebe)
+    apk: d.apk ? '/download/android' : '', exe: d.exe ? '/download/windows' : '', releases: d.page,
     coupons: !!one('SELECT id FROM coupons WHERE active = 1 AND (expires_at = 0 OR expires_at > ?) AND (max_uses = 0 OR used < max_uses) LIMIT 1', now()),
   };
 }

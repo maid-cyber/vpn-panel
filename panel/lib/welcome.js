@@ -23,14 +23,16 @@ function build(u, kind, baseOverride = '') {
   const until = new Date(u.expires_at).toLocaleDateString('bs-BA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: tz });
   const apps = String(s.apps || '').split(',');
   const veltrix = apps.includes('veltrix') && !wl;
-  const dl = veltrix ? `https://github.com/${s.app_repo || 'maid-cyber/veltrix-app'}/releases` : '';
+  // aplikacije se skidaju sa tvoje adrese (/download/…), ne sa GitHuba
+  const dl = veltrix ? `${base}/download/android` : '';
+  const dlWin = veltrix ? `${base}/download/windows` : '';
 
   const head = { new: 'Tvoj VPN je spreman ✅', newlink: 'Tvoj novi pristupni link', buy: 'Hvala na kupovini! Tvoj VPN je spreman ✅' }[kind] || 'Tvoj VPN pristup';
   const intro = kind === 'newlink'
     ? 'Napravili smo ti novi pristupni link. Stari više ne radi, pa ovaj novi uvezi u aplikaciju.'
     : 'Ispod je tvoj lični pristupni link. Ne dijeli ga ni sa kim: s njim se bilo ko može spojiti na tvoj nalog.';
   const subject = { new: `${brand} · tvoj pristup`, newlink: `${brand} · novi pristupni link`, buy: `${brand} · tvoj pristup` }[kind] || `${brand} · pristup`;
-  const appLine = veltrix ? `${brand} aplikacija (Android i Windows): ${dl}\nZa iPhone: Hiddify ili Streisand iz App Storea.` : 'Aplikacija: Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.';
+  const appLine = veltrix ? `${brand} za Android: ${dl}\n${brand} za Windows: ${dlWin}\nZa iPhone: Hiddify ili Streisand iz App Storea.` : 'Aplikacija: Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.';
 
   const text = `${head}
 
@@ -92,20 +94,24 @@ a { color:inherit; }
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${bg(CARD2)};border:1px solid ${LINE};border-radius:14px;margin-bottom:26px"><tr>
       ${stat('Plan', esc(plan?.name || '—'))}${stat('Vrijedi do', esc(until.replace(/\s\d{4}\.?$/, '')))}${stat('Uređaja', devices || '—')}
     </tr><tr><td colspan="3" style="border-top:1px solid ${LINE};padding:11px 14px;text-align:center;${F};font-size:13px">${t(`<span style="color:${MUTED}">Korisnik</span>&nbsp; <b style="color:${TXT}">${esc(u.username)}</b>`)}</td></tr></table>
-    <div style="text-align:center;margin:0 0 12px">${btn(link, 'Otvori moj nalog i spoji se', true)}</div>
-    ${t(`<div style="text-align:center;${F};font-size:12px;line-height:1.5;color:${MUTED};word-break:break-all;margin:0 0 26px">${esc(link)}</div>`)}
+    <div style="text-align:center;margin:0 0 12px">${btn(link + '?open=1', 'Otvori u aplikaciji i spoji se', true)}</div>
+    ${t(`<div style="text-align:center;${F};font-size:12px;line-height:1.5;color:${MUTED};margin:0 0 22px">Na telefonu: dugme otvori aplikaciju i sve podesi samo.</div>`)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${bg(CARD2)};border:1px solid ${LINE};border-radius:14px;margin:0 0 26px"><tr>
+      <td width="132" style="padding:14px"><img src="${esc(link)}/qr.png" width="116" height="116" alt="QR kod" style="display:block;border:0;border-radius:8px;width:116px;height:116px"></td>
+      <td style="padding:14px 16px 14px 4px;${F};font-size:14px;line-height:1.5;vertical-align:middle">${t(`<b style="color:${TXT}">Čitaš ovo na računaru?</b><br><span style="color:${SOFT}">Otvori aplikaciju na telefonu, klikni <b style="color:${TXT}">Skeniraj QR kod</b> i usmjeri kameru na ovaj kod.</span>`)}</td>
+    </tr></table>
     <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 26px"><tr>
       ${badge('🔒 Bez logova')}${s.proto_vless ? badge('⚡ VLESS Reality') : ''}${countries ? badge(`🌍 ${countries} ${countries === 1 ? 'zemlja' : countries < 5 ? 'zemlje' : 'zemalja'}`) : ''}
     </tr></table>
     ${t(`<div style="${F};font-weight:700;font-size:15px;color:${TXT};margin:0 0 16px">Kako se spojiti</div>`)}
     <table role="presentation" cellpadding="0" cellspacing="0">
-      ${step(1, 'Instaliraj aplikaciju', veltrix ? `${esc(brand)} za Android i Windows (dugmad ispod). Za iPhone: Hiddify ili Streisand iz App Storea.` : 'Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.')}
-      ${step(2, 'Otvori svoj nalog', 'Klikni crveno dugme iznad na telefonu ili računaru. Tamo su QR kod i dugme koje sve podesi samo.')}
-      ${step(3, 'Klikni Spoji se', 'I to je to. Lokaciju mijenjaš kad hoćeš.')}
+      ${step(1, 'Instaliraj aplikaciju', veltrix ? `${esc(brand)} za Android ili Windows (dugmad ispod). Za iPhone: Hiddify iz App Storea.` : 'Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.')}
+      ${step(2, 'Klikni crveno dugme iznad', 'Otvori se aplikacija i sama uveze tvoj nalog. Na računaru možeš skenirati QR kod telefonom.')}
+      ${step(3, 'Dozvoli VPN i spoji se', 'Telefon jednom pita za dozvolu za VPN: klikni OK. Lokaciju mijenjaš kad hoćeš.')}
     </table>
     ${veltrix ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 22px"><tr>
       <td width="50%" style="padding-right:6px">${btn(dl, '🤖 Android', false).replace('display:inline-block', 'display:block;text-align:center')}</td>
-      <td width="50%" style="padding-left:6px">${btn(dl, '🪟 Windows', false).replace('display:inline-block', 'display:block;text-align:center')}</td>
+      <td width="50%" style="padding-left:6px">${btn(dlWin, '🪟 Windows', false).replace('display:inline-block', 'display:block;text-align:center')}</td>
     </tr></table>` : ''}
   </td></tr>
   <tr><td class="px" style="padding:20px 30px 24px;border-top:1px solid ${LINE}">

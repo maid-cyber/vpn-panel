@@ -321,6 +321,12 @@ Meni **Aplikacija i podrška → Dijagnostika** (ili dugme "Dijagnostika: zašto
 
 Na vrhu piše presuda: **Kod nas** (popravi server), **Nalog** (produži, upali) ili **Kod kupca** (njegov provajder, ruter, antivirus, stara aplikacija), i gotova poruka koju kopiraš kupcu.
 
+## 24. Preuzimanje aplikacija i otvaranje jednim klikom
+
+- **/download/android** i **/download/windows**: aplikacije se skidaju sa tvoje adrese, ne sa GitHuba. Panel sam skine zadnju verziju sa GitHub Releases (pri pokretanju i svakih sat vremena) i čuva je u `data/downloads`.
+- E-mail i stranica kupca imaju dugme **Otvori u aplikaciji i spoji se**: na Androidu i Windowsu otvori Veltrix, uveze nalog i spoji se (ako aplikacija nije instalirana, Android ponudi preuzimanje). Na iPhoneu otvori Hiddify.
+- U e-mailu je i **QR kod** (PNG, `/s/TOKEN/qr.png`) za skeniranje telefonom kad kupac čita e-mail na računaru.
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

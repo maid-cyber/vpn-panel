@@ -76,6 +76,7 @@ async function onRequest(req, res) {
       const s0 = settings.load();
       return await require('./lib/growth').trial(req, res, (s0.sub_url || s0.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`).replace(/\/+$/, ''));
     }
+    { const dm = p.match(/^\/download\/(android|windows)(?:\.apk|\.exe)?$/); if (dm && req.method === 'GET') return await require('./lib/downloads').handle(req, res, dm[1]); }
     if (p === '/app/config' && req.method === 'GET') return send(res, 200, sub.appConfig(), { 'cache-control': 'no-store' });
     if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
     // logo za e-mailove (e-mail programi ne prikazuju SVG ni ugrađene slike, treba prava adresa)
@@ -139,3 +140,5 @@ const HOST = process.env.HOST || '127.0.0.1';
 http.createServer(onRequest).listen(PORT, HOST, () => {
   console.log(`Panel radi na http://${HOST}:${PORT}${settings.get('admin_path')}/  (verzija ${api.VERSION})`);
 });
+// aplikacije za /download/* se pripreme unaprijed (skinu sa GitHuba), pa provjera svakih sat vremena
+if (!process.env.VPN_NO_WARM) { setTimeout(() => require('./lib/downloads').tick(), 5000); setInterval(() => require('./lib/downloads').tick(), 600000).unref(); }

@@ -92,21 +92,37 @@ ${paid ? '<div class="note" style="background:#0f2419;border-color:#1b4a33;color
 ${renew.length ? `<section class="card"><h2>Produži pretplatu</h2><p class="muted" style="margin-top:0">Plaćanje karticom (Stripe). Dani se dodaju na trenutni datum isteka.</p>
 ${one('SELECT id FROM coupons WHERE active = 1 AND (expires_at = 0 OR expires_at > ?) AND (max_uses = 0 OR used < max_uses) LIMIT 1', now()) ? '<input id="cpn" placeholder="Kod za popust (ako ga imaš)" autocomplete="off" style="width:100%;min-height:46px;border-radius:12px;border:1px solid #2c2c37;background:#0d0d12;color:var(--text);padding:0 12px;font:inherit;text-transform:uppercase;margin-bottom:8px;box-sizing:border-box">' : ''}
 <div style="display:flex;flex-direction:column;gap:8px">${renew.map((pl) => `<button class="btn${pl === renew[0] ? ' red' : ''}" type="button" onclick="pay(${pl.id},this)">${esc(pl.name)} · ${pl.days} dana · ${esc(cur)}${pl.price}</button>`).join('')}</div>
-<script>function pay(id,b){const o=b.textContent;b.disabled=true;b.textContent='Otvaram plaćanje…';fetch(location.pathname.replace(/\/$/,'')+'/renew',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({plan_id:id,coupon:(document.getElementById('cpn')||{}).value||''})}).then(r=>r.json()).then(j=>{if(j.url)location.href=j.url;else{b.textContent=j.error||'Greška';setTimeout(()=>{b.textContent=o;b.disabled=false},3500)}}).catch(()=>{b.textContent='Greška, pokušaj ponovo';b.disabled=false})}</script></section>` : ''}
+<script>function pay(id,b){const o=b.textContent;b.disabled=true;b.textContent='Otvaram plaćanje…';fetch(location.pathname.replace(/[/]$/,'')+'/renew',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({plan_id:id,coupon:(document.getElementById('cpn')||{}).value||''})}).then(r=>r.json()).then(j=>{if(j.url)location.href=j.url;else{b.textContent=j.error||'Greška';setTimeout(()=>{b.textContent=o;b.disabled=false},3500)}}).catch(()=>{b.textContent='Greška, pokušaj ponovo';b.disabled=false})}</script></section>` : ''}
 ${ref ? `<section class="card"><h2>Pozovi prijatelja</h2><p class="muted" style="margin-top:0">Kad prijatelj instalira aplikaciju, upiše tvoj kod i prvi put plati, obojica dobijete ${ref.days} dana gratis.</p>
 <div style="text-align:center;font:700 26px ui-monospace,Consolas,monospace;letter-spacing:3px;margin:8px 0">${esc(ref.code)}</div>
 <div class="muted" style="text-align:center">Pozvano: ${ref.invited} · nagrađeno: ${ref.rewarded}</div></section>` : ''}
 <section class="card"><h2>Spoji se u 3 koraka</h2>
-<p class="muted" style="margin:0 0 6px">1. Instaliraj aplikaciju &nbsp; 2. Uvezi profil &nbsp; 3. Klikni Spoji</p>
-${QR.svg(link).replace('<svg ', '<svg class="qr" role="img" aria-label="QR kod za uvoz u aplikaciju" ')}
+<div id="smart"></div>
+<div class="qrwrap"><p class="muted" style="margin:14px 0 4px;text-align:center" id="qrhint">Na računaru? U aplikaciji na telefonu klikni <b>Skeniraj QR kod</b> i usmjeri kameru ovdje:</p>
+${QR.svg(link).replace('<svg ', '<svg class="qr" role="img" aria-label="QR kod za uvoz u aplikaciju" ')}</div>
 <div class="link">${esc(link)}</div>
 <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
-${apps.map((k, n) => `<a class="btn${n === 0 ? ' red' : ''}" href="${esc(APPS[k].href(link, pname))}">Otvori u ${APPS[k].name}</a>`).join('')}
 <button class="btn" type="button" onclick="navigator.clipboard.writeText('${esc(link)}').then(()=>{this.textContent='Kopirano ✓'})">Kopiraj link</button>
-</div></section>
+</div>
+<script>(function(){
+var L=${JSON.stringify(link)},N=${JSON.stringify(pname)},V=${apps.includes('veltrix') ? 'true' : 'false'},ua=navigator.userAgent,
+an=/Android/i.test(ua),ios=/iPhone|iPad|iPod/i.test(ua)||(/Macintosh/.test(ua)&&'ontouchend' in document),win=/Windows/i.test(ua),
+base=L.slice(0,L.lastIndexOf('/s/')),e=encodeURIComponent,box=document.getElementById('smart'),open=/[?&]open=1/.test(location.search);
+var vel='veltrix://import?url='+e(L),intent='intent://import?url='+e(L)+'#Intent;scheme=veltrix;package=com.veltrix.vpn;S.browser_fallback_url='+e(base+'/download/android')+';end',
+hid='hiddify://import/'+L+'#'+e(N);
+function b(h,t,red,sub){return '<a class="btn'+(red?' red':'')+'" href="'+h+'" style="flex-direction:column;gap:0">'+t+(sub?'<small style="font-weight:400;opacity:.8;font-size:12px">'+sub+'</small>':'')+'</a>'}
+var h='',go='';
+if(V&&an){go=intent;h=b(intent,'Otvori u aplikaciji i spoji se',1)+b(base+'/download/android','Nemam aplikaciju: preuzmi za Android',0,'Poslije instalacije vrati se ovdje i klikni dugme iznad')+'<p class="muted" style="margin:2px 0 0">Kod instalacije telefon može pitati da dozvoliš instaliranje iz ovog izvora: klikni Postavke → Dozvoli.</p>';}
+else if(V&&win){go=vel;h=b(vel,'Otvori u Veltrix aplikaciji',1)+b(base+'/download/windows','Nemam aplikaciju: preuzmi za Windows',0,'Instaliraj, pa se vrati ovdje i klikni dugme iznad');}
+else if(ios||!V&&an){go=hid;h=b(hid,'Otvori u Hiddify i spoji se',1)+b('https://hiddify.com/','Nemam aplikaciju: preuzmi Hiddify',0,ios?'Besplatna u App Storeu':'Besplatna u Google Playu');}
+else{h='<p style="margin:0 0 4px;font-weight:600">Skeniraj QR kod telefonom</p><p class="muted" style="margin:0">Instaliraj aplikaciju na telefon, otvori je i klikni Skeniraj QR kod.</p>'+(V?'<div class="grid" style="margin-top:10px">'+b(base+'/download/android','Android',0)+b(base+'/download/windows','Windows',0)+'</div>':'');}
+box.innerHTML='<div style="display:flex;flex-direction:column;gap:8px">'+h+'</div>';
+if(an||ios){document.getElementById('qrhint').textContent='Ili na drugom uređaju skeniraj ovaj QR kod u aplikaciji:';}
+if(open&&go){setTimeout(function(){location.href=go},350)}
+})();</script></section>
 <section class="card"><h2>Aplikacije</h2>
 ${apps.map((k, n) => k === 'veltrix'
-    ? `<details${n === 0 ? ' open' : ''}><summary>Veltrix VPN · <span class="muted">Android, Windows</span></summary><p class="muted">Naša aplikacija. Preuzmi je, otvori i zalijepi link ili skeniraj QR kod.</p><a class="btn" href="https://github.com/maid-cyber/veltrix-app/releases">Preuzmi (Android .apk / Windows Setup)</a></details>`
+    ? `<details${n === 0 ? ' open' : ''}><summary>Veltrix VPN · <span class="muted">Android, Windows</span></summary><p class="muted">Naša aplikacija. Preuzmi je, otvori i zalijepi link ili skeniraj QR kod.</p><div class="grid"><a class="btn" href="/download/android">Android</a><a class="btn" href="/download/windows">Windows</a></div></details>`
     : `<details${n === 0 ? ' open' : ''}><summary>${APPS[k].name} · <span class="muted">${APPS[k].os}</span></summary><p class="muted">Instaliraj ${APPS[k].name} iz App Storea, Google Playa ili sa njihove stranice. Zatim klikni "Otvori u ${APPS[k].name}" gore, ili u aplikaciji klikni + i skeniraj QR kod / zalijepi link.</p></details>`).join('')}
 </section>
 ${botName ? `<section class="card"><h2>Podsjetnici na Telegram</h2><p class="muted" style="margin-top:0">${u.tg_chat ? 'Telegram je povezan ✓ Javit ćemo ti prije isteka.' : 'Poveži Telegram i javit ćemo ti prije nego nalog istekne. Možeš i pitati za stanje naloga.'}</p>
@@ -190,7 +206,7 @@ function appJson(u, s, link) {
 }
 
 async function handle(req, res, p) {
-  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app)|\/(renew)|\/(diag))?$/);
+  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app)|\/(renew)|\/(diag)|\/(qr\.png))?$/);
   if (!m) return send(res, 404, 'Not found');
   const u = one('SELECT * FROM users WHERE sub_token = ?', m[1]);
   if (!u) return send(res, 404, 'Link nije ispravan ili je zamijenjen novim.');
@@ -201,6 +217,7 @@ async function handle(req, res, p) {
 
   if (m[3]) { noteApp(u, req.headers['user-agent']); return send(res, 200, { ...appJson(u, s, link), ...growth.appInfo(u) }, { 'cache-control': 'no-store' }); }
   if (m[4] && req.method === 'POST') return growth.renew(req, res, u, link);
+  if (m[6]) return send(res, 200, require('./qrpng').png(link), { 'content-type': 'image/png', 'cache-control': 'private, max-age=3600' });
   if (m[5]) { if (req.method !== 'POST') return send(res, 405, 'POST'); return require('./diag').receive(req, res, u); }
   if (m[2]) {
     const sv = one('SELECT * FROM servers WHERE id = ? AND enabled = 1', Number(m[2]));
