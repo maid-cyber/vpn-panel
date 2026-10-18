@@ -667,3 +667,32 @@ b .odot { width: 7px; height: 7px; vertical-align: 2px; margin-right: 4px; }
 .ph-ann { margin: 12px 14px 0; padding: 10px 12px; border-radius: 12px; background: rgba(245,165,36,.08); border: 1px solid rgba(245,165,36,.25); color: #f5a524; animation: phin .25s ease; }
 @keyframes phin { from { opacity: 0; transform: translateY(-4px); } }
 @media (max-width: 900px) { .app-side { position: static; max-width: none; } .aphone-in { height: 540px; } }
+
+/* ---------- Dijagnostika kupca */
+.diag-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.diag-verdict { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-top: 16px; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+.diag-verdict h2 { margin: 6px 0 4px; font: 700 20px/1.25 var(--display); }
+.diag-verdict p { margin: 0; color: var(--text); }
+.diag-verdict small { display: block; margin-top: 6px; color: var(--muted); }
+.dv-ic { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.dv-ic .i { width: 24px; height: 24px; }
+.dv-tag { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.v-ok { border-color: rgba(61,220,132,.35); background: linear-gradient(90deg, rgba(61,220,132,.10), var(--card) 60%); } .v-ok .dv-ic { background: rgba(61,220,132,.15); color: #3ddc84; } .v-ok .dv-tag { color: #3ddc84; }
+.v-bad { border-color: rgba(239,68,68,.45); background: linear-gradient(90deg, rgba(239,68,68,.12), var(--card) 60%); } .v-bad .dv-ic { background: rgba(239,68,68,.16); color: #f87171; } .v-bad .dv-tag { color: #f87171; }
+.v-warn { border-color: rgba(245,165,36,.4); background: linear-gradient(90deg, rgba(245,165,36,.10), var(--card) 60%); } .v-warn .dv-ic { background: rgba(245,165,36,.15); color: #f5a524; } .v-warn .dv-tag { color: #f5a524; }
+.v-info { border-color: rgba(96,165,250,.4); background: linear-gradient(90deg, rgba(96,165,250,.10), var(--card) 60%); } .v-info .dv-ic { background: rgba(96,165,250,.15); color: #60a5fa; } .v-info .dv-tag { color: #60a5fa; }
+.dv-user { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; text-align: right; font-size: 13.5px; }
+.dv-user a { color: var(--text); font-size: 16px; }
+.diag-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 18px; border-top: 1px solid var(--row); }
+.diag-row b { font-weight: 600; display: block; }
+.diag-row small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; word-break: break-word; }
+.diag-row small.fix { color: var(--text); opacity: .85; }
+.dr-st { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 800; font-size: 13px; margin-top: 1px; }
+.s-ok { background: rgba(61,220,132,.15); color: #3ddc84; } .s-bad { background: rgba(239,68,68,.16); color: #f87171; }
+.s-warn { background: rgba(245,165,36,.15); color: #f5a524; } .s-info { background: rgba(96,165,250,.15); color: #60a5fa; }
+.diag-msg { width: 100%; min-height: 120px; resize: vertical; font-size: 13.5px; line-height: 1.5; margin-top: 10px; }
+.diag-kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; margin-top: 10px; }
+.diag-kv span { color: var(--muted); } .diag-kv b { font-weight: 500; word-break: break-word; }
+.diag-log { margin-top: 12px; } .diag-log summary { cursor: pointer; color: var(--acc-hi); font-size: 13.5px; }
+.diag-log pre { white-space: pre-wrap; word-break: break-all; font-size: 11px; max-height: 260px; overflow: auto; background: rgba(0,0,0,.25); padding: 10px; border-radius: 8px; }
+@media (max-width: 700px) { .dv-user { align-items: flex-start; text-align: left; width: 100%; } }

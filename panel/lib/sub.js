@@ -190,7 +190,7 @@ function appJson(u, s, link) {
 }
 
 async function handle(req, res, p) {
-  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app)|\/(renew))?$/);
+  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app)|\/(renew)|\/(diag))?$/);
   if (!m) return send(res, 404, 'Not found');
   const u = one('SELECT * FROM users WHERE sub_token = ?', m[1]);
   if (!u) return send(res, 404, 'Link nije ispravan ili je zamijenjen novim.');
@@ -201,6 +201,7 @@ async function handle(req, res, p) {
 
   if (m[3]) { noteApp(u, req.headers['user-agent']); return send(res, 200, { ...appJson(u, s, link), ...growth.appInfo(u) }, { 'cache-control': 'no-store' }); }
   if (m[4] && req.method === 'POST') return growth.renew(req, res, u, link);
+  if (m[5]) { if (req.method !== 'POST') return send(res, 405, 'POST'); return require('./diag').receive(req, res, u); }
   if (m[2]) {
     const sv = one('SELECT * FROM servers WHERE id = ? AND enabled = 1', Number(m[2]));
     if (!sv || !s.proto_wg || !vpn.serversForUser(u).some((x) => x.id === sv.id)) return send(res, 404, 'Server nije dostupan.');

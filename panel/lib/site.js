@@ -159,4 +159,7 @@ function t(){fetch('/buy/status?s='+encodeURIComponent(s)).then(r=>r.json()).the
   return send(res, 200, html, { 'content-type': 'text/html; charset=utf-8' });
 }
 
-module.exports = { page, buy, paidBuy, status, bought, siteData, downloads };
+/** Zadnji poznati buildovi bez čekanja mreže (osvježi u pozadini). */
+function downloadsCached() { downloads().catch(() => {}); return dl; }
+
+module.exports = { page, buy, paidBuy, status, bought, siteData, downloads, downloadsCached };

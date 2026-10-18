@@ -890,6 +890,9 @@ route('PUT', 'settings', 'settings', (c) => {
   log(c.auth.admin.username, 'Postavke spremljene', changed.join(', '));
   return { ok: true, changed, admin_path: settings.get('admin_path') };
 });
+// ============================== dijagnostika kupca ==============================
+route('GET', 'diag/:id', 'users', async (c) => require('./diag').check(c.params.id));
+
 // ============================== aplikacija (prekidači za Veltrix aplikacije) ==============================
 route('GET', 'appctl', 'settings', async () => {
   const sec = settings.publicSchema().find((x) => x.id === 'aplikacija');

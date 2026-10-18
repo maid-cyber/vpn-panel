@@ -326,7 +326,10 @@
     if (can('plans')) g.push({ label: 'Prodaja', items: [['tag', 'Kuponi i akcije', 'kuponi']] });
     if (can('resellers')) g.push({ label: 'Reselleri', items: [['res', 'Reselleri', 'reselleri', S.badges?.res], ['levels', 'Nivoi i popusti', 'reselleri/nivoi']] });
     if (can('servers')) g.push({ label: 'Serveri', items: [['server', 'Serveri', 'serveri', S.badges?.servers]] });
-    if (can('settings')) g.push({ label: 'Aplikacija', items: [['phone', 'Aplikacija', 'aplikacija']] });
+    const ap = [];
+    if (can('settings')) ap.push(['phone', 'Aplikacija', 'aplikacija']);
+    if (can('users')) ap.push(['act', 'Dijagnostika', 'dijagnostika']);
+    if (ap.length) g.push({ label: 'Aplikacija i podrška', items: ap });
     if (can('finance')) g.push({ label: 'Finansije', items: [['money', 'Transakcije', 'finansije'], ['report', 'Izvještaji', 'finansije/izvjestaji']] });
     const s = [];
     if (can('logs')) s.push(['logs', 'Logovi', 'logovi']);
@@ -784,6 +787,7 @@
         <button class="btn" data-a="uAct" data-act="rekey" data-id="${u.id}">${ic('key')}Novi link</button>
         <button class="btn warnb" data-a="uAct" data-act="toggle" data-id="${u.id}">${u.disabled ? 'Upali' : 'Ugasi'}</button>
         <button class="btn danger" data-a="uAct" data-act="delete" data-id="${u.id}">Obriši</button>
+        ${can('users') ? `<a class="btn" style="grid-column:1/-1" href="#/dijagnostika?u=${u.id}">${ic('act')}Dijagnostika: zašto ne radi?</a>` : ''}
       </div>
       <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px" class="muted">
         ${u.contact ? `<div>Kontakt: <span style="color:var(--text)">${esc(u.contact)}</span></div>` : ''}
@@ -2089,6 +2093,91 @@
     if (tab === 'login') el.querySelector('.ph-nav').remove();
   }
 
+  // ================================================================== DIJAGNOSTIKA KUPCA
+  async function pageDiag(params) {
+    const uid = params?.get('u') || '';
+    $('#view').innerHTML = `${top('Dijagnostika', 'Upiši kupca: panel provjeri nalog, servere i izvještaj iz njegove aplikacije i kaže gdje je problem')}
+      <section class="card p diag-search">
+        <form id="diagForm" class="diag-form" autocomplete="off">
+          <label class="field" style="flex:1;margin:0">Kupac (korisničko ime)<input class="input" id="diagQ" list="diagList" placeholder="npr. emir_k" required></label>
+          <datalist id="diagList"></datalist>
+          <button class="btn red" type="submit">${ic('act')}Provjeri</button>
+        </form>
+        <p class="muted" style="margin:10px 0 0;font-size:13px">Za najtačniji rezultat zamoli kupca da u aplikaciji otvori <b>Nalog → Dijagnostika veze → Pošalji podršci</b> (Windows: <b>Dijagnostika → Pošalji podršci</b>), dok VPN nije spojen. Izvještaj stiže ovdje i na tvoj Telegram.</p>
+      </section>
+      <div id="diagOut"></div>`;
+    const q = $('#diagQ'); let timer = 0;
+    q.oninput = () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const v = q.value.trim(); if (v.length < 2) return;
+        try { const r = await GET('users?q=' + encodeURIComponent(v)); $('#diagList').innerHTML = r.users.slice(0, 12).map((u) => `<option value="${esc(u.username)}">`).join(''); S.diagUsers = r.users; } catch { /* */ }
+      }, 220);
+    };
+    $('#diagForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const v = q.value.trim();
+      let u = (S.diagUsers || []).find((x) => x.username.toLowerCase() === v.toLowerCase());
+      if (!u) { try { const r = await GET('users?q=' + encodeURIComponent(v)); u = r.users.find((x) => x.username.toLowerCase() === v.toLowerCase()) || (r.users.length === 1 ? r.users[0] : null); } catch { /* */ } }
+      if (!u) return toast(`Kupac "${v}" ne postoji.`, true);
+      history.replaceState(null, '', '#/dijagnostika?u=' + u.id);
+      diagRun(u.id);
+    };
+    if (uid) diagRun(uid);
+  }
+  async function diagRun(id) {
+    const out = $('#diagOut'); if (!out) return;
+    out.innerHTML = `<section class="card p"><span class="muted">Provjeravam nalog, servere i izvještaj kupca…</span></section>`;
+    let d;
+    try { d = await GET('diag/' + id); } catch (e) { out.innerHTML = `<section class="card p bad">${esc(e.message)}</section>`; return; }
+    $('#diagQ').value = d.user.username;
+    const SIDE = { nas: ['bad', 'Kod nas', 'Popravi ti: server ili panel'], nalog: ['warn', 'Nalog', 'Odluka je tvoja: produži, upali ili resetuj'], kupac: ['info', 'Kod kupca', 'Reci kupcu šta da uradi'], ok: ['ok', 'Sve radi', ''] };
+    const [vcls, vtag, vsub] = SIDE[d.verdict.side];
+    const STI = { ok: ['✓', 'ok'], warn: ['!', 'warn'], bad: ['✕', 'bad'], info: ['i', 'info'] };
+    const groups = [...new Set(d.checks.map((c) => c.group))];
+    const ST = { active: 'aktivan', expiring: 'ističe', grace: 'grace', expired: 'istekao', limited: 'promet', disabled: 'ugašen', devices: 'uređaji' };
+    const rep = d.report;
+    out.innerHTML = `
+      <section class="diag-verdict v-${vcls}">
+        <div class="dv-ic">${d.verdict.side === 'ok' ? ic('check') : d.verdict.side === 'nas' ? ic('server') : d.verdict.side === 'nalog' ? ic('user') : ic('globe')}</div>
+        <div style="flex:1;min-width:0"><span class="dv-tag">${vtag}</span><h2>${esc(d.verdict.title)}</h2><p>${esc(d.verdict.text)}</p>${vsub ? `<small>${vsub}</small>` : ''}</div>
+        <div class="dv-user"><a href="#/korisnik/${d.user.id}"><b>${esc(d.user.username)}</b></a><span>${esc(d.user.plan || '—')} · <span class="tag t-${['active', 'expiring'].includes(d.user.status) ? 'ok' : d.user.status === 'grace' ? 'warn' : 'bad'}">${ST[d.user.status] || d.user.status}</span></span>
+          <span class="dim">${d.user.app_os ? (d.user.app_os === 'windows' ? 'Windows' : 'Android') + ' build ' + d.user.app_build : 'druga aplikacija'}</span>
+          <button class="btn sm" data-a="diagAgain" data-id="${d.user.id}">${ic('refresh')}Ponovo</button></div>
+      </section>
+      <div class="split" style="margin-top:16px">
+        <div class="wide" style="display:flex;flex-direction:column;gap:16px">
+          ${groups.map((g) => `<section class="card"><div class="card-head"><h2>${esc(g)}</h2></div>
+            ${d.checks.filter((c) => c.group === g).map((c) => `<div class="diag-row"><span class="dr-st s-${STI[c.status][1]}">${STI[c.status][0]}</span>
+              <div style="flex:1;min-width:0"><b>${esc(c.label)}</b>${c.detail ? `<small>${esc(c.detail)}</small>` : ''}${c.fix ? `<small class="fix">→ ${esc(c.fix)}</small>` : ''}</div>
+              ${c.side && c.status !== 'ok' ? `<span class="tag t-${SIDE[c.side][0]}">${SIDE[c.side][1]}</span>` : ''}</div>`).join('')}
+          </section>`).join('')}
+          ${d.servers.length ? `<section class="card" style="overflow:hidden"><div class="card-head"><h2>Serveri kupca</h2></div><div class="tbl">
+            ${trow(['Server', 'Iz panela', 'Sa mreže kupca', 'Stanje'], true, '1.2fr .8fr .9fr 1.6fr')}
+            ${d.servers.map((s) => { const r = rep?.servers?.find((x) => x.id === s.id || x.host === s.host); return `<div class="tr" style="grid-template-columns:1.2fr .8fr .9fr 1.6fr">${[
+              `<b>${s.country ? flag(s.country) : ''} ${esc(s.name)}</b><small class="mono">${esc(s.host)}:${s.port}</small>`,
+              s.panel_reach.ok === null ? '<span class="dim">—</span>' : s.panel_reach.ok ? `<span class="ok">✓ ${esc(s.panel_reach.detail)}</span>` : `<span class="bad">✕ ${esc(s.panel_reach.detail)}</span>`,
+              r ? (r.ok ? `<span class="ok">✓ ${esc(r.detail)}</span>` : `<span class="bad">✕ ${esc(r.detail)}</span>`) : '<span class="dim">nema izvještaja</span>',
+              s.ok ? `<span class="ok">radi</span> <small>${s.users_online} spojeno</small>` : `<span class="bad">${esc(s.problems.join(', '))}</span>`,
+            ].map((x, i) => `<div class="cell${i === 0 ? ' first' : ''}" ${i ? `data-l="${['', 'Iz panela', 'Sa mreže kupca', 'Stanje'][i]}"` : ''}>${x}</div>`).join('')}</div>`; }).join('')}
+          </div></section>` : ''}
+        </div>
+        <aside class="narrow" style="display:flex;flex-direction:column;gap:16px">
+          <section class="card p"><div class="ch"><h2>${ic('send')}Poruka za kupca</h2></div>
+            <textarea class="input diag-msg" id="diagMsg" rows="9">${esc(d.message)}</textarea>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn red" data-a="copy" data-v="${esc(d.message)}">${ic('copy')}Kopiraj poruku</button>${d.user.contact ? `<span class="dim" style="align-self:center;font-size:13px">Kontakt: ${esc(d.user.contact)}</span>` : ''}</div>
+            <small class="dim" style="display:block;margin-top:8px">Možeš je izmijeniti prije kopiranja.</small></section>
+          <section class="card p"><div class="ch"><h2>${ic('phone')}Izvještaj iz aplikacije</h2></div>
+            ${rep ? `<div class="diag-kv"><span>Poslan</span><b>${esc(rep.ago)}</b><span>Uređaj</span><b>${esc(rep.os === 'windows' ? 'Windows' : 'Android')} · build ${rep.build}</b><span>VPN tada</span><b>${rep.vpn_on ? 'spojen' : 'nije spojen'}</b>${rep.network ? `<span>Mreža</span><b>${esc(rep.network)}</b>` : ''}${rep.protocol ? `<span>Protokol</span><b>${esc(rep.protocol)}</b>` : ''}${rep.internet ? `<span>Internet</span><b class="${rep.internet.ok ? 'ok' : 'bad'}">${rep.internet.ok ? '✓' : '✕'} ${esc(rep.internet.detail)}</b>` : ''}${rep.ip ? `<span>IP preko VPN-a</span><b class="mono">${esc(rep.ip)}</b>` : ''}</div>
+              ${rep.errors?.length ? `<details class="diag-log"><summary>Greške iz loga (${rep.errors.length})</summary><pre>${esc(rep.errors.join('\n'))}</pre></details>` : '<p class="muted" style="margin:8px 0 0;font-size:13px">U logu nema grešaka.</p>'}`
+              : `<p class="muted" style="margin:0;font-size:13.5px">Kupac još nije poslao izvještaj. Pošalji mu:</p><textarea class="input diag-msg" rows="4" readonly>Molim te otvori aplikaciju, prekini VPN, pa idi na Nalog → Dijagnostika veze → Pošalji podršci (na računaru: Dijagnostika → Pošalji podršci). Hvala!</textarea><button class="btn sm" style="margin-top:8px" data-a="copy" data-v="Molim te otvori aplikaciju, prekini VPN, pa idi na Nalog → Dijagnostika veze → Pošalji podršci (na računaru: Dijagnostika → Pošalji podršci). Hvala!">${ic('copy')}Kopiraj</button>`}
+          </section>
+        </aside>
+      </div>`;
+    const m = $('#diagMsg'); const b = out.querySelector('[data-a="copy"]');
+    if (m && b) m.oninput = () => { b.dataset.v = m.value; };
+  }
+
   // ================================================================== RUTER
   async function route() {
     if (!S.me) return;
@@ -2126,6 +2215,7 @@
       if (path === 'finansije/izvjestaji') return await pageReports(params);
       if (path === 'logovi') return await pageLogs(params);
       if (path === 'aplikacija' && can('settings')) return await pageApp();
+      if (path === 'dijagnostika' && can('users')) return await pageDiag(params);
       if (path === 'postavke') return await pageSettings();
       if (path === 'profil') return await pageProfile();
       if (path === 'vise') return pageMore();
@@ -2243,6 +2333,7 @@
       const y = window.scrollY;
       if (await appSave(d.k, v)) { await pageApp(); window.scrollTo(0, y); } else el.setAttribute('aria-checked', String(!v));
     },
+    diagAgain: (d) => diagRun(d.id),
     appTab: (d) => { S.appTab = d.v; $$('.app-tabs .chip').forEach((b) => b.classList.toggle('on', b.dataset.v === d.v)); appPhone(); },
     setToggle: (d, el) => { const v = el.getAttribute('aria-checked') !== 'true'; el.setAttribute('aria-checked', String(v)); markDirty(d.k, v); },
     setChip: (d, el) => { $$(`[data-a="setChip"][data-k="${d.k}"]`).forEach((c) => c.classList.toggle('on', c === el)); markDirty(d.k, d.v); },

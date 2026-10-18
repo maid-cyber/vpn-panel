@@ -310,6 +310,17 @@ OVH klasični "VPS" se ne može naručiti preko API-ja (ide kroz korpu i plaćan
 - **Dashboard → Prvi koraci prije prodaje**: lista sa kvačicama (HTTPS, server online, planovi, način plaćanja, kontakt podrške, Telegram, probni nalog, 2FA, prvi kupac). Klik vodi na mjesto gdje se to podešava. Nestane kad je sve gotovo ili klikom na "Sakrij" (vraća se u Postavke → Općenito).
 - **Korisnici → Uvoz**: kupci iz **3x-ui / x-ui** (x-ui.db), **Marzbana** (db.sqlite3), **Hiddify Managera** (backup .json) ili bilo kojeg panela preko **CSV-a** (`korisnik;uuid;ističe;GB;bilješka`). Prvo vidiš pregled, pa biraš plan, vlasnika (ti ili reseller) i da li uvoziš samo aktivne. Kupci zadržavaju UUID, datum isteka, limit i potrošen promet; postojeći (isto ime ili UUID) se preskaču. Novi link im pošalji preko "Poruka svima".
 
+## 23. Dijagnostika kupca
+
+Meni **Aplikacija i podrška → Dijagnostika** (ili dugme "Dijagnostika: zašto ne radi?" kod kupca). Upiši kupca i panel provjeri:
+
+- **Nalog:** aktivan, istekao, ugašen, potrošen promet, blokada zbog previše uređaja.
+- **Servere kupca:** online, radi li Xray, je li kupac u konfiguraciji servera, je li server pun, i odgovara li port iz panela.
+- **Aktivnost i aplikaciju:** kad je zadnji put imao promet, koju verziju aplikacije koristi.
+- **Izvještaj iz aplikacije kupca:** kupac u aplikaciji klikne *Nalog → Dijagnostika veze → Pošalji podršci* (Windows: *Dijagnostika → Pošalji podršci*). Aplikacija provjeri internet, može li do svakog servera **sa svoje mreže**, prolazi li promet kroz VPN i pošalje greške iz loga. Panel ti javi na Telegram.
+
+Na vrhu piše presuda: **Kod nas** (popravi server), **Nalog** (produži, upali) ili **Kod kupca** (njegov provajder, ruter, antivirus, stara aplikacija), i gotova poruka koju kopiraš kupcu.
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

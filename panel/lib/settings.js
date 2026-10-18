@@ -106,6 +106,7 @@ const SCHEMA = [
     { key: 'n_payment', type: 'toggle', label: 'Nova uplata ili kupovina kredita', def: true },
     { key: 'n_lowcredit', type: 'toggle', label: 'Reselleru ponestaje kredita (ispod €10)', def: true },
     { key: 'n_backup', type: 'toggle', label: 'Backup nije uspio', def: true },
+    { key: 'n_diag', type: 'toggle', label: 'Kupac poslao dijagnostiku iz aplikacije', def: true },
     { key: 'n_daily', type: 'toggle', label: 'Dnevni izvještaj u 09:00', sub: 'Zarada, novi korisnici, problemi', def: true },
     { key: 'customer_reminders', type: 'toggle', label: 'Podsjetnik kupcima prije isteka', sub: 'Na Telegram (bot za kupce) i e-mail, kad je ostalo onoliko dana koliko piše kod "Ističe uskoro"', def: true },
     { key: 'cbot_on', type: 'toggle', label: 'Telegram bot za kupce', sub: 'Kupac na svojoj stranici klikne "Poveži Telegram" i dobija podsjetnike, stanje naloga i tvoje poruke', def: false },
