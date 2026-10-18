@@ -25,10 +25,12 @@ async function downloads() {
   try {
     const r = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=40`, { headers: { 'user-agent': 'veltrix-panel', accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(8000) });
     const list = r.ok ? await r.json() : [];
-    const pick = (prefix, ext) => list.filter((x) => !x.draft && String(x.tag_name).startsWith(prefix))
-      .map((x) => ({ n: Number(String(x.tag_name).replace(/\D+/g, '')) || 0, a: (x.assets || []).find((a) => a.name.endsWith(ext)) }))
-      .filter((x) => x.a).sort((a, b) => b.n - a.n)[0]?.a?.browser_download_url || '';
-    dl = { t: now(), apk: pick('build-', '.apk'), exe: pick('win-', '.exe'), page };
+    const best = (prefix, ext) => list.filter((x) => !x.draft && String(x.tag_name).startsWith(prefix))
+      .map((x) => ({ n: Number(String(x.tag_name).replace(/\D+/g, '')) || 0, a: (x.assets || []).find((a) => a.name.endsWith(ext)), ts: Date.parse(x.published_at) || 0 }))
+      .filter((x) => x.a).sort((a, b) => b.n - a.n)[0];
+    const a = best('build-', '.apk'), w = best('win-', '.exe');
+    dl = { t: now(), apk: a?.a?.browser_download_url || '', exe: w?.a?.browser_download_url || '', page,
+      apkBuild: a?.n || 0, exeBuild: w?.n || 0, apkTs: a?.ts || 0, exeTs: w?.ts || 0 };
   } catch { dl = { ...dl, t: now() - 3000000, page }; }
   return dl;
 }

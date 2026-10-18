@@ -34,7 +34,7 @@
     moon: 'M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z', sun: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
     chart: 'M4 20V10M10 20V4M16 20v-7M4 20h18', act: 'M22 12h-4l-3 9L9 3l-3 9H2', check: 'M20 6 9 17l-5-5',
     plug: 'M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4', x: 'M18 6 6 18M6 6l12 12',
-    send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z', shield: 'M12 3 20 6v6c0 5-3.5 8.5-8 9.5C7.5 20.5 4 17 4 12V6z',
+    send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z', phone: 'M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2', shield: 'M12 3 20 6v6c0 5-3.5 8.5-8 9.5C7.5 20.5 4 17 4 12V6z',
   };
   const ic = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n] || ''}"/></svg>`;
   // znak brenda (štit sa V)
@@ -326,6 +326,7 @@
     if (can('plans')) g.push({ label: 'Prodaja', items: [['tag', 'Kuponi i akcije', 'kuponi']] });
     if (can('resellers')) g.push({ label: 'Reselleri', items: [['res', 'Reselleri', 'reselleri', S.badges?.res], ['levels', 'Nivoi i popusti', 'reselleri/nivoi']] });
     if (can('servers')) g.push({ label: 'Serveri', items: [['server', 'Serveri', 'serveri', S.badges?.servers]] });
+    if (can('settings')) g.push({ label: 'Aplikacija', items: [['phone', 'Aplikacija', 'aplikacija']] });
     if (can('finance')) g.push({ label: 'Finansije', items: [['money', 'Transakcije', 'finansije'], ['report', 'Izvještaji', 'finansije/izvjestaji']] });
     const s = [];
     if (can('logs')) s.push(['logs', 'Logovi', 'logovi']);
@@ -1878,7 +1879,7 @@
     $('#view').innerHTML = `${top('Postavke', 'Sve postavke sistema · vidi ih samo admin', `<span class="warn" id="dirty" style="font-size:13px"></span><button class="btn" data-a="reload">Poništi</button><button class="btn red" data-a="saveSettings">Spremi sve</button>`)}
       <div class="split" style="align-items:flex-start">
         <nav class="card set-nav narrow" style="flex:1 1 210px;max-width:260px" aria-label="Kategorije">${schema.map((s, i) => `<a href="javascript:void 0" data-a="jump" data-id="${s.id}"><span>${String(i + 1).padStart(2, '0')}</span>${esc(s.title)}</a>`).join('')}</nav>
-        <div class="wide" style="display:flex;flex-direction:column;gap:16px">${schema.map((s, i) => `<section class="card set-sec" id="sec-${s.id}"><header><h2><span style="color:var(--acc-hi);margin-right:8px">${String(i + 1).padStart(2, '0')}</span>${esc(s.title)}</h2><p>${esc(s.desc)}</p></header>
+        <div class="wide" style="display:flex;flex-direction:column;gap:16px">${schema.map((s, i) => s.page ? `<section class="card set-sec" id="sec-${s.id}"><header><h2><span style="color:var(--acc-hi);margin-right:8px">${String(i + 1).padStart(2, '0')}</span>${esc(s.title)}</h2><p>${esc(s.desc)}</p></header><div class="set-row"><div class="lbl"><b>Sve funkcije aplikacije na jednom mjestu</b><small>Uključi i isključi šta kupci imaju u Android i Windows aplikaciji, uz pregled telefona.</small></div><div class="ctl"><a class="btn red" href="#/${s.page}">${ic('phone')}Otvori Aplikacija</a></div></div></section>` : `<section class="card set-sec" id="sec-${s.id}"><header><h2><span style="color:var(--acc-hi);margin-right:8px">${String(i + 1).padStart(2, '0')}</span>${esc(s.title)}</h2><p>${esc(s.desc)}</p></header>
           ${s.rows.map((r) => `<div class="set-row"><div class="lbl"><b>${esc(r.label)}</b>${r.soon ? '<span class="soon">uskoro</span>' : ''}${r.sub ? `<small>${esc(r.sub)}</small>` : ''}</div><div class="ctl">${ctl(r)}</div></div>`).join('')}
           ${extra[s.id] || ''}</section>`).join('')}</div>
       </div>`;
@@ -1956,6 +1957,134 @@
       <button class="btn danger" data-a="logout">${ic('logout')}Odjava</button>`;
   }
 
+  // ================================================================== APLIKACIJA (prekidači za Veltrix aplikacije)
+  const APP_GRP = [
+    ['nalog', 'Prijava i nalog', 'user', 'Dugmad na prijavi i u kartici Nalog.'],
+    ['veza', 'Spajanje', 'plug', 'Kako se aplikacija spaja na servere.'],
+    ['sigurnost', 'Sigurnost', 'shield', 'Kartica Sigurnost. "Za nove" je početno stanje koje kupac može promijeniti.'],
+    ['alati', 'Alati', 'bolt', 'Test brzine, dijagnostika i obavijesti.'],
+    ['izgled', 'Izgled i jezik', 'sun', 'Boja aplikacije i jezik.'],
+    ['verzije', 'Verzije i ažuriranja', 'down', 'Nove verzije i gašenje starih.'],
+  ];
+  async function pageApp() {
+    const d = await GET('appctl');
+    S.appctl = d;
+    const v = d.values, L = d.latest, U = d.usage;
+    const warn = (k) => {
+      if (k === 'renew_on' && v.renew_on && !d.stripe) return 'Stripe nije podešen (Postavke → Plaćanja), pa se dugme ne prikazuje.';
+      if (k === 'app_trial' && v.app_trial && !d.trial_plan) return 'Nema probnog plana. U Planovi označi jedan plan kao probni.';
+      if (k === 'app_ss_fallback' && v.app_ss_fallback && !v.proto_ss) return 'Shadowsocks je isključen na serverima (Postavke → Serveri i protokoli).';
+      return '';
+    };
+    const ctl = (r) => {
+      const val = v[r.key];
+      if (r.type === 'toggle') return `<button type="button" class="switch" role="switch" aria-checked="${!!val}" aria-label="${esc(r.label)}" data-a="appToggle" data-k="${r.key}"></button>`;
+      if (r.type === 'select') return `<select class="input" data-appset="${r.key}" aria-label="${esc(r.label)}">${r.options.map((o, i) => `<option value="${esc(o)}" ${String(val) === o ? 'selected' : ''}>${esc(r.labels?.[i] || o)}</option>`).join('')}</select>`;
+      return `<input class="input" style="${r.type === 'number' ? 'width:110px' : ''}" data-appset="${r.key}" value="${esc(val)}" ${r.type === 'number' ? 'inputmode="numeric"' : ''} aria-label="${esc(r.label)}">`;
+    };
+    const latestHint = (k) => k === 'app_min_android' ? (L.android ? `Najnovija na GitHubu: build ${L.android}` : '') : k === 'app_min_windows' ? (L.windows ? `Najnovija na GitHubu: build ${L.windows}` : '') : '';
+    const row = (r) => {
+      const off = r.dep && !v[r.dep];
+      const w = warn(r.key), h = latestHint(r.key);
+      return `<div class="set-row${r.dep ? ' app-dep' : ''}${off ? ' app-off' : ''}" data-row="${r.key}"><div class="lbl"><b>${esc(r.label)}</b>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}${h ? `<small class="ok">${esc(h)}</small>` : ''}${w ? `<small class="warn">${esc(w)}</small>` : ''}</div><div class="ctl">${ctl(r)}</div></div>`;
+    };
+    const builds = (os) => U.builds.filter((b) => b.os === os);
+    const buildList = (os, name) => builds(os).length ? `<div class="app-builds"><b>${name}</b>${builds(os).map((b) => `<span class="tag ${L[os] && b.build >= L[os] ? 't-ok' : 't-grey'}">build ${b.build || '?'} · ${b.n}</span>`).join('')}</div>` : '';
+    $('#view').innerHTML = `${top('Aplikacija', 'Šta kupci imaju u Veltrix aplikaciji · Android i Windows')}
+      <div class="banner soft">${ic('check')}<span style="flex:1;min-width:0">Promjene se spremaju odmah. Aplikacija ih dobije kad je kupac sljedeći put otvori ili osvježi nalog. Ništa ne treba ponovo instalirati.</span></div>
+      <section class="stats">
+        <div class="stat"><div class="l"><span>Android</span>${ic('phone')}</div><div class="v">${U.android}</div><div class="s muted">kupaca u zadnjih 7 dana</div></div>
+        <div class="stat"><div class="l"><span>Windows</span>${ic('dash')}</div><div class="v">${U.windows}</div><div class="s muted">kupaca u zadnjih 7 dana</div></div>
+        <div class="stat"><div class="l"><span>Druge aplikacije</span>${ic('layers')}</div><div class="v">${U.other}</div><div class="s muted">Hiddify, v2rayNG… (ovi prekidači ne važe)</div></div>
+        <div class="stat"><div class="l"><span>Najnovija verzija</span>${ic('down')}</div><div class="v" style="font-size:22px">${L.android || L.windows ? `${L.android ? 'Android ' + L.android : ''}${L.android && L.windows ? ' · ' : ''}${L.windows ? 'Win ' + L.windows : ''}` : '<span class="dim" style="font-size:16px">GitHub ne odgovara</span>'}</div><div class="s muted">${L.page ? `build · <a href="${esc(L.page)}" target="_blank" rel="noopener">izdanja na GitHubu ↗</a>` : 'build'}</div></div>
+      </section>
+      <div class="split">
+        <div class="wide" style="display:flex;flex-direction:column;gap:16px">
+          ${APP_GRP.map(([g, title, icon, desc]) => `<section class="card set-sec" id="ag-${g}"><header><h2><span class="app-gi">${ic(icon)}</span>${esc(title)}</h2><p>${esc(desc)}</p></header>
+            ${d.rows.filter((r) => r.grp === g).map(row).join('')}
+            ${g === 'verzije' ? `<div class="set-row"><div class="lbl"><b>Kupci po verziji</b><small>Ko je otvorio aplikaciju u zadnjih 7 dana</small>${buildList('android', 'Android') + buildList('windows', 'Windows') || '<small>Još nema podataka. Pojavi se kad kupci otvore novu verziju aplikacije.</small>'}</div></div>` : ''}
+          </section>`).join('')}
+          <section class="card set-sec"><header><h2><span class="app-gi">${ic('send')}</span>Poruka i podrška</h2><p>Tekst koji kupci vide u aplikaciji.</p></header>
+            ${d.extra.filter((r) => ['sub_announce', 'support_contact'].includes(r.key)).map((r) => `<div class="set-row"><div class="lbl"><b>${esc(r.key === 'sub_announce' ? 'Poruka na početnom ekranu' : r.label)}</b><small>${esc(r.key === 'sub_announce' ? 'Npr. "Novi server u Švicarskoj 🇨🇭". Prazno = nema poruke.' : r.sub || '')}</small></div><div class="ctl" style="flex:1 1 320px"><input class="input" style="width:100%" data-appset="${r.key}" value="${esc(v[r.key])}" aria-label="${esc(r.label)}"></div></div>`).join('')}
+          </section>
+        </div>
+        <aside class="narrow app-side">
+          <div class="app-tabs" role="tablist">${[['login', 'Prijava'], ['home', 'Početna'], ['sec', 'Sigurnost'], ['acc', 'Nalog']].map(([k, l], i) => `<button role="tab" class="chip${i === 3 ? ' on' : ''}" data-a="appTab" data-v="${k}">${l}</button>`).join('')}</div>
+          <div class="aphone"><div class="aphone-in" id="appPhone"></div></div>
+          <p class="muted" style="font-size:12.5px;text-align:center;margin:8px 0 0">Pregled: šta kupac vidi s ovim postavkama</p>
+        </aside>
+      </div>`;
+    S.appTab = S.appTab || 'acc';
+    $$('.app-tabs .chip').forEach((b) => b.classList.toggle('on', b.dataset.v === S.appTab));
+    appPhone();
+    $$('[data-appset]').forEach((el) => {
+      el.onchange = () => appSave(el.dataset.appset, el.value);
+    });
+  }
+  async function appSave(k, val) {
+    try {
+      await PUT('settings', { [k]: val });
+      const r = await GET('appctl'); S.appctl.values = r.values;
+      $$('#toasts .toast').forEach((t) => t.remove());
+      toast('Spremljeno. Aplikacije dobiju promjenu pri sljedećem otvaranju.');
+      appPhone();
+      return true;
+    } catch (e) { fail(e); return false; }
+  }
+  function appPhone() {
+    const el = $('#appPhone'); if (!el || !S.appctl) return;
+    const v = S.appctl.values, tab = S.appTab || 'acc';
+    const bs = v.app_lang_default !== 'en';
+    const T = (en, b) => bs ? b : en;
+    const r = (icon, title, sub) => `<div class="ph-row"><span class="ph-ic">${ic(icon)}</span><span style="flex:1;min-width:0"><b>${title}</b><small>${sub}</small></span><span class="ph-chev">›</span></div>`;
+    const tg = (title, sub, on) => `<div class="ph-row"><span style="flex:1;min-width:0"><b>${title}</b><small>${sub}</small></span><span class="ph-sw${on ? ' on' : ''}"></span></div>`;
+    const grp = (title, rows) => rows.filter(Boolean).length ? `<div class="ph-gt">${title}</div><div class="ph-grp">${rows.filter(Boolean).join('')}</div>` : '';
+    let body = '';
+    if (tab === 'login') {
+      body = `<div class="ph-login"><div class="ph-logo">${logo(54)}</div><div class="ph-brand">VELTRIX</div><div class="ph-vpn">V P N</div>
+        <p>${T('Scan the QR code or paste your access link.', 'Skeniraj QR kod ili zalijepi pristupni link.')}</p>
+        <div class="ph-btn">${T('Scan QR code', 'Skeniraj QR kod')}</div><div class="ph-input">https://…/s/…</div><div class="ph-btn line">${T('Log in', 'Prijavi se')}</div>
+        ${v.app_trial ? `<div class="ph-btn fill">${T('Try free', 'Probaj besplatno')}</div>${v.ref_on ? `<div class="ph-link">${T("Have a friend's code?", 'Imaš kod prijatelja?')}</div>` : ''}` : ''}</div>`;
+    } else if (tab === 'home') {
+      body = `<div class="ph-top"><b>Veltrix VPN</b></div><div class="ph-power"><div class="ph-ring">${ic('plug')}</div><b>${T('Protected', 'Zaštićen')}</b><small>🇩🇪 Falkenstein</small></div>
+        <div class="ph-stats"><span>00:12:41</span><span>↓ 24 Mb/s</span><span>↑ 6 Mb/s</span></div>
+        ${v.app_speedtest ? `<div class="ph-link">${T('Test speed →', 'Izmjeri brzinu →')}</div>` : ''}
+        <div class="ph-btn fill">${T('Disconnect', 'Prekini vezu')}</div>
+        ${v.sub_announce ? `<div class="ph-ann">${esc(v.sub_announce)}</div>` : ''}`;
+    } else if (tab === 'sec') {
+      body = `<div class="ph-top"><b>${T('Security', 'Sigurnost')}</b></div>${grp(T('Protection', 'Zaštita'), [
+        v.app_killswitch && r('shield', 'Kill Switch', T('Block internet without VPN', 'Bez VPN-a nema interneta')),
+        v.app_dns && tg(T('DNS protection', 'DNS zaštita'), T('Encrypted DNS', 'Šifrovani DNS'), v.app_dns_def),
+        v.app_ipleak && tg(T('IP leak protection', 'IP leak zaštita'), 'IPv6', v.app_ipleak_def),
+        v.app_webrtc && tg(T('WebRTC protection', 'WebRTC zaštita'), T('Hide real IP', 'Sakrij pravu IP'), v.app_webrtc_def),
+        v.app_split && r('layers', T('App management', 'Upravljanje aplikacijama'), T('Apps that bypass VPN', 'Aplikacije mimo VPN-a')),
+      ])}${!(v.app_killswitch || v.app_dns || v.app_ipleak || v.app_webrtc || v.app_split) ? `<p class="ph-empty">${T('Nothing here', 'Kartica je prazna')}</p>` : ''}`;
+    } else {
+      body = `<div class="ph-top"><b>${T('My Account', 'Moj nalog')}</b></div>
+        ${grp(T('Settings', 'Podešavanja'), [
+          v.app_protocol && r('key', T('VPN protocol', 'VPN protokol'), T('Automatic', 'Automatski')),
+          r('refresh', T('Auto-connect', 'Automatsko povezivanje'), v.app_boot ? T('app, phone start', 'aplikacija, paljenje') : T('on app start', 'pri otvaranju')),
+          (v.app_look || v.app_language) && r('sun', T('Appearance', 'Izgled aplikacije'), [v.app_look && T('Color', 'Boja'), v.app_language && T('Language', 'Jezik')].filter(Boolean).join(' · ')),
+          v.app_notify && r('bell', T('Notifications', 'Obavijesti'), T('disconnects, expiry', 'prekid veze, istek')),
+        ])}
+        ${grp(T('Account', 'Račun'), [
+          v.renew_on && S.appctl.stripe && r('credit', T('Renew subscription', 'Produži pretplatu'), T('Pay by card', 'Plati karticom')),
+          v.ref_on && r('send', T('Invite a friend', 'Pozovi prijatelja'), `${v.ref_days || 7} ${T('free days', 'dana gratis')}`),
+          r('tag', T('Subscription', 'Pretplata'), 'Premium · ' + T('active', 'aktivan')),
+          v.app_devices && r('users', T('Devices', 'Uređaji'), T('1 of 3 connected', '1 od 3 spojeno')),
+          v.app_history && r('clock', T('Activity history', 'Povijest aktivnosti'), T('12 entries', 'Zapisa: 12')),
+          v.app_support && r('send', T('Help & Support', 'Podrška'), esc(v.support_contact || T('Contact your seller', 'Javi se prodavcu'))),
+        ])}
+        ${grp('', [
+          v.app_diag && r('act', T('Connection test', 'Dijagnostika veze'), T('Why the internet does not work', 'Zašto internet ne radi')),
+          r('down', T('Version', 'Verzija') + ' 0.1.' + (S.appctl.latest.android || 1), v.app_updates ? T('Checks for updates', 'Provjerava nove verzije') : 'sing-box'),
+          r('logout', T('Log out', 'Odjava'), ''),
+        ])}`;
+    }
+    el.innerHTML = `<div class="aphone-sc">${body}</div>` + `<div class="ph-nav">${[['dash', T('Home', 'Početna'), 'home'], ['pin', T('Locations', 'Lokacije'), ''], ['shield', T('Security', 'Sigurnost'), 'sec'], ['user', T('Account', 'Nalog'), 'acc']].map(([i, l, k]) => `<span class="${k && k === tab ? 'on' : ''}">${ic(i)}${l}</span>`).join('')}</div>`;
+    if (tab === 'login') el.querySelector('.ph-nav').remove();
+  }
+
   // ================================================================== RUTER
   async function route() {
     if (!S.me) return;
@@ -1992,6 +2121,7 @@
       if (path === 'finansije') return await pageFinance(params);
       if (path === 'finansije/izvjestaji') return await pageReports(params);
       if (path === 'logovi') return await pageLogs(params);
+      if (path === 'aplikacija' && can('settings')) return await pageApp();
       if (path === 'postavke') return await pageSettings();
       if (path === 'profil') return await pageProfile();
       if (path === 'vise') return pageMore();
@@ -2103,6 +2233,13 @@
     editLevel: (d) => editLevel(d.id).catch(fail),
     newTx: (d) => newTx(d.type).catch(fail),
     jump: (d) => $('#sec-' + d.id)?.scrollIntoView({ behavior: 'smooth' }),
+    appToggle: async (d, el) => {
+      const v = el.getAttribute('aria-checked') !== 'true';
+      el.setAttribute('aria-checked', String(v));
+      const y = window.scrollY;
+      if (await appSave(d.k, v)) { await pageApp(); window.scrollTo(0, y); } else el.setAttribute('aria-checked', String(!v));
+    },
+    appTab: (d) => { S.appTab = d.v; $$('.app-tabs .chip').forEach((b) => b.classList.toggle('on', b.dataset.v === d.v)); appPhone(); },
     setToggle: (d, el) => { const v = el.getAttribute('aria-checked') !== 'true'; el.setAttribute('aria-checked', String(v)); markDirty(d.k, v); },
     setChip: (d, el) => { $$(`[data-a="setChip"][data-k="${d.k}"]`).forEach((c) => c.classList.toggle('on', c === el)); markDirty(d.k, d.v); },
     saveSettings: () => saveSettings(),

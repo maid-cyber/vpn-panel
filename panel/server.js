@@ -76,6 +76,7 @@ async function onRequest(req, res) {
       const s0 = settings.load();
       return await require('./lib/growth').trial(req, res, (s0.sub_url || s0.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`).replace(/\/+$/, ''));
     }
+    if (p === '/app/config' && req.method === 'GET') return send(res, 200, sub.appConfig(), { 'cache-control': 'no-store' });
     if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
     // javni sajt na glavnoj adresi (tajna adresa panela ostaje skrivena)
     if (settings.get('site_on')) {

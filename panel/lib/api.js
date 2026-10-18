@@ -171,7 +171,7 @@ function setupSteps(c) {
     { k: 'pay', label: 'Način plaćanja', hint: 'Postavke → Plaćanja (USDT, IBAN, PayPal ili Stripe)', href: 'postavke', done: !!((s.stripe_on && s.stripe_secret) || s.pay_usdt || s.pay_iban || s.pay_paypal) },
     { k: 'support', label: 'Kontakt podrške za kupce', hint: 'Postavke → Pretplata i aplikacije', href: 'postavke', done: !!s.support_contact },
     { k: 'tg', label: 'Telegram obavještenja', hint: 'Postavke → Obavještenja', href: 'postavke', done: !!s.tg_token },
-    { k: 'trial', label: 'Probni nalog u aplikaciji', hint: 'Postavke → Veltrix aplikacija', href: 'postavke', done: !!s.app_trial },
+    { k: 'trial', label: 'Probni nalog u aplikaciji', hint: 'Aplikacija → Probaj besplatno', href: 'aplikacija', done: !!s.app_trial },
     { k: '2fa', label: 'Dvostruka zaštita prijave (2FA)', hint: 'Moj profil → 2FA', href: 'profil', done: !!me?.totp_on },
     { k: 'user', label: 'Prvi kupac', hint: 'Korisnici → Novi korisnik', href: 'korisnici', done: !!one('SELECT id FROM users LIMIT 1') },
   ];
@@ -883,6 +883,29 @@ route('PUT', 'settings', 'settings', (c) => {
   log(c.auth.admin.username, 'Postavke spremljene', changed.join(', '));
   return { ok: true, changed, admin_path: settings.get('admin_path') };
 });
+// ============================== aplikacija (prekidači za Veltrix aplikacije) ==============================
+route('GET', 'appctl', 'settings', async () => {
+  const sec = settings.publicSchema().find((x) => x.id === 'aplikacija');
+  const extra = settings.publicSchema().flatMap((x) => x.rows).filter((r) => ['sub_announce', 'support_contact', 'proto_ss', 'stripe_on'].includes(r.key));
+  const v = settings.forClient();
+  const t = now(), week = t - 7 * 86400000;
+  const rows = all('SELECT app_os, app_build, COUNT(*) AS n FROM users WHERE app_seen > ? GROUP BY app_os, app_build ORDER BY app_build DESC', week);
+  const dl = await require('./site').downloads().catch(() => ({}));
+  const keys = [...sec.rows.map((r) => r.key), ...extra.map((r) => r.key)];
+  return {
+    rows: sec.rows, extra, values: Object.fromEntries(keys.map((k) => [k, v[k]])),
+    usage: {
+      android: rows.filter((r) => r.app_os === 'android').reduce((a, r) => a + r.n, 0),
+      windows: rows.filter((r) => r.app_os === 'windows').reduce((a, r) => a + r.n, 0),
+      builds: rows.map((r) => ({ os: r.app_os, build: r.app_build, n: r.n })),
+      other: one('SELECT COUNT(*) AS n FROM users WHERE last_seen > ? AND (app_seen IS NULL OR app_seen < ?)', week, week).n,
+    },
+    latest: { android: dl.apkBuild || 0, windows: dl.exeBuild || 0, android_ts: dl.apkTs || 0, windows_ts: dl.exeTs || 0, page: dl.page || '' },
+    stripe: !!(settings.get('stripe_on') && settings.get('stripe_secret')),
+    trial_plan: !!one('SELECT id FROM plans WHERE active = 1 AND trial = 1'),
+  };
+});
+
 route('POST', 'settings/test-telegram', 'settings', async () => {
   const r = await telegram('Probna poruka iz panela. Obavještenja rade. ✅');
   if (!r.ok) fail(400, `Telegram: ${r.error}`);

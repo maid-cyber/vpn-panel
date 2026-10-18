@@ -117,6 +117,31 @@ ${support ? `<p class="muted" style="text-align:center">Podrška: ${esc(support)
 </main></body></html>`;
 }
 
+// prekidači iz stranice Aplikacija koji vrijede i prije prijave (GET /app/config)
+function appFlags(s) {
+  return {
+    protocol: s.app_protocol !== false, ss_fallback: s.app_ss_fallback !== false, speedtest: s.app_speedtest !== false, diag: s.app_diag !== false,
+    notify: s.app_notify !== false, look: s.app_look !== false, language: s.app_language !== false, lang_default: s.app_lang_default || 'auto',
+    devices: s.app_devices !== false, support: s.app_support !== false, updates: s.app_updates !== false,
+    min_android: Number(s.app_min_android) || 0, min_windows: Number(s.app_min_windows) || 0, update_msg: s.app_update_msg || '',
+  };
+}
+
+/** Javna podešavanja za ekran prijave (nema naloga). */
+function appConfig() {
+  const s = settings.load();
+  return { brand: s.brand || 'Veltrix VPN', support: s.support_contact || '', trial: !!s.app_trial, ref: !!s.ref_on, features: appFlags(s) };
+}
+
+// zapamti koja aplikacija i verzija se javlja (za stranicu Aplikacija); UA: VeltrixVPN/Android/57
+function noteApp(u, ua) {
+  const m = /VeltrixVPN\/(Android|Windows)(?:\/(\d+))?/i.exec(String(ua || ''));
+  if (!m) return;
+  const os = m[1].toLowerCase(), build = Number(m[2]) || 0, t = Date.now();
+  if (u.app_os === os && u.app_build === build && t - (u.app_seen || 0) < 3600000) return;
+  run('UPDATE users SET app_os = ?, app_build = ?, app_seen = ? WHERE id = ?', os, build, t, u.id);
+}
+
 // podaci za Veltrix aplikaciju: nalog i gotovi sing-box outboundi za svaki server
 function appJson(u, s, link) {
   const st = vpn.userStatus(u);
@@ -136,7 +161,7 @@ function appJson(u, s, link) {
     return { id: sv.id, kind: 'server', name: sv.name, city: sv.city || sv.name, country: (sv.country || '').toUpperCase(), host: sv.host, port: sv.vless_port, tags: vpn.serverTags(sv), outbounds: out };
   }).filter((x) => x.outbounds.length) : [];
   // Double VPN / Multihop: kupac se spaja na ulazni server (port lanca), izlazi na zadnjem
-  if (ok && s.proto_vless) {
+  if (ok && s.proto_vless && s.app_chains !== false) {
     for (const { c, hops } of vpn.chainsForUser(u)) {
       const entry = hops[0], exit = hops[hops.length - 1];
       servers.push({
@@ -153,6 +178,7 @@ function appJson(u, s, link) {
     ipleak: !!s.app_ipleak, ipleak_default: !!s.app_ipleak_def, webrtc: !!s.app_webrtc, webrtc_default: !!s.app_webrtc_def,
     boot: !!s.app_boot, history: !!s.app_history,
     dns_filters: [s.block_ads && 'ads', s.block_adult && 'adult', s.block_malware && 'malware'].filter(Boolean),
+    ...appFlags(s),
   };
   const history = s.app_history ? all('SELECT ts, text FROM user_history WHERE user_id = ? ORDER BY id DESC LIMIT 30', u.id) : [];
   return {
@@ -173,7 +199,7 @@ async function handle(req, res, p) {
   const base = (s.sub_url || s.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`).replace(/\/+$/, '');
   const link = `${base}/s/${u.sub_token}`;
 
-  if (m[3]) return send(res, 200, { ...appJson(u, s, link), ...growth.appInfo(u) }, { 'cache-control': 'no-store' });
+  if (m[3]) { noteApp(u, req.headers['user-agent']); return send(res, 200, { ...appJson(u, s, link), ...growth.appInfo(u) }, { 'cache-control': 'no-store' }); }
   if (m[4] && req.method === 'POST') return growth.renew(req, res, u, link);
   if (m[2]) {
     const sv = one('SELECT * FROM servers WHERE id = ? AND enabled = 1', Number(m[2]));
@@ -205,4 +231,4 @@ async function handle(req, res, p) {
   return send(res, 200, b64(links.join('\n')), headers);
 }
 
-module.exports = { handle };
+module.exports = { handle, appConfig };

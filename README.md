@@ -246,7 +246,9 @@ Povezani kupci dobijaju podsjetnike pred istek i tvoje poruke, a sami mogu pitat
 
 Izvorni kod i instalacije su u repozitoriju `maid-cyber/veltrix-app` (Releases). Aplikacija čita nalog sa `/s/TOKEN/app`.
 
-- **Postavke → Veltrix aplikacija:** koje funkcije kupac vidi (Kill Switch, DNS, split tunneling, IP leak, WebRTC, povijest) i šta je uključeno za nove.
+- **Aplikacija (meni):** uključi ili isključi šta kupci imaju u aplikaciji, uz pregled telefona: Probaj besplatno, Produži karticom, Pozovi prijatelja, uređaji, povijest, podrška, izbor protokola, automatski Shadowsocks, Double VPN, Kill Switch, DNS, split tunneling, IP leak, WebRTC, test brzine, dijagnostika, obavijesti, boja, jezik i nove verzije. Promjena stiže kad kupac otvori aplikaciju.
+- **Obavezno ažuriranje:** u Aplikacija → Verzije upiši najstariji dozvoljeni build (Android ili Windows). Starije verzije prikažu samo dugme za ažuriranje i ne spajaju se. Stranica pokazuje koliko kupaca koristi koju verziju.
+- Aplikacija prije prijave čita `GET /app/config` (probni nalog, kod prijatelja, jezik, obavezno ažuriranje).
 - **Oznake servera** (Serveri → Uredi): P2P, Streaming, Gaming, Specijalni. Na P2P serverima torrent radi i kad je blokada uključena.
 - **Double VPN i Multihop** (Serveri → Novi lanac): 2 do 4 servera redom. Port lanca mora biti otvoren na svim serverima osim zadnjeg (agent ga otvori u ufw-u; Hetzner Cloud Firewall otvori ručno).
 
