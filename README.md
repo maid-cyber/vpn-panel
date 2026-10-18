@@ -242,7 +242,7 @@ Povezani kupci dobijaju podsjetnike pred istek i tvoje poruke, a sami mogu pitat
 - **S3:** upiši endpoint, regiju, bucket i ključeve u Postavke → Backup (Backblaze B2, Cloudflare R2, Wasabi ili AWS) i klikni **Probaj S3**. Svaki backup ode i tamo.
 - **Ažuriranje:** u Postavke → Sistem vidiš svoju i najnoviju verziju. Ažuriraš klikom na **Ažuriraj**, a dugme proradi nakon prvog ručnog ažuriranja na verziju 1.2.0. Log ažuriranja je u `/var/log/vpn-panel-update.log`.
 
-## 15. Veltrix aplikacija (Android i Windows)
+## 15. AdiLink aplikacija (Android i Windows)
 
 Izvorni kod i instalacije su u repozitoriju `maid-cyber/veltrix-app` (Releases). Aplikacija čita nalog sa `/s/TOKEN/app`.
 
@@ -255,9 +255,9 @@ Izvorni kod i instalacije su u repozitoriju `maid-cyber/veltrix-app` (Releases).
 
 ## 16. Probni nalog, plaćanje karticom i preporuke
 
-- **Probni nalog iz aplikacije:** Postavke → Veltrix aplikacija → "Probni nalog iz aplikacije". Koristi prvi aktivni plan označen kao probni. Jedan po uređaju, jedan po IP adresi sedmično i dnevni limit.
+- **Probni nalog iz aplikacije:** Postavke → AdiLink aplikacija → "Probni nalog iz aplikacije". Koristi prvi aktivni plan označen kao probni. Jedan po uređaju, jedan po IP adresi sedmično i dnevni limit.
 - **Kupac sam produžava karticom:** treba uključen Stripe (Postavke → Plaćanja) i planovi sa cijenom. Dugme "Produži" se pojavi u aplikaciji i na stranici kupca. Uplata se vidi u Transakcijama, a nalog se produži sam. Samo za tvoje kupce, ne za kupce resellera.
-- **Pozovi prijatelja:** svaki kupac ima kod. Prijatelj ga upiše kod "Probaj besplatno"; kad prvi put plati, obojica dobiju gratis dane (Postavke → Veltrix aplikacija).
+- **Pozovi prijatelja:** svaki kupac ima kod. Prijatelj ga upiše kod "Probaj besplatno"; kad prvi put plati, obojica dobiju gratis dane (Postavke → AdiLink aplikacija).
 - **Telegram:** ako Xray na serveru ne radi duže od 3 javljanja, stiže upozorenje, i ponovo kad proradi.
 
 ## 17. Web sajt
@@ -324,7 +324,7 @@ Na vrhu piše presuda: **Kod nas** (popravi server), **Nalog** (produži, upali)
 ## 24. Preuzimanje aplikacija i otvaranje jednim klikom
 
 - **/download/android** i **/download/windows**: aplikacije se skidaju sa tvoje adrese, ne sa GitHuba. Panel sam skine zadnju verziju sa GitHub Releases (pri pokretanju i svakih sat vremena) i čuva je u `data/downloads`.
-- E-mail i stranica kupca imaju dugme **Otvori u aplikaciji i spoji se**: na Androidu i Windowsu otvori Veltrix, uveze nalog i spoji se (ako aplikacija nije instalirana, Android ponudi preuzimanje). Na iPhoneu otvori Hiddify.
+- E-mail i stranica kupca imaju dugme **Otvori u aplikaciji i spoji se**: na Androidu i Windowsu otvori AdiLink aplikaciju, uveze nalog i spoji se (ako aplikacija nije instalirana, Android ponudi preuzimanje). Na iPhoneu otvori Hiddify.
 - U e-mailu je i **QR kod** (PNG, `/s/TOKEN/qr.png`) za skeniranje telefonom kad kupac čita e-mail na računaru.
 
 ## 25. Privatni GitHub repozitoriji
@@ -345,7 +345,7 @@ Aplikacije se same ažuriraju preko panela (`/app/config` i `/download/…`), pa
 
 ## 26. E-mailovi resellerima
 
-Reselleri dobijaju e-mailove u istom tamnom Veltrix izgledu kao kupci:
+Reselleri dobijaju e-mailove u istom tamnom AdiLink izgledu kao kupci:
 
 - **Novi reseller**: link panela, korisničko ime, nivo, popust, kredit, cijene sa popustom i 3 koraka za početak. Šifra ide u e-mail samo ako u formi označiš "Upiši i šifru u e-mail".
 - **Nalog odobren**: kad odobriš resellera koji se sam registrovao.
@@ -364,3 +364,10 @@ Kupac u botu klikne **Kupi VPN**, izabere plan, plati PayPalom (računom ili kar
 4. Postavke → Opšte → **Adresa panela** mora biti upisana (PayPal tamo vraća kupca).
 
 Valuta mora biti EUR, USD ili CHF. Bot prodaje aktivne planove sa cijenom (bez probnih). Uplata se provjerava i svake minute, pa nalog stiže i ako kupac zatvori PayPal stranicu prije povratka. Kupci resellera ne mogu produžiti preko bota (javljaju se svom prodavcu).
+
+## 28. Novo ime: AdiLink VPN, novi sajt i godišnje cijene (3.0.0)
+
+- **Ime:** brend je sada **AdiLink VPN** (logo: štit sa slovom A). Panel pri prvom pokretanju sam promijeni ime brenda, ime profila i ime pošiljaoca e-maila ako je ostalo staro "Veltrix VPN". Interni nazivi (`veltrix://`, paket `com.veltrix.vpn`, repozitorij `veltrix-app`) ostaju isti, da postojeće aplikacije rade i nadograde se bez reinstalacije.
+- **Sajt:** novi izgled u bojama aplikacije, koraci "Kako radi", prekidač **Mjesečno / Godišnje** sa cijenom po mjesecu i uštedom, plaćanje **PayPalom ili karticom preko PayPala** (i Stripe, ako je uključen), dugme za kupovinu preko Telegram bota.
+- **Godišnji planovi:** pri prvom pokretanju 3.0.0 panel za svaki mjesečni plan napravi godišnji (365 dana, oko 40% jeftinije po mjesecu, npr. €5/mj → €35.99/god). Ako već imaš planove od 300+ dana, ne pravi ništa. Cijene mijenjaš u **Planovi**.
+- **Produženje bez Stripea:** kad Stripe nije uključen, kupac na svojoj stranici i u aplikaciji produžava preko PayPala.

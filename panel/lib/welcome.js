@@ -14,7 +14,7 @@ function build(u, kind, baseOverride = '') {
   if (!base) return null;
   const owner = u.owner_id ? one('SELECT brand, contact, brand_color FROM admins WHERE id = ?', u.owner_id) : null;
   const wl = s.res_whitelabel && owner?.brand;
-  const brand = wl ? owner.brand : s.brand || 'Veltrix VPN';
+  const brand = wl ? owner.brand : s.brand || 'AdiLink VPN';
   const support = (wl ? owner.contact : s.support_contact) || '';
   const color = (wl && owner.brand_color) || ACCENT[s.accent] || '#E3172B';
   const link = `${base}/s/${u.sub_token}`;

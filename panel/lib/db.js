@@ -157,6 +157,9 @@ const run = (sql, ...a) => db.prepare(sql).run(...a);
 db.exec(`CREATE TABLE IF NOT EXISTS bot_orders (id INTEGER PRIMARY KEY AUTOINCREMENT, chat TEXT NOT NULL, kind TEXT NOT NULL, plan_id INTEGER, user_id INTEGER,
   amount REAL NOT NULL, currency TEXT NOT NULL, pp_id TEXT UNIQUE, capture_id TEXT, status TEXT NOT NULL, tg_name TEXT DEFAULT '', created_at INTEGER NOT NULL, paid_at INTEGER);
 CREATE INDEX IF NOT EXISTS bot_orders_status ON bot_orders(status);`);
+addCol('bot_orders', 'email', "TEXT DEFAULT ''");
+addCol('bot_orders', 'coupon_id', 'INTEGER');
+addCol('bot_orders', 'discount', 'REAL DEFAULT 0');
 
 function tx(fn) {
   db.exec('BEGIN');

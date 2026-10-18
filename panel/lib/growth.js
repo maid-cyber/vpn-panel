@@ -30,7 +30,7 @@ function trialPlan() {
 
 function renewPlans(u) {
   const s = settings.load();
-  if (!s.renew_on || !s.stripe_on || !s.stripe_secret || u.owner_id) return [];
+  if (!s.renew_on || u.owner_id || !((s.stripe_on && s.stripe_secret) || require('./paypal').ready())) return [];
   return all('SELECT id, name, days, price, traffic_gb, devices FROM plans WHERE active = 1 AND trial = 0 AND price > 0 ORDER BY sort, id')
     .map((p) => ({ id: p.id, name: p.name, days: p.days, price: p.price, traffic_gb: p.traffic_gb, devices: p.devices }));
 }
@@ -90,9 +90,18 @@ async function renew(req, res, u, link) {
   const s = settings.load();
   const b = await readBody(req, 4096).catch(() => ({}));
   const plan = renewPlans(u).find((p) => p.id === Number(b.plan_id));
-  if (!plan) return send(res, 400, { error: 'Plan nije dostupan za plaćanje karticom.' });
+  if (!plan) return send(res, 400, { error: 'Plan nije dostupan za plaćanje.' });
   let k;
   try { k = require('./coupons').apply(b.coupon, plan); } catch (e) { return send(res, 400, { error: e.message }); }
+  // bez Stripea: PayPal (PayPal račun ili kartica preko PayPala)
+  if (!(s.stripe_on && s.stripe_secret)) {
+    try {
+      const o = await require('./paypal').createOrder({ kind: 'renew_web', chat: u.tg_chat || '', userId: u.id, plan, price: k.price, couponId: k.coupon?.id, discount: k.discount, email: u.email });
+      if (!o.url) return send(res, 502, { error: 'PayPal nije vratio link za plaćanje.' });
+      log(u.username, 'Kupac započeo plaćanje (PayPal)', `${plan.name} · €${k.price}`);
+      return send(res, 200, { url: o.url });
+    } catch (e) { return send(res, 502, { error: e.message }); }
+  }
   const form = new URLSearchParams({
     mode: 'payment',
     success_url: `${link}?placeno=1`,

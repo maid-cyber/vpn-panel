@@ -897,7 +897,7 @@ route('PUT', 'settings', 'settings', (c) => {
 // ============================== dijagnostika kupca ==============================
 route('GET', 'diag/:id', 'users', async (c) => require('./diag').check(c.params.id));
 
-// ============================== aplikacija (prekidači za Veltrix aplikacije) ==============================
+// ============================== aplikacija (prekidači za AdiLink aplikacije) ==============================
 route('GET', 'appctl', 'settings', async () => {
   const sec = settings.publicSchema().find((x) => x.id === 'aplikacija');
   const extra = settings.publicSchema().flatMap((x) => x.rows).filter((r) => ['sub_announce', 'support_contact', 'proto_ss', 'stripe_on'].includes(r.key));
@@ -1009,7 +1009,7 @@ route('POST', 'settings/test-cbot', 'settings', async () => {
   return { ok: true, username: r.result.username };
 });
 route('POST', 'settings/test-s3', 'settings', async () => {
-  await s3.put(`vpn-panel/test-${Date.now()}.txt`, Buffer.from('Veltrix panel test'), 'text/plain');
+  await s3.put(`vpn-panel/test-${Date.now()}.txt`, Buffer.from('AdiLink panel test'), 'text/plain');
   return { ok: true };
 });
 route('GET', 'system/update', 'owner', async () => {

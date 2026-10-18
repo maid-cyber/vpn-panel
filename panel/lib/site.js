@@ -64,8 +64,8 @@ function siteData(d) {
     byCountry.set(cc, c);
   }
   return {
-    brand: s.brand || 'Veltrix VPN', currency: CUR[s.currency] || '€', support: s.support_contact || '',
-    buy: !!(s.stripe_on && s.stripe_secret), plans,
+    brand: s.brand || 'AdiLink VPN', currency: CUR[s.currency] || '€', support: s.support_contact || '',
+    buy: !!(s.stripe_on && s.stripe_secret) || require('./paypal').ready(), card: !!(s.stripe_on && s.stripe_secret), paypal: require('./paypal').ready(), plans,
     countries: [...byCountry.values()].map((c) => ({ cc: c.cc, cities: [...c.cities], online: c.online })),
     servers: servers.length, protocols: { vless: !!s.proto_vless, ss: !!s.proto_ss, wg: !!s.proto_wg },
     blocks: { ads: !!s.block_ads, malware: !!s.block_malware },
@@ -77,6 +77,8 @@ function siteData(d) {
 
 async function page(req, res) {
   const data = siteData(await downloads());
+  const s0 = settings.load();
+  data.bot = s0.cbot_on && s0.cbot_sell !== false && data.paypal ? await require('./cbot').username().catch(() => null) : null;
   const html = fs.readFileSync(path.join(PUBLIC, 'site.html'), 'utf8')
     .replace(/__BRAND__/g, esc(data.brand))
     .replace('/*__DATA__*/', `window.SITE=${JSON.stringify(data).replace(/</g, '\\u003c')};`);
@@ -86,8 +88,10 @@ async function page(req, res) {
 // POST /buy {plan_id, email} → Stripe Checkout
 async function buy(req, res) {
   const s = settings.load();
-  if (!s.stripe_on || !s.stripe_secret) return send(res, 400, { error: 'Kupovina karticom trenutno nije dostupna.' });
   const b = await readBody(req, 4096).catch(() => ({}));
+  const pp = require('./paypal');
+  const usePaypal = b.method === 'paypal' || !(s.stripe_on && s.stripe_secret);
+  if (usePaypal && !pp.ready()) return send(res, 400, { error: 'Kupovina trenutno nije dostupna.' });
   const plan = one('SELECT * FROM plans WHERE id = ? AND active = 1 AND trial = 0 AND price > 0', Number(b.plan_id));
   if (!plan) return send(res, 400, { error: 'Plan nije dostupan.' });
   const email = String(b.email || '').trim().slice(0, 120);
@@ -95,6 +99,14 @@ async function buy(req, res) {
   const site = base(req);
   let k;
   try { k = coupons.apply(b.coupon, plan); } catch (e) { return send(res, 400, { error: e.message }); }
+  if (usePaypal) {
+    try {
+      const o = await pp.createOrder({ kind: 'site', plan, email, price: k.price, couponId: k.coupon?.id, discount: k.discount });
+      if (!o.url) return send(res, 502, { error: 'PayPal nije vratio link za plaćanje.' });
+      log('sajt', 'Kupovina započeta na sajtu (PayPal)', `${plan.name} · ${email}`);
+      return send(res, 200, { url: o.url });
+    } catch (e) { return send(res, 502, { error: e.message }); }
+  }
   const form = new URLSearchParams({
     mode: 'payment', customer_email: email,
     success_url: `${site}/kupljeno?s={CHECKOUT_SESSION_ID}`, cancel_url: `${site}/#cijene`,
@@ -140,8 +152,8 @@ function paidBuy(ses, siteBase) {
 
 // GET /buy/status?s=cs_... → {ready, link, qr}
 function status(req, res, url) {
-  const sid = String(url.searchParams.get('s') || '');
-  if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(sid)) return send(res, 400, { error: 'bad' });
+  const sid = String(url.searchParams.get('s') || url.searchParams.get('pp') || '');
+  if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(sid) && !/^[A-Z0-9]{8,40}$/.test(sid)) return send(res, 400, { error: 'bad' });
   const p = one('SELECT * FROM purchases WHERE session = ?', sid);
   if (!p) return send(res, 200, { ready: false });
   const u = one('SELECT sub_token, username FROM users WHERE id = ?', p.user_id);
@@ -153,19 +165,43 @@ function status(req, res, url) {
 function bought(req, res) {
   const s = settings.load();
   const html = `<!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(s.brand)} · hvala</title><meta name="robots" content="noindex">
-<style>body{margin:0;background:#050916;color:#f1f4fb;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:grid;place-items:center;min-height:100vh;padding:20px;box-sizing:border-box}
-main{max-width:460px;width:100%;background:#0b1226;border:1px solid #1c2747;border-radius:20px;padding:30px;text-align:center}h1{margin:0 0 6px;font-size:26px}.m{color:#9aa6c2}
+<style>body{margin:0;background:#0b0b10;color:#f2f2f6;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:grid;place-items:center;min-height:100vh;padding:20px;box-sizing:border-box}
+main{max-width:460px;width:100%;background:#14141c;border:1px solid #2a2a37;border-top:4px solid #e3172b;border-radius:20px;padding:30px;text-align:center}h1{margin:0 0 6px;font-size:26px}.m{color:#8e8e9c}
 .qr{background:#fff;border-radius:14px;padding:10px;width:220px;margin:18px auto}.qr svg{display:block;width:100%;height:auto}
-.l{font:13px ui-monospace,Consolas,monospace;word-break:break-all;color:#c5cde0;background:#070c1d;border:1px solid #1c2747;border-radius:10px;padding:10px}
+.l{font:13px ui-monospace,Consolas,monospace;word-break:break-all;color:#c3c3cf;background:#101017;border:1px solid #2a2a37;border-radius:10px;padding:10px}
 a.b,button{display:block;width:100%;margin-top:12px;padding:14px;border-radius:12px;border:0;background:linear-gradient(180deg,#ff4a5a,#e3172b);color:#fff;font:600 16px system-ui;text-decoration:none;cursor:pointer}
-.sp{width:34px;height:34px;border:3px solid #223056;border-top-color:#ff4a5a;border-radius:50%;margin:20px auto;animation:r 1s linear infinite}@keyframes r{to{transform:rotate(360deg)}}</style></head>
+.sp{width:34px;height:34px;border:3px solid #2a2a37;border-top-color:#ff4a5a;border-radius:50%;margin:20px auto;animation:r 1s linear infinite}@keyframes r{to{transform:rotate(360deg)}}</style></head>
 <body><main id="m"><h1>Hvala na kupovini! 🎉</h1><p class="m">Pravimo tvoj nalog, traje par sekundi…</p><div class="sp"></div></main>
-<script>const s=new URLSearchParams(location.search).get('s');let n=0;
-function t(){fetch('/buy/status?s='+encodeURIComponent(s)).then(r=>r.json()).then(j=>{if(j.ready){document.getElementById('m').innerHTML='<h1>Spreman si ✅</h1><p class="m">Nalog <b>'+j.username+'</b>. Skeniraj QR kod u aplikaciji ili otvori link. Link smo poslali i na tvoj e-mail.</p><div class="qr">'+j.qr+'</div><div class="l">'+j.link+'</div><a class="b" href="'+j.link+'">Otvori moj nalog i aplikacije</a><button onclick="navigator.clipboard.writeText(\\''+j.link+'\\').then(()=>this.textContent=\\'Kopirano ✓\\')">Kopiraj link</button>';}else if(++n<40)setTimeout(t,3000);else document.getElementById('m').innerHTML='<h1>Uplata primljena</h1><p class="m">Nalog se još pravi. Provjeri e-mail za par minuta ili se javi podršci${s.support_contact ? ': ' + esc(s.support_contact) : ''}.</p>';}).catch(()=>setTimeout(t,4000))}t();</script></body></html>`;
+<script>const q=new URLSearchParams(location.search),s=q.get('s')||q.get('pp');let n=0;
+function t(){fetch('/buy/status?'+(q.get('pp')?'pp=':'s=')+encodeURIComponent(s)).then(r=>r.json()).then(j=>{if(j.ready){document.getElementById('m').innerHTML='<h1>Spreman si ✅</h1><p class="m">Nalog <b>'+j.username+'</b>. Skeniraj QR kod u aplikaciji ili otvori link. Link smo poslali i na tvoj e-mail.</p><div class="qr">'+j.qr+'</div><div class="l">'+j.link+'</div><a class="b" href="'+j.link+'">Otvori moj nalog i aplikacije</a><button onclick="navigator.clipboard.writeText(\\''+j.link+'\\').then(()=>this.textContent=\\'Kopirano ✓\\')">Kopiraj link</button>';}else if(++n<40)setTimeout(t,3000);else document.getElementById('m').innerHTML='<h1>Uplata primljena</h1><p class="m">Nalog se još pravi. Provjeri e-mail za par minuta ili se javi podršci${s.support_contact ? ': ' + esc(s.support_contact) : ''}.</p>';}).catch(()=>setTimeout(t,4000))}t();</script></body></html>`;
   return send(res, 200, html, { 'content-type': 'text/html; charset=utf-8' });
 }
 
 /** Zadnji poznati buildovi bez čekanja mreže (osvježi u pozadini). */
 function downloadsCached() { downloads().catch(() => {}); return dl; }
 
-module.exports = { page, buy, paidBuy, status, bought, siteData, downloads, downloadsCached, ghHeaders };
+/**
+ * Jednom: za svaki mjesečni plan napravi godišnji (12 mjeseci, oko 40% jeftinije po mjesecu),
+ * ako godišnjih planova još nema. Cijene se poslije mijenjaju u Planovi.
+ */
+function ensureYearly() {
+  if (one("SELECT value FROM settings WHERE key = '_yearly_plans_v1'")) return;
+  run("INSERT OR REPLACE INTO settings (key, value) VALUES ('_yearly_plans_v1', 'true')");
+  if (one('SELECT id FROM plans WHERE days >= 300 AND trial = 0 LIMIT 1')) return;
+  const cols = all('PRAGMA table_info(plans)').map((c) => c.name).filter((c) => !['id', 'name', 'days', 'price', 'traffic_gb', 'sort'].includes(c));
+  const monthly = all('SELECT * FROM plans WHERE active = 1 AND trial = 0 AND price > 0 AND days BETWEEN 28 AND 31 ORDER BY sort, id');
+  const seen = new Set();
+  for (const p of monthly) {
+    const key = `${p.name}|${p.price}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let name = (String(p.name).replace(/\s*[-·,]?\s*\d+\s*(dana|dan|days?)$/i, '').replace(/\s*mjese(č|c)ni\b/i, '').trim() || p.name) + ' · 12 mjeseci';
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    const price = Math.max(1, Math.ceil(p.price * 12 * 0.6) - 0.01);
+    run(`INSERT INTO plans (name, days, price, traffic_gb, sort${cols.map((c) => ', ' + c).join('')}) VALUES (?,?,?,?,?${cols.map(() => ',?').join('')})`,
+      name, 365, Math.round(price * 100) / 100, p.traffic_gb ? p.traffic_gb * 12 : 0, (p.sort || 0) + 100, ...cols.map((c) => p[c]));
+    log('sistem', 'Napravljen godišnji plan', `${name} · ${price.toFixed(2)}`);
+  }
+}
+
+module.exports = { ensureYearly, page, buy, paidBuy, status, bought, siteData, downloads, downloadsCached, ghHeaders };

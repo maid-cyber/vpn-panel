@@ -54,21 +54,21 @@ function baseUrl() {
 
 const money = (n) => `${CUR[settings.get('currency')] || '€'}${Number(n || 0).toFixed(2)}`;
 
-/** Napravi narudžbu za bota. kind: 'buy' | 'renew'. Vraća { id, url }. */
-async function createOrder({ chat, kind, plan, userId, tgName }) {
+/** Napravi narudžbu. kind: 'buy' | 'renew' (Telegram bot) | 'site' (web sajt). Vraća { id, url }. */
+async function createOrder({ chat, kind, plan, userId, tgName, email, price, couponId, discount }) {
   const s = settings.load();
   if (!ready()) throw new Error('PayPal nije podešen.');
   const b = baseUrl();
   if (!b) throw new Error('Upiši adresu panela (Postavke → Opšte → Adresa panela).');
   const cur = s.currency || 'EUR';
-  const amount = Number(plan.price).toFixed(2);
-  const r = run('INSERT INTO bot_orders (chat, kind, plan_id, user_id, amount, currency, status, tg_name, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
-    String(chat), kind, plan.id, userId || null, Number(amount), cur, 'new', String(tgName || '').slice(0, 64), now());
+  const amount = Number(price ?? plan.price).toFixed(2);
+  const r = run('INSERT INTO bot_orders (chat, kind, plan_id, user_id, amount, currency, status, tg_name, created_at, email, coupon_id, discount) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+    String(chat || ''), kind, plan.id, userId || null, Number(amount), cur, 'new', String(tgName || '').slice(0, 64), now(), String(email || '').slice(0, 120), couponId || null, Number(discount) || 0);
   const oid = Number(r.lastInsertRowid);
   const res = await pp('POST', '/v2/checkout/orders', {
     intent: 'CAPTURE',
     purchase_units: [{
-      reference_id: `bot-${oid}`, custom_id: `bot-${oid}`, invoice_id: `${String(s.brand || 'VPN').replace(/[^A-Za-z0-9]/g, '').slice(0, 12)}-TG-${oid}`,
+      reference_id: `bot-${oid}`, custom_id: `bot-${oid}`, invoice_id: `${String(s.brand || 'VPN').replace(/[^A-Za-z0-9]/g, '').slice(0, 12)}-${kind === 'site' ? 'WEB' : 'TG'}-${oid}`,
       description: `${s.brand} · ${plan.name}${kind === 'renew' ? ' (produženje)' : ''}`.slice(0, 127),
       amount: { currency_code: cur, value: amount },
     }],
@@ -83,7 +83,7 @@ async function createOrder({ chat, kind, plan, userId, tgName }) {
   }
   const link = (res.j.links || []).find((l) => l.rel === 'payer-action' || l.rel === 'approve');
   run("UPDATE bot_orders SET pp_id = ?, status = 'created' WHERE id = ?", res.j.id, oid);
-  log('sistem', 'PayPal narudžba (bot)', `#${oid} · ${plan.name} · ${money(amount)}`);
+  log('sistem', kind === 'site' ? 'PayPal narudžba (sajt)' : 'PayPal narudžba (bot)', `#${oid} · ${plan.name} · ${money(amount)}`);
   return { id: oid, url: link?.href };
 }
 
@@ -116,11 +116,16 @@ function fulfil(o, cap) {
   });
   if (!claimed) return one('SELECT * FROM bot_orders WHERE id = ?', o.id);
   try {
-    if (o.kind === 'buy') {
+    if (o.kind === 'site') {
+      userId = core.createUser({ username: 'sajt', role: 'owner', id: 0 }, { plan_id: o.plan_id, email: o.email, paid: o.amount, method: 'PayPal', note: 'Kupljeno na sajtu', contact: o.email });
+      run('INSERT OR IGNORE INTO purchases (session, user_id, email, ts) VALUES (?,?,?,?)', o.pp_id, userId, o.email, now());
+      require('./coupons').used({ id: o.pp_id, metadata: { coupon_id: o.coupon_id, discount: o.discount }, amount_total: Math.round(o.amount * 100) }, userId);
+    } else if (o.kind === 'buy') {
       userId = core.createUser(SYSTEM, { plan_id: o.plan_id, paid: o.amount, method: 'PayPal', note: `Kupljeno preko Telegram bota${o.tg_name ? ' · @' + o.tg_name : ''}`, contact: o.tg_name ? '@' + o.tg_name : `tg:${o.chat}` });
       run('UPDATE users SET tg_chat = ? WHERE id = ?', o.chat, userId);
     } else {
-      require('./growth').paidRenew({ id: cap.id, metadata: { user_id: o.user_id, plan_id: o.plan_id }, amount_total: Math.round(o.amount * 100), method: 'PayPal', actor: 'Telegram bot' });
+      if (o.coupon_id) require('./coupons').used({ id: cap.id, metadata: { coupon_id: o.coupon_id, discount: o.discount }, amount_total: Math.round(o.amount * 100) }, o.user_id);
+      require('./growth').paidRenew({ id: cap.id, metadata: { user_id: o.user_id, plan_id: o.plan_id }, amount_total: Math.round(o.amount * 100), method: 'PayPal', actor: o.kind === 'renew_web' ? 'kupac (PayPal)' : 'Telegram bot' });
     }
     const trx = one('SELECT id FROM transactions WHERE user_id = ? AND ext_id IS NULL ORDER BY id DESC LIMIT 1', userId);
     if (trx) run('UPDATE transactions SET ext_id = ? WHERE id = ?', cap.id, trx.id);
@@ -132,8 +137,10 @@ function fulfil(o, cap) {
     throw e;
   }
   const done = one('SELECT * FROM bot_orders WHERE id = ?', o.id);
-  log('sistem', o.kind === 'buy' ? 'Kupljeno preko bota (PayPal)' : 'Produženo preko bota (PayPal)', `#${o.id} · ${money(o.amount)}`);
-  require('./cbot').delivered(done).catch((e) => console.error('cbot delivered', e));
+  log(o.kind === 'site' ? 'sajt' : 'sistem', { site: 'Kupljeno na sajtu (PayPal)', buy: 'Kupljeno preko bota (PayPal)', renew: 'Produženo preko bota (PayPal)', renew_web: 'Kupac produžio nalog (PayPal)' }[o.kind], `#${o.id} · ${money(o.amount)}`);
+  if (o.kind === 'site') {
+    if (o.email && require('./mail').configured()) require('./welcome').send(userId, 'buy', o.email, baseUrl()).catch((e) => log('sistem', 'E-mail kupcu nije poslan', String(e.message || e), 'warn'));
+  } else if (o.chat) require('./cbot').delivered(done).catch((e) => console.error('cbot delivered', e));
   return done;
 }
 
@@ -157,6 +164,19 @@ async function handle(req, res, url) {
   const ppId = String(url.searchParams.get('token') || '');
   const h = { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' };
   if (!/^[A-Z0-9]{8,40}$/.test(ppId)) return send(res, 400, page('Neispravan link', 'Vrati se u Telegram i pokušaj ponovo.', false).replace('__BTN__', await btn()), h);
+  const ord = one('SELECT kind, user_id FROM bot_orders WHERE pp_id = ?', ppId);
+  if (ord?.kind === 'renew_web') {   // produženje sa stranice kupca ili iz aplikacije: nazad na stranicu naloga
+    const u = one('SELECT sub_token FROM users WHERE id = ?', ord.user_id);
+    const back = u ? `/s/${u.sub_token}` : '/';
+    if (url.pathname.endsWith('/cancel')) { run("UPDATE bot_orders SET status = 'cancelled' WHERE pp_id = ? AND status = 'created'", ppId); res.writeHead(302, { location: back }); return res.end(); }
+    try { await capture(ppId); } catch (e) { console.error('paypal renew', e); }
+    res.writeHead(302, { location: `${back}?placeno=1` }); return res.end();
+  }
+  if (ord?.kind === 'site') {   // kupovina sa sajta: nazad na sajt
+    if (url.pathname.endsWith('/cancel')) { run("UPDATE bot_orders SET status = 'cancelled' WHERE pp_id = ? AND status = 'created'", ppId); res.writeHead(302, { location: '/#cijene' }); return res.end(); }
+    try { await capture(ppId); } catch (e) { console.error('paypal site', e); }
+    res.writeHead(302, { location: `/kupljeno?pp=${ppId}` }); return res.end();
+  }
   if (url.pathname.endsWith('/cancel')) {
     const o = one('SELECT * FROM bot_orders WHERE pp_id = ?', ppId);
     if (o && o.status === 'created') {

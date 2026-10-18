@@ -21,7 +21,7 @@ function base(fallback = '') {
  */
 function layout(o) {
   const s = settings.load();
-  const brand = o.brand || s.brand || 'Veltrix VPN';
+  const brand = o.brand || s.brand || 'AdiLink VPN';
   const color = o.color || ACCENT[s.accent] || '#E3172B';
   const logo = o.logo || (base() ? `${base()}/mail/logo.png` : '');
   const m = brand.trim().match(/^(.*?)\s+vpn$/i) || brand.trim().match(/^vpn\s+(.*)$/i);

@@ -10,8 +10,8 @@ const { send } = require('./http');
 
 const DIR = path.join(DATA_DIR, 'downloads');
 const KIND = {
-  android: { key: 'apk', build: 'apkBuild', file: (b) => `android-${b}.apk`, name: 'Veltrix-VPN.apk', type: 'application/vnd.android.package-archive' },
-  windows: { key: 'exe', build: 'exeBuild', file: (b) => `windows-${b}.exe`, name: 'Veltrix-VPN-Setup.exe', type: 'application/vnd.microsoft.portable-executable' },
+  android: { key: 'apk', build: 'apkBuild', file: (b) => `android-${b}.apk`, name: 'AdiLink-VPN.apk', type: 'application/vnd.android.package-archive' },
+  windows: { key: 'exe', build: 'exeBuild', file: (b) => `windows-${b}.exe`, name: 'AdiLink-VPN-Setup.exe', type: 'application/vnd.microsoft.portable-executable' },
 };
 const busy = new Map();
 

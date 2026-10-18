@@ -7,7 +7,7 @@ const { one, run, all } = require('./db');
 // soon: true -> prikazuje se, ali još ne radi (označeno u panelu)
 const SCHEMA = [
   { id: 'opste', title: 'Općenito i brend', desc: 'Ime, izgled i osnovne informacije panela.', rows: [
-    { key: 'brand', type: 'text', label: 'Ime brenda', sub: 'Prikazuje se u panelu, aplikacijama, stranici za kupce i fakturama', def: 'Veltrix VPN' },
+    { key: 'brand', type: 'text', label: 'Ime brenda', sub: 'Prikazuje se u panelu, aplikacijama, stranici za kupce i fakturama', def: 'AdiLink VPN' },
     { key: 'accent', type: 'chips', label: 'Boja akcenta', options: ['crvena', 'plava', 'zelena', 'ljubičasta'], def: 'crvena' },
     { key: 'panel_url', type: 'text', label: 'Adresa panela', sub: 'npr. https://panel.tvojvpn.com — koristi se u komandi za instalaciju servera', def: '', mono: true },
     { key: 'sub_url', type: 'text', label: 'Adresa za pretplatne linkove', sub: 'Odvojena domena, da kupci ne vide adresu panela. Prazno = ista kao panel.', def: '', mono: true },
@@ -120,7 +120,7 @@ const SCHEMA = [
     { key: 'smtp_port', type: 'select', label: 'E-mail: port', options: ['587', '465', '2525'], labels: ['587 (STARTTLS)', '465 (SSL)', '2525'], def: '587' },
     { key: 'smtp_user', type: 'text', label: 'E-mail: korisničko ime', def: '', mono: true },
     { key: 'smtp_pass', type: 'secret', label: 'E-mail: šifra ili API ključ', def: '' },
-    { key: 'smtp_from', type: 'text', label: 'E-mail: pošiljalac', sub: 'npr. Veltrix VPN <info@tvojadomena.com>', def: '' },
+    { key: 'smtp_from', type: 'text', label: 'E-mail: pošiljalac', sub: 'npr. AdiLink VPN <info@tvojadomena.com>', def: '' },
     { key: 'mail_welcome', type: 'toggle', label: 'Kupcu automatski pošalji pristup na e-mail', sub: 'Kad napraviš kupca sa e-mailom (ti ili reseller): link, plan, datum isteka i 3 koraka za spajanje', def: true },
     { key: 'mail_newlink', type: 'toggle', label: 'Pošalji kupcu e-mail kad mu daš novi link', def: true },
     { key: 'mail_resellers', type: 'toggle', label: 'E-mailovi resellerima', sub: 'Pristup kad napraviš reseller nalog, nalog odobren, faktura za dopunu kredita i upozorenje kad padne ispod €10', def: true },
@@ -131,14 +131,14 @@ const SCHEMA = [
     { key: 'sub_announce', type: 'text', label: 'Poruka u aplikaciji i na stranici za kupce', sub: 'Podržavaju je Hiddify i neke druge aplikacije', def: '' },
     { key: 'customer_page', type: 'toggle', label: 'Stranica za kupce', sub: 'Status, QR kod i uputstva kad kupac otvori link u browseru', def: true },
     { key: 'support_contact', type: 'text', label: 'Kontakt podrške za kupce', sub: 'npr. Telegram @tvojvpn', def: '' },
-    { key: 'apps', type: 'multi', label: 'Preporučene aplikacije na stranici kupca', options: ['veltrix', 'hiddify', 'v2rayng', 'streisand', 'v2box', 'happ', 'shadowrocket'], labels: ['Veltrix VPN (naša)', 'Hiddify', 'v2rayNG', 'Streisand', 'V2Box', 'Happ', 'Shadowrocket'], def: 'veltrix,hiddify,v2rayng,streisand,v2box' },
+    { key: 'apps', type: 'multi', label: 'Preporučene aplikacije na stranici kupca', options: ['veltrix', 'hiddify', 'v2rayng', 'streisand', 'v2box', 'happ', 'shadowrocket'], labels: ['AdiLink VPN (naša)', 'Hiddify', 'v2rayNG', 'Streisand', 'V2Box', 'Happ', 'Shadowrocket'], def: 'veltrix,hiddify,v2rayng,streisand,v2box' },
     { key: 'msg_template', type: 'textarea', label: 'Poruka za kupca (dugme "Pošalji kupcu")', sub: 'Zamjene: {korisnik} {plan} {istice} {dana} {link} {brend} {podrska}', def: 'Zdravo! 👋\n\nTvoj {brend} je spreman ✅\nPlan: {plan}\nVrijedi do: {istice}\n\n1️⃣ Instaliraj aplikaciju Hiddify (iPhone, Android ili računar)\n2️⃣ Otvori ovaj link i klikni „Dodaj u Hiddify“, ili skeniraj QR kod:\n{link}\n3️⃣ Klikni dugme za spajanje i to je to.\n\nPomoć: {podrska}' },
   ] },
   { id: 'sajt', title: 'Web sajt', desc: 'Javni sajt na glavnoj adresi servera: cijene i lokacije uživo, kupovina karticom.', rows: [
     { key: 'site_on', type: 'toggle', label: 'Prikaži sajt na glavnoj adresi', sub: 'Isključeno: glavna adresa vraća "Not found" kao prije. Tajna adresa panela ostaje skrivena u oba slučaja.', def: true },
     { key: 'app_repo', type: 'text', label: 'GitHub repozitorij aplikacija', sub: 'Odavde sajt uzima zadnji Android APK i Windows instalaciju', def: 'maid-cyber/veltrix-app', mono: true },
   ] },
-  { id: 'aplikacija', page: 'aplikacija', title: 'Veltrix aplikacija', desc: 'Šta kupci imaju u Android i Windows aplikaciji. Uređuje se na stranici Aplikacija.', rows: [
+  { id: 'aplikacija', page: 'aplikacija', title: 'AdiLink aplikacija', desc: 'Šta kupci imaju u Android i Windows aplikaciji. Uređuje se na stranici Aplikacija.', rows: [
     // prijava i nalog
     { key: 'app_trial', grp: 'nalog', type: 'toggle', label: 'Probaj besplatno', sub: 'Dugme na prijavi. Koristi prvi aktivni plan označen kao probni (Planovi). Jedan po uređaju, jedan po IP adresi sedmično.', def: false },
     { key: 'app_trial_cap', grp: 'nalog', type: 'number', label: 'Najviše probnih naloga dnevno', sub: 'Zaštita od zloupotrebe', def: 20 },
@@ -215,6 +215,15 @@ function load() {
   if (!out.admin_path) {           // prvo pokretanje: nasumična tajna putanja
     out.admin_path = '/' + crypto.randomBytes(5).toString('hex');
     run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', 'admin_path', JSON.stringify(out.admin_path));
+  }
+  // jednom: novo ime brenda (Veltrix VPN → AdiLink VPN), samo ako je ostalo staro ime
+  if (!out._rebrand_adilink) {
+    for (const k of ['brand', 'sub_name', 'smtp_from']) {
+      const v = String(out[k] || '');
+      if (/^veltrix vpn\b/i.test(v)) { out[k] = v.replace(/^veltrix vpn/i, 'AdiLink VPN'); run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', k, JSON.stringify(out[k])); }
+    }
+    out._rebrand_adilink = true;
+    run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', '_rebrand_adilink', 'true');
   }
   if (process.env.VPN_ADMIN_PATH) out.admin_path = process.env.VPN_ADMIN_PATH;
   cache = out;

@@ -96,7 +96,7 @@ async function onRequest(req, res) {
       if (p === '/buy' && req.method === 'POST') return await site.buy(req, res);
       if (p === '/buy/status' && req.method === 'GET') return site.status(req, res, url);
       if (p === '/kupljeno' && req.method === 'GET') return site.bought(req, res);
-      if (p === '/assets/globe.js' || /^\/assets\/fonts\/[\w.-]+\.woff$/.test(p)) return serveStatic(res, p.slice(8));
+      if (p === '/assets/globe.js' || /^\/assets\/fonts\/[\w.-]+\.woff$/.test(p) || /^\/assets\/flags\/[a-z]{2}\.png$/.test(p)) return serveStatic(res, p.slice(8));
     }
 
     // dva ulaza: tajna admin adresa i (ako je uključeno) posebna adresa za resellere
@@ -142,4 +142,5 @@ http.createServer(onRequest).listen(PORT, HOST, () => {
   console.log(`Panel radi na http://${HOST}:${PORT}${settings.get('admin_path')}/  (verzija ${api.VERSION})`);
 });
 // aplikacije za /download/* se pripreme unaprijed (skinu sa GitHuba), pa provjera svakih sat vremena
+try { require('./lib/site').ensureYearly(); } catch (e) { console.error('godišnji planovi', e); }
 if (!process.env.VPN_NO_WARM) { setTimeout(() => require('./lib/downloads').tick(), 5000); setInterval(() => require('./lib/downloads').tick(), 600000).unref(); }

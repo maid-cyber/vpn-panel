@@ -18,7 +18,8 @@
     const css = getComputedStyle(document.documentElement);
     const acc = (css.getPropertyValue('--acc-hi') || '#ff5a6a').trim();
     const rgb = (h) => { const m = h.replace('#', '').match(/../g) || ['ff', '5a', '6a']; return m.map((x) => parseInt(x, 16)).join(','); };
-    const A = rgb(acc.length === 7 ? acc : '#ff5a6a'), B = '120,160,255';
+    const A = rgb(acc.length === 7 ? acc : '#ff5a6a'), B = (css.getPropertyValue('--gl-b') || '120,160,255').trim();
+    const G1 = (css.getPropertyValue('--gl-1') || '#13204a').trim(), G2 = (css.getPropertyValue('--gl-2') || '#050a1c').trim(), GD = (css.getPropertyValue('--gl-dot') || '#7fa2ff').trim();
     const inPoly = (x, y, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
     const dots = [];
     for (let lat = -56; lat <= 76; lat += 1.5) {
@@ -63,7 +64,7 @@
       g.addColorStop(0, `rgba(${B},.28)`); g.addColorStop(0.4, `rgba(${B},.06)`); g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.35, 0, 6.29); ctx.fill();
       g = ctx.createRadialGradient(cx - R * .35, cy - R * .45, R * .1, cx, cy, R);
-      g.addColorStop(0, '#13204a'); g.addColorStop(1, '#050a1c');
+      g.addColorStop(0, G1); g.addColorStop(1, G2);
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.29); ctx.fill();
       ctx.strokeStyle = `rgba(${B},.35)`; ctx.lineWidth = 1.2; ctx.stroke();
       // kopno (tačke), svjetlije prema sredini
@@ -71,7 +72,7 @@
         const p = proj(vec(d));
         if (p[2] <= 0) continue;
         ctx.globalAlpha = 0.25 + 0.75 * p[2];
-        ctx.fillStyle = '#7fa2ff';
+        ctx.fillStyle = GD;
         const r = 1 + 1.6 * p[2];
         ctx.fillRect(p[0] - r / 2, p[1] - r / 2, r, r);
       }

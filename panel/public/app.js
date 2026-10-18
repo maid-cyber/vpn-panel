@@ -38,7 +38,7 @@
   };
   const ic = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[n] || ''}"/></svg>`;
   // znak brenda (štit sa V)
-  const MARK = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" style="fill:var(--lg1,#E3172B)"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" style="fill:var(--lg0,#121216)"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M48 70h32l20 68v46z" style="fill:var(--lg1,#E3172B)"/><path d="M152 70h-32l-20 68v46z" style="fill:var(--lg2,#9E0C1A)"/><path d="M48 70h32l2 7H51z" style="fill:var(--lg3,#FF4A5A)"/><path d="M86 58h28l-14 38z" style="fill:var(--lg3,#FF4A5A)"/><path d="M100 58h14l-14 38z" style="fill:var(--lg1,#E3172B)"/>';
+  const MARK = '<path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" style="fill:var(--lg1,#E3172B)"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" style="fill:var(--lg0,#121216)"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M100 52 100 104 82 164H54z" style="fill:var(--lg1,#E3172B)"/><path d="M100 52 146 164h-28l-18-60z" style="fill:var(--lg2,#9E0C1A)"/><path d="M90.5 128h19l4.5 14h-28z" style="fill:var(--lg3,#FF4A5A)"/><path d="M100 52 111 78H89z" style="fill:var(--lg3,#FF4A5A)"/><path d="M100 52 111 78h-11z" style="fill:var(--lg1,#E3172B)"/>';
   const logo = (w = 34) => `<svg width="${w}" height="${Math.round(w * 1.12)}" viewBox="0 0 200 224" aria-hidden="true">${MARK}</svg>`;
   const LOGO = logo(32);
   // ime brenda: zadnje slovo glavne riječi u boji, "VPN" ide ispod kao na logu
@@ -1970,7 +1970,7 @@
       <button class="btn danger" data-a="logout">${ic('logout')}Odjava</button>`;
   }
 
-  // ================================================================== APLIKACIJA (prekidači za Veltrix aplikacije)
+  // ================================================================== APLIKACIJA (prekidači za AdiLink aplikacije)
   const APP_GRP = [
     ['nalog', 'Prijava i nalog', 'user', 'Dugmad na prijavi i u kartici Nalog.'],
     ['veza', 'Spajanje', 'plug', 'Kako se aplikacija spaja na servere.'],
@@ -2003,7 +2003,7 @@
     };
     const builds = (os) => U.builds.filter((b) => b.os === os);
     const buildList = (os, name) => builds(os).length ? `<div class="app-builds"><b>${name}</b>${builds(os).map((b) => `<span class="tag ${L[os] && b.build >= L[os] ? 't-ok' : 't-grey'}">build ${b.build || '?'} · ${b.n}</span>`).join('')}</div>` : '';
-    $('#view').innerHTML = `${top('Aplikacija', 'Šta kupci imaju u Veltrix aplikaciji · Android i Windows')}
+    $('#view').innerHTML = `${top('Aplikacija', 'Šta kupci imaju u AdiLink aplikaciji · Android i Windows')}
       <div class="banner soft">${ic('check')}<span style="flex:1;min-width:0">Promjene se spremaju odmah. Aplikacija ih dobije kad je kupac sljedeći put otvori ili osvježi nalog. Ništa ne treba ponovo instalirati.</span></div>
       <section class="stats">
         <div class="stat"><div class="l"><span>Android</span>${ic('phone')}</div><div class="v">${U.android}</div><div class="s muted">kupaca u zadnjih 7 dana</div></div>
@@ -2054,12 +2054,12 @@
     const grp = (title, rows) => rows.filter(Boolean).length ? `<div class="ph-gt">${title}</div><div class="ph-grp">${rows.filter(Boolean).join('')}</div>` : '';
     let body = '';
     if (tab === 'login') {
-      body = `<div class="ph-login"><div class="ph-logo">${logo(54)}</div><div class="ph-brand">VELTRIX</div><div class="ph-vpn">V P N</div>
+      body = `<div class="ph-login"><div class="ph-logo">${logo(54)}</div><div class="ph-brand">ADILINK</div><div class="ph-vpn">V P N</div>
         <p>${T('Scan the QR code or paste your access link.', 'Skeniraj QR kod ili zalijepi pristupni link.')}</p>
         <div class="ph-btn">${T('Scan QR code', 'Skeniraj QR kod')}</div><div class="ph-input">https://…/s/…</div><div class="ph-btn line">${T('Log in', 'Prijavi se')}</div>
         ${v.app_trial ? `<div class="ph-btn fill">${T('Try free', 'Probaj besplatno')}</div>${v.ref_on ? `<div class="ph-link">${T("Have a friend's code?", 'Imaš kod prijatelja?')}</div>` : ''}` : ''}</div>`;
     } else if (tab === 'home') {
-      body = `<div class="ph-top"><b>Veltrix VPN</b></div><div class="ph-power"><div class="ph-ring">${ic('plug')}</div><b>${T('Protected', 'Zaštićen')}</b><small>🇩🇪 Falkenstein</small></div>
+      body = `<div class="ph-top"><b>AdiLink VPN</b></div><div class="ph-power"><div class="ph-ring">${ic('plug')}</div><b>${T('Protected', 'Zaštićen')}</b><small>🇩🇪 Falkenstein</small></div>
         <div class="ph-stats"><span>00:12:41</span><span>↓ 24 Mb/s</span><span>↑ 6 Mb/s</span></div>
         ${v.app_speedtest ? `<div class="ph-link">${T('Test speed →', 'Izmjeri brzinu →')}</div>` : ''}
         <div class="ph-btn fill">${T('Disconnect', 'Prekini vezu')}</div>

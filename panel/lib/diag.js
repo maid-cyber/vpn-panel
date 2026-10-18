@@ -135,8 +135,8 @@ async function check(userId) {
     const newest = u.app_os === 'windows' ? latest.exeBuild : latest.apkBuild;
     if (min && u.app_build && u.app_build < min) add('Aplikacija', 'bad', `Stara verzija aplikacije (${os} build ${u.app_build})`, `Najstarija dozvoljena je ${min}, pa se ne može spojiti.`, 'kupac', 'Neka ažurira aplikaciju.');
     else if (newest && u.app_build && u.app_build < newest) add('Aplikacija', 'warn', `${os} aplikacija nije najnovija (build ${u.app_build})`, `Najnovija je ${newest}. Otvorio je ${ago(u.app_seen)}.`, 'kupac', 'Neka ažurira aplikaciju.');
-    else add('Aplikacija', 'ok', `Koristi Veltrix za ${os}${u.app_build ? ' (build ' + u.app_build + ')' : ''}`, `Zadnji put otvorio ${ago(u.app_seen)}.`);
-  } else add('Aplikacija', 'info', 'Ne koristi Veltrix aplikaciju (ili ima staru verziju)', 'Vjerovatno Hiddify, v2rayNG ili slično. Izvještaj iz aplikacije tad nije moguć.');
+    else add('Aplikacija', 'ok', `Koristi AdiLink aplikaciju za ${os}${u.app_build ? ' (build ' + u.app_build + ')' : ''}`, `Zadnji put otvorio ${ago(u.app_seen)}.`);
+  } else add('Aplikacija', 'info', 'Ne koristi AdiLink aplikaciju (ili ima staru verziju)', 'Vjerovatno Hiddify, v2rayNG ili slično. Izvještaj iz aplikacije tad nije moguć.');
 
   // ---- zadnji izvještaj iz aplikacije kupca
   const rep = one('SELECT * FROM diag_reports WHERE user_id = ? ORDER BY id DESC LIMIT 1', u.id);
@@ -180,7 +180,7 @@ async function check(userId) {
   const bad = checks.filter((c) => c.status === 'bad');
   const warn = checks.filter((c) => c.status === 'warn' && c.side);
   const main = order.map((sd) => bad.find((c) => c.side === sd)).find(Boolean) || order.map((sd) => warn.find((c) => c.side === sd)).find(Boolean);
-  const brand = s.brand || 'Veltrix VPN';
+  const brand = s.brand || 'AdiLink VPN';
   let verdict;
   if (!main) verdict = { side: 'ok', title: 'Sve izgleda u redu', text: report ? 'Nalog, serveri i izvještaj kupca su u redu. Ako i dalje ne radi, neka restartuje aplikaciju i proba drugu lokaciju.' : 'Nalog i serveri su u redu. Zatraži od kupca izvještaj iz aplikacije da vidiš njegovu stranu.' };
   else verdict = {
