@@ -84,7 +84,7 @@ async function sendMail({ to, subject, text, html }) {
   const cmd = async (line, ok, secret) => {
     if (line != null) sock.write(line + '\r\n');
     const r = await rd.next();
-    if (!ok.includes(r.code)) throw new Error(`SMTP: ${secret ? 'prijava odbijena' : r.text.slice(0, 200)}`);
+    if (!ok.includes(r.code)) throw new Error(`SMTP: ${secret ? 'prijava odbijena · server kaže: ' + r.code + ' ' + r.text.replace(/^\d{3}[ -]?/gm, '').slice(0, 160) : r.text.slice(0, 200)}`);
     return r;
   };
   try {
@@ -101,8 +101,9 @@ async function sendMail({ to, subject, text, html }) {
     }
     if (s.smtp_user) {
       await cmd('AUTH LOGIN', [334]);
-      await cmd(b64(s.smtp_user), [334]);
-      await cmd(b64(s.smtp_pass || ''), [235], true);
+      // razmaci i novi redovi se često zalijepe pri kopiranju ključa
+      await cmd(b64(String(s.smtp_user).trim()), [334]);
+      await cmd(b64(String(s.smtp_pass || '').replace(/\s+/g, '')), [235], true);
     }
     await cmd(`MAIL FROM:<${from.addr}>`, [250]);
     await cmd(`RCPT TO:<${rcpt.addr}>`, [250, 251]);
