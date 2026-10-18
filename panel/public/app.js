@@ -828,14 +828,16 @@
         <div class="row2"><label class="field">Plaćeno (€, opcionalno)<input class="input" name="paid" inputmode="decimal" placeholder="0"></label>
         <label class="field">Način plaćanja<input class="input" name="method" placeholder="npr. Wise"></label></div>` : `<p class="muted" style="margin:0">Cijena se skida sa tvog kredita (${money(S.me.credit)}).</p>`}
       <div class="row2"><label class="field">Kontakt (opcionalno)<input class="input" name="contact" placeholder="+387…, @telegram"></label>
-      <label class="field">E-mail kupca (opcionalno)<input class="input" name="email" type="email" placeholder="za podsjetnike"></label></div>
+      <label class="field">E-mail kupca (opcionalno)<input class="input" name="email" type="email" placeholder="${S.me.mail_on ? 'pristup mu stiže na e-mail' : 'za podsjetnike'}"></label></div>
       <label class="field">Bilješka (opcionalno)<input class="input" name="note"></label>
       ${isR ? '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="cb" name="auto_renew">Produži sam sa mog kredita dan prije isteka</label>' : ''}
       <div class="dlg-actions"><button class="btn" value="cancel">Odustani</button><button class="btn red" value="ok">Napravi korisnika</button></div>`,
     async (d) => {
       const body = { username: d.username, plan_id: Number(d.plan_id), note: d.note, contact: d.contact, email: d.email, auto_renew: !!d.auto_renew };
       if (!isR) Object.assign(body, { days: d.days ? Number(d.days) : undefined, traffic_gb: d.traffic_gb !== '' ? Number(d.traffic_gb) : undefined, owner_id: d.owner_id || undefined, paid: Number(String(d.paid || '0').replace(',', '.')), method: d.method });
-      return (await POST(R('users'), body)).id;
+      const res = await POST(R('users'), body);
+      if (res.mailed) toast(`Pristup poslan kupcu na ${d.email}.`);
+      return res.id;
     });
     if (!id) return;
     toast('Korisnik napravljen.');
@@ -932,8 +934,8 @@
     if (!(await ask(text[0], text[1], text[2], act === 'delete' || act === 'rekey'))) return;
     try {
       if (act === 'delete') { await DEL(R('users/' + id)); S.selUser = null; toast('Obrisano.'); if (location.hash.startsWith('#/korisnik/')) location.hash = '#/korisnici'; else pageUsers(new URLSearchParams()); return; }
-      await POST(R(`users/${id}/${act}`));
-      if (act === 'rekey') return await showNewLink(id);
+      const res = await POST(R(`users/${id}/${act}`));
+      if (act === 'rekey') { if (res.mailed) toast('Novi link je poslan kupcu i na e-mail.'); return await showNewLink(id); }
       toast('Urađeno.'); refreshUser();
     } catch (e) { fail(e); }
   }

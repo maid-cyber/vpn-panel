@@ -116,6 +116,8 @@ const SCHEMA = [
     { key: 'smtp_user', type: 'text', label: 'E-mail: korisničko ime', def: '', mono: true },
     { key: 'smtp_pass', type: 'secret', label: 'E-mail: šifra ili API ključ', def: '' },
     { key: 'smtp_from', type: 'text', label: 'E-mail: pošiljalac', sub: 'npr. Veltrix VPN <info@tvojadomena.com>', def: '' },
+    { key: 'mail_welcome', type: 'toggle', label: 'Kupcu automatski pošalji pristup na e-mail', sub: 'Kad napraviš kupca sa e-mailom (ti ili reseller): link, plan, datum isteka i 3 koraka za spajanje', def: true },
+    { key: 'mail_newlink', type: 'toggle', label: 'Pošalji kupcu e-mail kad mu daš novi link', def: true },
   ] },
   { id: 'pretplata', title: 'Pretplata i aplikacije', desc: 'Šta kupac vidi u aplikaciji i na svojoj stranici.', rows: [
     { key: 'sub_name', type: 'text', label: 'Ime profila u aplikaciji', sub: 'Prazno = ime brenda', def: '' },

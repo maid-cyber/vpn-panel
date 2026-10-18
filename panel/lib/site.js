@@ -122,11 +122,7 @@ function paidBuy(ses, siteBase) {
   if (email && b) {
     const mail = require('./mail');
     if (mail.configured()) {
-      const link = `${b}/s/${u.sub_token}`;
-      mail.sendMail({
-        to: email, subject: `${s.brand} · tvoj pristup`,
-        text: `Hvala na kupovini!\n\nPlan: ${plan.name}\nTvoj pristupni link:\n${link}\n\nOtvori link na telefonu ili računaru: tamo su QR kod, aplikacije i uputstvo.\n\n${s.brand}`,
-      }).catch((e) => log('sistem', 'E-mail kupcu nije poslan', String(e.message || e), 'warn'));
+      require('./welcome').send(u.id, 'buy', email, b).catch((e) => log('sistem', 'E-mail kupcu nije poslan', String(e.message || e), 'warn'));
     }
   }
   log('sajt', 'Kupljeno na sajtu', `${u.username} · ${plan.name} · €${amount}`);

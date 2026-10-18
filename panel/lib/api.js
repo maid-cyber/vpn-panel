@@ -383,7 +383,11 @@ route('GET', 'res/users/suggest', 'res', () => ({ username: core.suggestUsername
 route('GET', 'users/:id', 'users', (c) => userDetail(c, c.auth.me));
 route('GET', 'res/users/:id', 'res', (c) => userDetail(c, c.auth.me));
 
-const createH = (c) => ({ id: core.createUser(c.auth.me, c.body) });
+const createH = (c) => {
+  const id = core.createUser(c.auth.me, c.body);
+  const mailed = settings.get('mail_welcome') !== false && require('./welcome').sendLater(id, 'new');
+  return { id, mailed };
+};
 route('POST', 'users', 'users', createH);
 route('POST', 'res/users', 'res', createH);
 
@@ -425,7 +429,7 @@ for (const pre of ['', 'res/']) {
   route('POST', `${pre}users/:id/extend`, perm, (c) => { core.extendUser(c.auth.me, c.params.id, c.body); return { ok: true }; });
   route('POST', `${pre}users/:id/reset`, perm, (c) => { core.resetTraffic(c.auth.me, c.params.id); return { ok: true }; });
   route('POST', `${pre}users/:id/toggle`, perm, (c) => { const u = core.getUser(c.params.id, isRes(c.auth.me) ? c.auth.me : null); core.setDisabled(c.auth.me, u.id, !u.disabled); return { ok: true }; });
-  route('POST', `${pre}users/:id/rekey`, perm, (c) => { core.rekey(c.auth.me, c.params.id); return { ok: true }; });
+  route('POST', `${pre}users/:id/rekey`, perm, (c) => { core.rekey(c.auth.me, c.params.id); const mailed = settings.get('mail_newlink') !== false && require('./welcome').sendLater(c.params.id, 'newlink'); return { ok: true, mailed }; });
   route('DELETE', `${pre}users/:id`, perm, (c) => { core.deleteUser(c.auth.me, c.params.id); return { ok: true }; });
 }
 
