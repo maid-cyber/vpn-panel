@@ -994,7 +994,10 @@ route('POST', 'backups/restore', 'owner', async (c) => {
 route('POST', 'settings/test-mail', 'settings', async (c) => {
   const s = settings.load();
   const to = String(c.body.to || '').trim() || (s.smtp_from.match(/<([^>]+)>/)?.[1] || s.smtp_from);
-  await mail.sendMail({ to, subject: `${s.brand}: probni e-mail`, text: 'Ako vidiš ovu poruku, e-mail iz panela radi. ✅' });
+  // probni e-mail izgleda isto kao pristup koji dobije kupac (primjer kupca)
+  const plan = one('SELECT id FROM plans WHERE active = 1 AND trial = 0 ORDER BY sort, id LIMIT 1');
+  const m = require('./welcome').build({ username: 'primjer_kupca', plan_id: plan?.id || null, owner_id: null, expires_at: now() + 30 * 86400000, sub_token: 'PRIMJER' }, 'new', `${c.proto}://${c.req.headers.host}`);
+  await mail.sendMail({ to, subject: `${s.brand}: probni e-mail (ovako kupac dobije pristup)`, text: 'E-mail iz panela radi. ✅\n\n' + (m?.text || ''), html: m?.html });
   return { ok: true, to };
 });
 route('POST', 'settings/test-cbot', 'settings', async () => {

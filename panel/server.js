@@ -78,6 +78,15 @@ async function onRequest(req, res) {
     }
     if (p === '/app/config' && req.method === 'GET') return send(res, 200, sub.appConfig(), { 'cache-control': 'no-store' });
     if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
+    // logo za e-mailove (e-mail programi ne prikazuju SVG ni ugrađene slike, treba prava adresa)
+    if (p === '/mail/logo.png') return serveStatic(res, 'mail-logo.png');
+    { const ml = p.match(/^\/mail\/logo\/(\d+)\.png$/);
+      if (ml) {
+        const a = one("SELECT brand_logo FROM admins WHERE id = ? AND role = 'reseller'", Number(ml[1]));
+        const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(a?.brand_logo || '');
+        if (!m) return serveStatic(res, 'mail-logo.png');
+        return send(res, 200, Buffer.from(m[2], 'base64'), { 'content-type': m[1], 'cache-control': 'public, max-age=86400' });
+      } }
     // javni sajt na glavnoj adresi (tajna adresa panela ostaje skrivena)
     if (settings.get('site_on')) {
       const site = require('./lib/site');

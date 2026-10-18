@@ -50,32 +50,50 @@ Kako se spojiti:
 ${support ? `\nPomoć: ${support}` : ''}
 ${brand}`;
 
-  const step = (n, t, d) => `<tr><td style="padding:0 0 14px 0;vertical-align:top;width:34px"><div style="width:26px;height:26px;border-radius:50%;background:${color};color:#fff;font:700 13px/26px Arial,sans-serif;text-align:center">${n}</div></td><td style="padding:0 0 14px 8px;font:15px/1.5 Arial,sans-serif;color:#1f2430"><b>${t}</b><br><span style="color:#5b6170">${d}</span></td></tr>`;
-  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#f2f3f7">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f3f7;padding:24px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden">
-<tr><td style="background:#0d0f16;padding:22px 28px;font:800 20px/1 Arial,sans-serif;color:#fff;letter-spacing:.5px">${esc(brand)}</td></tr>
-<tr><td style="height:4px;background:${color}"></td></tr>
-<tr><td style="padding:28px 28px 8px">
-  <h1 style="margin:0 0 10px;font:700 22px/1.3 Arial,sans-serif;color:#11131a">${esc(head)}</h1>
-  <p style="margin:0 0 20px;font:15px/1.55 Arial,sans-serif;color:#454b59">${esc(intro)}</p>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;border-radius:10px;margin-bottom:22px"><tr><td style="padding:14px 18px;font:14px/1.9 Arial,sans-serif;color:#454b59">
-    Korisnik: <b style="color:#11131a">${esc(u.username)}</b><br>Plan: <b style="color:#11131a">${esc(plan?.name || '—')}</b><br>Vrijedi do: <b style="color:#11131a">${esc(until)}</b>
-  </td></tr></table>
-  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 10px"><tr><td style="border-radius:10px;background:${color}">
-    <a href="${esc(link)}" style="display:inline-block;padding:14px 28px;font:700 16px Arial,sans-serif;color:#fff;text-decoration:none">Otvori moj nalog i spoji se</a>
-  </td></tr></table>
-  <p style="margin:0 0 24px;text-align:center;font:12px/1.5 Arial,sans-serif;color:#8a8f9c;word-break:break-all">${esc(link)}</p>
-  <h2 style="margin:0 0 14px;font:700 16px Arial,sans-serif;color:#11131a">Kako se spojiti</h2>
-  <table role="presentation" cellpadding="0" cellspacing="0">
-    ${step(1, 'Instaliraj aplikaciju', veltrix ? `<a href="${esc(dl)}" style="color:${color}">${esc(brand)} za Android i Windows</a>. Za iPhone: Hiddify ili Streisand iz App Storea.` : 'Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.')}
-    ${step(2, 'Otvori link iznad', 'Na telefonu ili računaru. Tamo su QR kod i dugme koje sve podesi samo.')}
-    ${step(3, 'Klikni Spoji se', 'I to je to. Lokaciju mijenjaš kad hoćeš.')}
+  // izgled kao aplikacija i panel: tamna pozadina, crveni akcenat, štit logo, ime sa zadnjim slovom u boji
+  const logo = wl ? `${base}/mail/logo/${u.owner_id}.png` : `${base}/mail/logo.png`;
+  const m = brand.trim().match(/^(.*?)\s+vpn$/i) || brand.trim().match(/^vpn\s+(.*)$/i);
+  const main = ((m ? m[1] : brand) || brand).toUpperCase();
+  const word = `${esc(main.slice(0, -1))}<span style="color:${color}">${esc(main.slice(-1))}</span>`;
+  const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const BG = '#0b0b10', CARD = '#14141c', CARD2 = '#1b1b25', LINE = '#262632', TXT = '#ececf1', SOFT = '#b4b4c2', MUTED = '#8b8b99';
+  const step = (n, t, d) => `<tr><td style="padding:0 0 16px 0;vertical-align:top;width:38px"><div style="width:30px;height:30px;border-radius:50%;background:${color};color:#fff;${F};font-weight:700;font-size:14px;line-height:30px;text-align:center">${n}</div></td><td style="padding:2px 0 16px 10px;${F};font-size:15px;line-height:1.5;color:${TXT}"><b>${t}</b><br><span style="color:${SOFT};font-size:14px">${d}</span></td></tr>`;
+  const html = `<!doctype html><html><head><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
+<body style="margin:0;padding:0;background:${BG}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
+<tr><td align="center" style="padding:6px 0 22px">
+  <img src="${esc(logo)}" width="64" height="72" alt="${esc(brand)}" style="display:block;border:0;margin:0 auto 12px;max-height:72px;width:auto">
+  <div style="${F};font-weight:900;font-size:26px;letter-spacing:4px;color:${TXT}">${word}</div>
+  ${m ? `<div style="${F};font-weight:600;font-size:12px;letter-spacing:6px;color:${color};margin-top:4px">V P N</div>` : ''}
+</td></tr>
+<tr><td style="background:${CARD};border:1px solid ${LINE};border-radius:18px;overflow:hidden">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <tr><td style="height:4px;background:${color};border-radius:18px 18px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
+  <tr><td style="padding:30px 28px 6px">
+    <h1 style="margin:0 0 10px;${F};font-weight:700;font-size:23px;line-height:1.3;color:${TXT}">${esc(head)}</h1>
+    <p style="margin:0 0 22px;${F};font-size:15px;line-height:1.6;color:${SOFT}">${esc(intro)}</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CARD2};border:1px solid ${LINE};border-radius:12px;margin-bottom:24px"><tr><td style="padding:16px 18px;${F};font-size:14px;line-height:2;color:${MUTED}">
+      Korisnik&nbsp;&nbsp;<b style="color:${TXT}">${esc(u.username)}</b><br>Plan&nbsp;&nbsp;<b style="color:${TXT}">${esc(plan?.name || '—')}</b><br>Vrijedi do&nbsp;&nbsp;<b style="color:${TXT}">${esc(until)}</b>
+    </td></tr></table>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 12px"><tr><td align="center" style="border-radius:14px;background:${color};box-shadow:0 8px 24px ${color}55">
+      <a href="${esc(link)}" style="display:inline-block;padding:16px 32px;${F};font-weight:700;font-size:16px;color:#ffffff;text-decoration:none">Otvori moj nalog i spoji se</a>
+    </td></tr></table>
+    <p style="margin:0 0 28px;text-align:center;${F};font-size:12px;line-height:1.5;color:${MUTED};word-break:break-all">${esc(link)}</p>
+    <div style="${F};font-weight:600;font-size:15px;color:${SOFT};margin:0 0 14px">Kako se spojiti</div>
+    <table role="presentation" cellpadding="0" cellspacing="0">
+      ${step(1, 'Instaliraj aplikaciju', veltrix ? `<a href="${esc(dl)}" style="color:${color};text-decoration:none;font-weight:600">${esc(brand)} za Android i Windows</a>. Za iPhone: Hiddify ili Streisand iz App Storea.` : 'Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.')}
+      ${step(2, 'Otvori link iznad', 'Na telefonu ili računaru. Tamo su QR kod i dugme koje sve podesi samo.')}
+      ${step(3, 'Klikni Spoji se', 'I to je to. Lokaciju mijenjaš kad hoćeš.')}
+    </table>
+  </td></tr>
+  <tr><td style="padding:18px 28px 24px;border-top:1px solid ${LINE};${F};font-size:13px;line-height:1.7;color:${MUTED}">
+    ${support ? `Treba ti pomoć? <b style="color:${TXT}">${esc(support)}</b><br>` : ''}🔒 Ne dijeli ovaj link: on je tvoj lični ključ.
+  </td></tr>
   </table>
 </td></tr>
-<tr><td style="padding:18px 28px 26px;border-top:1px solid #eceef3;font:13px/1.6 Arial,sans-serif;color:#8a8f9c">
-  ${support ? `Treba ti pomoć? Javi se: <b style="color:#454b59">${esc(support)}</b><br>` : ''}Ne dijeli ovaj link: on je tvoj lični ključ.
-</td></tr></table>
+<tr><td align="center" style="padding:18px 0 0;${F};font-size:12px;color:#5d5d6b">© ${new Date().getFullYear()} ${esc(brand)}</td></tr>
+</table>
 </td></tr></table></body></html>`;
   return { subject, text, html };
 }
