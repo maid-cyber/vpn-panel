@@ -50,49 +50,73 @@ Kako se spojiti:
 ${support ? `\nPomoć: ${support}` : ''}
 ${brand}`;
 
-  // izgled kao aplikacija i panel: tamna pozadina, crveni akcenat, štit logo, ime sa zadnjim slovom u boji
+  // izgled kao aplikacija i panel: tamna pozadina, akcenat brenda, štit logo, ime sa zadnjim slovom u boji.
+  // Gmail na telefonu u tamnom načinu sam "obrne" boje (crveno postane plavo, tamno svijetlo).
+  // Zato su pozadine slike (linear-gradient: Gmail ih ne dira), a tekst ide kroz gm-* blokove koji vrate pravu boju.
   const logo = wl ? `${base}/mail/logo/${u.owner_id}.png` : `${base}/mail/logo.png`;
   const m = brand.trim().match(/^(.*?)\s+vpn$/i) || brand.trim().match(/^vpn\s+(.*)$/i);
   const main = ((m ? m[1] : brand) || brand).toUpperCase();
-  const word = `${esc(main.slice(0, -1))}<span style="color:${color}">${esc(main.slice(-1))}</span>`;
   const F = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-  const BG = '#0b0b10', CARD = '#14141c', CARD2 = '#1b1b25', LINE = '#262632', TXT = '#ececf1', SOFT = '#b4b4c2', MUTED = '#8b8b99';
-  const step = (n, t, d) => `<tr><td style="padding:0 0 16px 0;vertical-align:top;width:38px"><div style="width:30px;height:30px;border-radius:50%;background:${color};color:#fff;${F};font-weight:700;font-size:14px;line-height:30px;text-align:center">${n}</div></td><td style="padding:2px 0 16px 10px;${F};font-size:15px;line-height:1.5;color:${TXT}"><b>${t}</b><br><span style="color:${SOFT};font-size:14px">${d}</span></td></tr>`;
-  const html = `<!doctype html><html><head><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
-<body style="margin:0;padding:0;background:${BG}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:28px 12px"><tr><td align="center">
+  const BG = '#0b0b10', CARD = '#14141c', CARD2 = '#1c1c27', LINE = '#2a2a37', TXT = '#f2f2f6', SOFT = '#b9b9c6', MUTED = '#8e8e9c';
+  const bg = (c) => `background-color:${c};background-image:linear-gradient(${c},${c})`;
+  const t = (html) => `<div class="gm-s"><div class="gm-d">${html}</div></div>`;   // tekst koji Gmail ne smije obrnuti
+  const word = `${esc(main.slice(0, -1))}<span style="color:${color}">${esc(main.slice(-1))}</span>`;
+  let servers = [];
+  try { servers = require('./vpn').serversForUser(u); } catch { /* */ }
+  const countries = new Set(servers.map((x) => String(x.country || '').toUpperCase()).filter(Boolean)).size;
+  const devices = u.devices || one('SELECT devices FROM plans WHERE id = ?', u.plan_id)?.devices || 0;
+  const tg = (support.match(/@([A-Za-z0-9_]{4,})/) || [])[1];
+  const supportUrl = /^https?:\/\//.test(support) ? support : tg ? `https://t.me/${tg}` : '';
+  const btn = (href, label, fill) => `<a href="${esc(href)}" style="display:inline-block;padding:${fill ? '17px 34px' : '12px 18px'};border-radius:14px;${fill ? bg(color) : bg(CARD2) + `;border:1px solid ${LINE}`};${F};font-weight:700;font-size:${fill ? 16 : 14}px;color:#ffffff;text-decoration:none">${t(label)}</a>`;
+  const stat = (k, v) => `<td width="33%" style="padding:14px 10px;text-align:center;${F}">${t(`<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${MUTED}">${k}</div><div style="font-size:16px;font-weight:700;color:${TXT};margin-top:4px">${v}</div>`)}</td>`;
+  const step = (n, title, d) => `<tr><td style="padding:0 0 18px 0;vertical-align:top;width:40px"><div style="width:32px;height:32px;border-radius:50%;${bg(color)};${F};font-weight:800;font-size:14px;line-height:32px;text-align:center;color:#fff">${t(n)}</div></td><td style="padding:3px 0 18px 12px;${F};font-size:15px;line-height:1.5">${t(`<b style="color:${TXT}">${title}</b><br><span style="color:${SOFT};font-size:14px">${d}</span>`)}</td></tr>`;
+  const badge = (x) => `<td style="padding:0 4px 8px"><div style="${bg(CARD2)};border:1px solid ${LINE};border-radius:20px;padding:7px 12px;${F};font-size:12px;white-space:nowrap">${t(`<span style="color:${SOFT}">${x}</span>`)}</div></td>`;
+  const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
+<style>
+u + .body .gm-s { background:#000; mix-blend-mode:screen; }
+u + .body .gm-d { background:#000; mix-blend-mode:difference; }
+a { color:inherit; }
+@media (max-width:480px) { .px { padding-left:20px !important; padding-right:20px !important; } .h1 { font-size:21px !important; } }
+</style></head>
+<body class="body" style="margin:0;padding:0;${bg(BG)}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${bg(BG)}"><tr><td align="center" style="padding:30px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
-<tr><td align="center" style="padding:6px 0 22px">
-  <img src="${esc(logo)}" width="64" height="72" alt="${esc(brand)}" style="display:block;border:0;margin:0 auto 12px;max-height:72px;width:auto">
-  <div style="${F};font-weight:900;font-size:26px;letter-spacing:4px;color:${TXT}">${word}</div>
-  ${m ? `<div style="${F};font-weight:600;font-size:12px;letter-spacing:6px;color:${color};margin-top:4px">V P N</div>` : ''}
+<tr><td align="center" style="padding:4px 0 24px">
+  <img src="${esc(logo)}" width="58" height="65" alt="" style="display:block;border:0;margin:0 auto 12px;height:65px;width:auto">
+  ${t(`<div style="${F};font-weight:900;font-size:26px;letter-spacing:5px;color:${TXT}">${word}</div>${m ? `<div style="${F};font-weight:700;font-size:11px;letter-spacing:7px;color:${color};margin-top:6px">V P N</div>` : ''}`)}
 </td></tr>
-<tr><td style="background:${CARD};border:1px solid ${LINE};border-radius:18px;overflow:hidden">
+<tr><td style="${bg(CARD)};border:1px solid ${LINE};border-top:4px solid ${color};border-radius:20px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-  <tr><td style="height:4px;background:${color};border-radius:18px 18px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
-  <tr><td style="padding:30px 28px 6px">
-    <h1 style="margin:0 0 10px;${F};font-weight:700;font-size:23px;line-height:1.3;color:${TXT}">${esc(head)}</h1>
-    <p style="margin:0 0 22px;${F};font-size:15px;line-height:1.6;color:${SOFT}">${esc(intro)}</p>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CARD2};border:1px solid ${LINE};border-radius:12px;margin-bottom:24px"><tr><td style="padding:16px 18px;${F};font-size:14px;line-height:2;color:${MUTED}">
-      Korisnik&nbsp;&nbsp;<b style="color:${TXT}">${esc(u.username)}</b><br>Plan&nbsp;&nbsp;<b style="color:${TXT}">${esc(plan?.name || '—')}</b><br>Vrijedi do&nbsp;&nbsp;<b style="color:${TXT}">${esc(until)}</b>
-    </td></tr></table>
-    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 12px"><tr><td align="center" style="border-radius:14px;background:${color};box-shadow:0 8px 24px ${color}55">
-      <a href="${esc(link)}" style="display:inline-block;padding:16px 32px;${F};font-weight:700;font-size:16px;color:#ffffff;text-decoration:none">Otvori moj nalog i spoji se</a>
-    </td></tr></table>
-    <p style="margin:0 0 28px;text-align:center;${F};font-size:12px;line-height:1.5;color:${MUTED};word-break:break-all">${esc(link)}</p>
-    <div style="${F};font-weight:600;font-size:15px;color:${SOFT};margin:0 0 14px">Kako se spojiti</div>
+  <tr><td class="px" style="padding:32px 30px 8px">
+    ${t(`<div class="h1" style="${F};font-weight:800;font-size:24px;line-height:1.3;color:${TXT};margin:0 0 10px">${esc(head)}</div><div style="${F};font-size:15px;line-height:1.6;color:${SOFT};margin:0 0 24px">${esc(intro)}</div>`)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${bg(CARD2)};border:1px solid ${LINE};border-radius:14px;margin-bottom:26px"><tr>
+      ${stat('Plan', esc(plan?.name || '—'))}${stat('Vrijedi do', esc(until.replace(/\s\d{4}\.?$/, '')))}${stat('Uređaja', devices || '—')}
+    </tr><tr><td colspan="3" style="border-top:1px solid ${LINE};padding:11px 14px;text-align:center;${F};font-size:13px">${t(`<span style="color:${MUTED}">Korisnik</span>&nbsp; <b style="color:${TXT}">${esc(u.username)}</b>`)}</td></tr></table>
+    <div style="text-align:center;margin:0 0 12px">${btn(link, 'Otvori moj nalog i spoji se', true)}</div>
+    ${t(`<div style="text-align:center;${F};font-size:12px;line-height:1.5;color:${MUTED};word-break:break-all;margin:0 0 26px">${esc(link)}</div>`)}
+    <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 26px"><tr>
+      ${badge('🔒 Bez logova')}${s.proto_vless ? badge('⚡ VLESS Reality') : ''}${countries ? badge(`🌍 ${countries} ${countries === 1 ? 'zemlja' : countries < 5 ? 'zemlje' : 'zemalja'}`) : ''}
+    </tr></table>
+    ${t(`<div style="${F};font-weight:700;font-size:15px;color:${TXT};margin:0 0 16px">Kako se spojiti</div>`)}
     <table role="presentation" cellpadding="0" cellspacing="0">
-      ${step(1, 'Instaliraj aplikaciju', veltrix ? `<a href="${esc(dl)}" style="color:${color};text-decoration:none;font-weight:600">${esc(brand)} za Android i Windows</a>. Za iPhone: Hiddify ili Streisand iz App Storea.` : 'Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.')}
-      ${step(2, 'Otvori link iznad', 'Na telefonu ili računaru. Tamo su QR kod i dugme koje sve podesi samo.')}
+      ${step(1, 'Instaliraj aplikaciju', veltrix ? `${esc(brand)} za Android i Windows (dugmad ispod). Za iPhone: Hiddify ili Streisand iz App Storea.` : 'Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.')}
+      ${step(2, 'Otvori svoj nalog', 'Klikni crveno dugme iznad na telefonu ili računaru. Tamo su QR kod i dugme koje sve podesi samo.')}
       ${step(3, 'Klikni Spoji se', 'I to je to. Lokaciju mijenjaš kad hoćeš.')}
     </table>
+    ${veltrix ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 22px"><tr>
+      <td width="50%" style="padding-right:6px">${btn(dl, '🤖 Android', false).replace('display:inline-block', 'display:block;text-align:center')}</td>
+      <td width="50%" style="padding-left:6px">${btn(dl, '🪟 Windows', false).replace('display:inline-block', 'display:block;text-align:center')}</td>
+    </tr></table>` : ''}
   </td></tr>
-  <tr><td style="padding:18px 28px 24px;border-top:1px solid ${LINE};${F};font-size:13px;line-height:1.7;color:${MUTED}">
-    ${support ? `Treba ti pomoć? <b style="color:${TXT}">${esc(support)}</b><br>` : ''}🔒 Ne dijeli ovaj link: on je tvoj lični ključ.
+  <tr><td class="px" style="padding:20px 30px 24px;border-top:1px solid ${LINE}">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="${F};font-size:13px;line-height:1.6;vertical-align:middle">${t(`<span style="color:${TXT};font-weight:700">Treba ti pomoć?</span><br><span style="color:${MUTED}">${support ? esc(support) : 'Odgovori na ovaj e-mail.'}</span>`)}</td>
+      ${supportUrl ? `<td align="right" style="vertical-align:middle">${btn(supportUrl, tg ? 'Piši na Telegram' : 'Kontakt', false)}</td>` : ''}
+    </tr></table>
   </td></tr>
   </table>
 </td></tr>
-<tr><td align="center" style="padding:18px 0 0;${F};font-size:12px;color:#5d5d6b">© ${new Date().getFullYear()} ${esc(brand)}</td></tr>
+<tr><td align="center" style="padding:20px 10px 0;${F};font-size:12px;line-height:1.6">${t(`<span style="color:#6c6c7a">🔒 Ne dijeli ovaj link: on je tvoj lični ključ.<br>© ${new Date().getFullYear()} ${esc(brand)}</span>`)}</td></tr>
 </table>
 </td></tr></table></body></html>`;
   return { subject, text, html };
