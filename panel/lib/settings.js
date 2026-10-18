@@ -192,6 +192,7 @@ const SCHEMA = [
     { key: 'log_days', type: 'select', label: 'Čuvaj logove aktivnosti', options: ['30', '90', '365'], labels: ['30 dana', '90 dana', '1 godinu'], def: '90' },
     { key: 'no_logs', type: 'toggle', label: 'Ne čuvaj IP adrese korisnika (no-logs)', sub: 'Bilježi se samo država i vrijeme', def: true },
     { key: 'update_repo', type: 'text', label: 'GitHub repozitorij za ažuriranje panela', sub: 'Odakle dugme "Ažuriraj panel" skida novu verziju', def: 'maid-cyber/vpn-panel', mono: true },
+    { key: 'gh_token', type: 'secret', label: 'GitHub token (za privatne repozitorije)', sub: 'Treba samo ako su vpn-panel i veltrix-app Private. GitHub → Settings → Developer settings → Fine-grained tokens: samo ta 2 repozitorija, dozvola Contents: Read-only.', def: '' },
   ] },
 ];
 

@@ -18,7 +18,8 @@ const busy = new Map();
 async function ensure(kind) {
   const k = KIND[kind];
   const d = await require('./site').downloads();
-  const url = d[k.key], build = d[k.build];
+  const tok = String(require('./settings').get('gh_token') || '').trim();
+  const url = tok && d[k.key + 'Api'] ? d[k.key + 'Api'] : d[k.key], build = d[k.build];
   if (!url || !build) return { file: latestLocal(kind), page: d.page };
   const f = path.join(DIR, k.file(build));
   if (fs.existsSync(f) && fs.statSync(f).size > 100000) return { file: f, build };
@@ -26,7 +27,7 @@ async function ensure(kind) {
     busy.set(kind, (async () => {
       fs.mkdirSync(DIR, { recursive: true });
       const tmp = f + '.part';
-      const r = await fetch(url, { headers: { 'user-agent': 'veltrix-panel' }, redirect: 'follow', signal: AbortSignal.timeout(300000) });
+      const r = await fetch(url, { headers: require('./site').ghHeaders('application/octet-stream'), redirect: 'follow', signal: AbortSignal.timeout(300000) });
       if (!r.ok) throw new Error(`GitHub ${r.status}`);
       await pipeline(Readable.fromWeb(r.body), fs.createWriteStream(tmp));
       fs.renameSync(tmp, f);
@@ -53,8 +54,7 @@ async function handle(req, res, kind) {
   const r = await ensure(kind);
   if (!r.file) {
     // ništa nije sačuvano i GitHub ne odgovara: pošalji na stranicu izdanja
-    res.writeHead(302, { location: r.page || 'https://github.com/maid-cyber/veltrix-app/releases' });
-    return res.end();
+    return send(res, 503, 'Aplikacija se upravo priprema. Pokušaj ponovo za minut.');
   }
   const st = fs.statSync(r.file);
   res.writeHead(200, {

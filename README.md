@@ -327,6 +327,16 @@ Na vrhu piše presuda: **Kod nas** (popravi server), **Nalog** (produži, upali)
 - E-mail i stranica kupca imaju dugme **Otvori u aplikaciji i spoji se**: na Androidu i Windowsu otvori Veltrix, uveze nalog i spoji se (ako aplikacija nije instalirana, Android ponudi preuzimanje). Na iPhoneu otvori Hiddify.
 - U e-mailu je i **QR kod** (PNG, `/s/TOKEN/qr.png`) za skeniranje telefonom kad kupac čita e-mail na računaru.
 
+## 25. Privatni GitHub repozitoriji
+
+Ako su `vpn-panel` i `veltrix-app` **Private**, panel treba GitHub token da skine aplikacije i nove verzije panela:
+
+1. GitHub → Settings → Developer settings → **Fine-grained tokens** → Generate new token.
+2. Repository access: **Only select repositories** → `vpn-panel` i `veltrix-app`. Permissions → **Contents: Read-only**. Rok trajanja po želji (npr. 1 godina).
+3. Token upiši samo u panel: **Postavke → Sistem → GitHub token**.
+
+Aplikacije se same ažuriraju preko panela (`/app/config` i `/download/…`), pa kupcima GitHub ne treba. Ručna instalacija panela iz privatnog repozitorija: `git clone https://TOKEN@github.com/maid-cyber/vpn-panel.git` (ili zip).
+
 ## Šta još nije gotovo
 
 - **Smanjena brzina u grace periodu:** Xray ne zna ograničavati brzinu po korisniku.

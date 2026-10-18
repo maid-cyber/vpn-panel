@@ -146,7 +146,11 @@ function appFlags(s) {
 /** Javna podešavanja za ekran prijave (nema naloga). */
 function appConfig() {
   const s = settings.load();
-  return { brand: s.brand || 'Veltrix VPN', support: s.support_contact || '', trial: !!s.app_trial, ref: !!s.ref_on, features: appFlags(s) };
+  // zadnje verzije aplikacija: aplikacije se ažuriraju sa panela (/download/…), ne sa GitHuba
+  let d = {};
+  try { d = require('./site').downloadsCached() || {}; } catch { /* */ }
+  return { brand: s.brand || 'Veltrix VPN', support: s.support_contact || '', trial: !!s.app_trial, ref: !!s.ref_on, features: appFlags(s),
+    latest: { android: d.apkBuild || 0, windows: d.exeBuild || 0, android_url: '/download/android', windows_url: '/download/windows' } };
 }
 
 // zapamti koja aplikacija i verzija se javlja (za stranicu Aplikacija); UA: VeltrixVPN/Android/57

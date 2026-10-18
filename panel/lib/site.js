@@ -16,6 +16,14 @@ const PUBLIC = path.join(__dirname, '..', 'public');
 const SYSTEM = { username: 'sajt', role: 'owner', id: 0 };
 const CUR = { EUR: '€', USD: '$', BAM: 'KM ', CHF: 'CHF ' };
 
+/** Zaglavlja za GitHub (token iz Postavke → Sistem, ako su repozitoriji privatni). */
+function ghHeaders(accept) {
+  const h = { 'user-agent': 'veltrix-panel', accept };
+  const t = String(settings.get('gh_token') || '').trim();
+  if (t) h.authorization = `Bearer ${t}`;
+  return h;
+}
+
 // zadnji Android APK i Windows instalacija sa GitHuba (keš 1 sat)
 let dl = { t: 0, apk: '', exe: '', page: '' };
 async function downloads() {
@@ -23,13 +31,14 @@ async function downloads() {
   const page = `https://github.com/${repo}/releases`;
   if (now() - dl.t < 3600000 && dl.page === page) return dl;
   try {
-    const r = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=40`, { headers: { 'user-agent': 'veltrix-panel', accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(8000) });
+    const r = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=40`, { headers: ghHeaders('application/vnd.github+json'), signal: AbortSignal.timeout(8000) });
     const list = r.ok ? await r.json() : [];
     const best = (prefix, ext) => list.filter((x) => !x.draft && String(x.tag_name).startsWith(prefix))
       .map((x) => ({ n: Number(String(x.tag_name).replace(/\D+/g, '')) || 0, a: (x.assets || []).find((a) => a.name.endsWith(ext)), ts: Date.parse(x.published_at) || 0 }))
       .filter((x) => x.a).sort((a, b) => b.n - a.n)[0];
     const a = best('build-', '.apk'), w = best('win-', '.exe');
-    dl = { t: now(), apk: a?.a?.browser_download_url || '', exe: w?.a?.browser_download_url || '', page,
+    // za privatni repozitorij fajl se skida preko API adrese (a.url) sa tokenom
+    dl = { t: now(), apk: a?.a?.browser_download_url || '', exe: w?.a?.browser_download_url || '', page, apkApi: a?.a?.url || '', exeApi: w?.a?.url || '',
       apkBuild: a?.n || 0, exeBuild: w?.n || 0, apkTs: a?.ts || 0, exeTs: w?.ts || 0 };
   } catch { dl = { ...dl, t: now() - 3000000, page }; }
   return dl;
@@ -159,4 +168,4 @@ function t(){fetch('/buy/status?s='+encodeURIComponent(s)).then(r=>r.json()).the
 /** Zadnji poznati buildovi bez čekanja mreže (osvježi u pozadini). */
 function downloadsCached() { downloads().catch(() => {}); return dl; }
 
-module.exports = { page, buy, paidBuy, status, bought, siteData, downloads, downloadsCached };
+module.exports = { page, buy, paidBuy, status, bought, siteData, downloads, downloadsCached, ghHeaders };

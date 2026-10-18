@@ -104,13 +104,18 @@ cat > "$APP/update.sh" <<'UPD'
 #!/usr/bin/env bash
 set -euo pipefail
 REQ=/var/lib/vpn-panel/update.request
-REPO="$(tr -cd 'A-Za-z0-9._/-' < "$REQ" 2>/dev/null || true)"; REPO="${REPO:-maid-cyber/vpn-panel}"
+REPO="$(head -n1 "$REQ" 2>/dev/null | tr -cd 'A-Za-z0-9._/-' || true)"; REPO="${REPO:-maid-cyber/vpn-panel}"
+TOK="$(sed -n 2p "$REQ" 2>/dev/null | tr -cd 'A-Za-z0-9_' || true)"
 rm -f "$REQ"
 . /opt/vpn-panel/install.env
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 cd "$T"
 echo "=== $(date) · ažuriranje iz github.com/$REPO"
-curl -fsSL -o p.zip "https://github.com/$REPO/archive/refs/heads/main.zip"
+if [ -n "$TOK" ]; then
+  curl -fsSL -H "Authorization: Bearer $TOK" -o p.zip "https://api.github.com/repos/$REPO/zipball/main"
+else
+  curl -fsSL -o p.zip "https://github.com/$REPO/archive/refs/heads/main.zip"
+fi
 unzip -q p.zip
 cd "$(find . -maxdepth 1 -mindepth 1 -type d | head -1)"
 bash install-panel.sh ${DOMAIN:-}

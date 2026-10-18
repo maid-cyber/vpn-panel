@@ -1013,8 +1013,8 @@ route('GET', 'system/update', 'owner', async () => {
   const repo = String(settings.get('update_repo') || '').trim();
   let latest = null;
   try {
-    const r = await fetch(`https://raw.githubusercontent.com/${repo}/main/panel/package.json`, { signal: AbortSignal.timeout(10000) });
-    if (r.ok) latest = (await r.json()).version;
+    const r = await fetch(`https://api.github.com/repos/${repo}/contents/panel/package.json?ref=main`, { headers: require('./site').ghHeaders('application/vnd.github.raw+json'), signal: AbortSignal.timeout(10000) });
+    if (r.ok) latest = JSON.parse(await r.text()).version;
   } catch { /* nema veze */ }
   const fsx = require('node:fs');
   const ready = fsx.existsSync('/etc/systemd/system/vpn-panel-update.path');
@@ -1023,7 +1023,8 @@ route('GET', 'system/update', 'owner', async () => {
 route('POST', 'system/update', 'owner', (c) => {
   const fsx = require('node:fs');
   if (!fsx.existsSync('/etc/systemd/system/vpn-panel-update.path')) fail(400, 'Ažuriranje iz panela još nije podešeno. Jednom ažuriraj ručno komandom iz README-a.');
-  fsx.writeFileSync(require('node:path').join(require('./db').DATA_DIR, 'update.request'), String(settings.get('update_repo') || 'maid-cyber/vpn-panel'));
+  // repozitorij u 1. redu, token (za privatni repozitorij) u 2.; fajl čita samo root servis za ažuriranje
+  fsx.writeFileSync(require('node:path').join(require('./db').DATA_DIR, 'update.request'), `${String(settings.get('update_repo') || 'maid-cyber/vpn-panel')}\n${String(settings.get('gh_token') || '').trim()}\n`, { mode: 0o600 });
   log(c.auth.admin.username, 'Pokrenuto ažuriranje panela', settings.get('update_repo'), 'warn');
   return { ok: true };
 });
