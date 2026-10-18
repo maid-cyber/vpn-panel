@@ -353,3 +353,14 @@ Reselleri dobijaju e-mailove u istom tamnom Veltrix izgledu kao kupci:
 - **Malo kredita**: kad kredit padne ispod €10.
 
 Uključuješ i isključuješ u **Postavke → Obavještenja → E-mailovi resellerima**. Treba podešen SMTP (sekcija 22).
+
+## 27. Prodaja preko Telegram bota (PayPal)
+
+Kupac u botu klikne **Kupi VPN**, izabere plan, plati PayPalom (računom ili karticom preko PayPala) i odmah dobije nalog, link, QR kod i dugmad za aplikacije. Postojeći kupci u botu produžavaju nalog i vide stanje.
+
+1. PayPal Business račun → developer.paypal.com → **Apps & Credentials** → **Live** → Create App → kopiraj **Client ID** i **Secret**.
+2. Panel → Postavke → **Plaćanja**: uključi "PayPal: kupci plaćaju preko Telegram bota", način **Live**, zalijepi Client ID i Secret, Spremi, klikni **Provjeri PayPal**.
+3. Postavke → **Obavještenja**: uključi "Telegram bot za kupce", upiši token bota (@BotFather) i "Bot za kupce prodaje VPN".
+4. Postavke → Opšte → **Adresa panela** mora biti upisana (PayPal tamo vraća kupca).
+
+Valuta mora biti EUR, USD ili CHF. Bot prodaje aktivne planove sa cijenom (bez probnih). Uplata se provjerava i svake minute, pa nalog stiže i ako kupac zatvori PayPal stranicu prije povratka. Kupci resellera ne mogu produžiti preko bota (javljaju se svom prodavcu).

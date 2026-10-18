@@ -122,6 +122,7 @@ async function minute() {
     if (due) backup.make('sistem').catch(() => {});
   }
   autoRenew(s);
+  require('./paypal').sweep().catch((e) => console.error('paypal', e));
   if (lp.hour >= 10 && lp.hour < 21) remindCustomers(s).catch((e) => console.error(e));
   // jednom dnevno: čišćenje
   if (mark('cleanup') !== lp.date) {

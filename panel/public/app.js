@@ -1875,7 +1875,7 @@
           <button class="btn sm" data-a="testTg">${ic('send')}Probna poruka meni</button>
           <button class="btn sm" data-a="testCbot">${ic('send')}Provjeri bota za kupce</button>
           <button class="btn sm" data-a="testMail">${ic('send')}Probni e-mail</button></div></div>`,
-      placanja: `<div class="set-row"><div class="lbl"><b>Stripe webhook adresa</b><small>U Stripeu: Developers → Webhooks → Add endpoint, događaj checkout.session.completed. Tajnu (whsec_…) zalijepi gore.</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch"><div class="list-item" style="flex:1"><span class="mono">${esc((values.panel_url || location.origin).replace(/\/+$/, ''))}/stripe/webhook</span><button class="btn sm" data-a="copy" data-v="${esc((values.panel_url || location.origin).replace(/\/+$/, ''))}/stripe/webhook">${ic('copy')}</button></div></div></div>`,
+      placanja: `<div class="set-row"><div class="lbl"><b>PayPal</b><small>Prvo spremi postavke. Valuta mora biti EUR, USD ili CHF. Adresa panela (Opšte) mora biti upisana.</small></div><div class="ctl"><button class="btn sm" data-a="testPaypal">${ic('check')}Provjeri PayPal</button></div></div>` + `<div class="set-row"><div class="lbl"><b>Stripe webhook adresa</b><small>U Stripeu: Developers → Webhooks → Add endpoint, događaj checkout.session.completed. Tajnu (whsec_…) zalijepi gore.</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch"><div class="list-item" style="flex:1"><span class="mono">${esc((values.panel_url || location.origin).replace(/\/+$/, ''))}/stripe/webhook</span><button class="btn sm" data-a="copy" data-v="${esc((values.panel_url || location.origin).replace(/\/+$/, ''))}/stripe/webhook">${ic('copy')}</button></div></div></div>`,
       backup: `<div class="set-row"><div class="lbl"><b>Backupi</b><small>Čuvaju se u folderu data/backups na serveru panela</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
           ${backups.slice(0, 6).map((b) => `<div class="list-item"><span>${fmtDT(b.ts)}</span><span class="dim">${bytes(b.size)}</span><a class="btn sm" href="api/backups/${encodeURIComponent(b.name)}">${ic('down')}Preuzmi</a></div>`).join('') || '<span class="muted">Još nema backupa.</span>'}
           <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-a="backupNow">Napravi backup sada</button><button class="btn sm" data-a="testS3">Probaj S3</button>${owner ? '<button class="btn sm danger" data-a="restore">Vrati iz backupa…</button>' : ''}</div></div></div>`,
@@ -2354,6 +2354,7 @@
       if (!(await ask('Ažuriraj panel', 'Panel skida novu verziju i restartuje se. Traje 1–3 minute. VPN serveri rade normalno.', 'Ažuriraj'))) return;
       try { await POST('system/update'); toast('Ažuriranje pokrenuto. Stranica će se osvježiti za 90 sekundi.'); setTimeout(() => location.reload(), 90000); } catch (e) { fail(e); }
     },
+    testPaypal: async () => { try { const r = await POST('settings/test-paypal'); toast(`PayPal radi (${r.mode === 'sandbox' ? 'probni Sandbox' : 'pravi novac'}).`); } catch (e) { fail(e); } },
     testTg: async () => { try { await POST('settings/test-telegram'); toast('Poruka poslana. Provjeri Telegram.'); } catch (e) { fail(e); } },
     editAdmin: (d) => editAdmin(d.id).catch(fail),
     newKey: async () => {

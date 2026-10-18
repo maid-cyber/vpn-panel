@@ -169,7 +169,7 @@ function setupSteps(c) {
     { k: 'https', label: 'HTTPS adresa panela', hint: 'Postavke → Općenito → Adresa panela', href: 'postavke', done: /^https:\/\//.test(s.panel_url || '') },
     { k: 'server', label: 'Bar jedan server online', hint: 'Serveri → Dodaj server', href: 'serveri', done: !!one("SELECT id FROM servers WHERE enabled = 1 AND last_seen > ?", now() - 300000) },
     { k: 'plans', label: 'Planovi sa cijenama', hint: 'Planovi → bar jedan plaćeni plan', href: 'planovi', done: !!one('SELECT id FROM plans WHERE active = 1 AND trial = 0 AND price > 0') },
-    { k: 'pay', label: 'Način plaćanja', hint: 'Postavke → Plaćanja (USDT, IBAN, PayPal ili Stripe)', href: 'postavke', done: !!((s.stripe_on && s.stripe_secret) || s.pay_usdt || s.pay_iban || s.pay_paypal) },
+    { k: 'pay', label: 'Način plaćanja', hint: 'Postavke → Plaćanja (USDT, IBAN, PayPal ili Stripe)', href: 'postavke', done: !!((s.stripe_on && s.stripe_secret) || (s.paypal_on && s.paypal_secret) || s.pay_usdt || s.pay_iban || s.pay_paypal) },
     { k: 'support', label: 'Kontakt podrške za kupce', hint: 'Postavke → Pretplata i aplikacije', href: 'postavke', done: !!s.support_contact },
     { k: 'tg', label: 'Telegram obavještenja', hint: 'Postavke → Obavještenja', href: 'postavke', done: !!s.tg_token },
     { k: 'trial', label: 'Probni nalog u aplikaciji', hint: 'Aplikacija → Probaj besplatno', href: 'aplikacija', done: !!s.app_trial },
@@ -920,6 +920,9 @@ route('GET', 'appctl', 'settings', async () => {
   };
 });
 
+route('POST', 'settings/test-paypal', 'settings', async () => {
+  try { return await require('./paypal').test(); } catch (e) { fail(400, e.message); }
+});
 route('POST', 'settings/test-telegram', 'settings', async () => {
   const r = await telegram('Probna poruka iz panela. Obavještenja rade. ✅');
   if (!r.ok) fail(400, `Telegram: ${r.error}`);

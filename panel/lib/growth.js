@@ -122,7 +122,7 @@ function paidRenew(ses) {
   const u = one('SELECT * FROM users WHERE id = ?', uid);
   if (!u) return;
   const amount = (ses.amount_total || 0) / 100;
-  core.extendUser({ username: 'Stripe', role: 'owner', id: 0 }, uid, { plan_id: pid, paid: amount, method: 'Stripe (kartica)' });
+  core.extendUser({ username: ses.actor || 'Stripe', role: 'owner', id: 0 }, uid, { plan_id: pid, paid: amount, method: ses.method || 'Stripe (kartica)' });
   const trx = one('SELECT id FROM transactions WHERE user_id = ? AND ext_id IS NULL ORDER BY id DESC LIMIT 1', uid);
   if (trx) run('UPDATE transactions SET ext_id = ? WHERE id = ?', ses.id, trx.id);
   require('./coupons').used(ses, uid);
