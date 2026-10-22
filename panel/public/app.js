@@ -69,12 +69,21 @@
   const GET = (p) => api('GET', p), POST = (p, b) => api('POST', p, b ?? {}), PUT = (p, b) => api('PUT', p, b), DEL = (p) => api('DELETE', p, {});
   const R = (p) => (isRes() ? 'res/' : '') + p;   // reseller ima svoje putanje
 
+  // stariji preglednici bez popovera: skini atribut, inače bi poruke ostale skrivene
+  if (!('showPopover' in HTMLElement.prototype)) $('#toasts')?.removeAttribute('popover');
+
   function toast(msg, err) {
+    const box = $('#toasts');
     const el = document.createElement('div');
     el.className = 'toast' + (err ? ' err' : '');
     el.textContent = msg;
-    $('#toasts').append(el);
-    setTimeout(() => el.remove(), err ? 6000 : 3500);
+    box.append(el);
+    // otvoreni <dialog> je u "top layer"-u: bez popovera poruka ostane ispod njega
+    if (box.hasAttribute('popover')) { try { box.showPopover(); } catch { /* već otvoren */ } }
+    setTimeout(() => {
+      el.remove();
+      if (!box.children.length && box.hasAttribute('popover')) { try { box.hidePopover(); } catch { /* već zatvoren */ } }
+    }, err ? 6000 : 3500);
   }
   const fail = (e) => toast(e.message || String(e), true);
   const cur = () => ({ EUR: '€', USD: '$', BAM: 'KM ', CHF: 'CHF ' }[S.me?.currency] || '€');
@@ -141,7 +150,7 @@
         data._btn = btn.value;
         dlg.removeEventListener('close', onClose);
         form.onsubmit = null;
-        resolve({ data, close: () => dlg.close(), keep: () => {} });
+        resolve({ data, btn, close: () => dlg.close(), keep: () => {} });
       };
     });
   }
@@ -156,7 +165,21 @@
     for (;;) {
       const r = await modal(html, opts);
       if (!r) return null;
-      try { const out = await handler(r.data); r.close(); return out ?? true; } catch (e) { fail(e); html = $('#modalForm').innerHTML; restoreValues(r.data); }
+      const form = $('#modalForm'), btn = r.btn, label = btn ? btn.innerHTML : '';
+      const busy = (on) => {
+        $$('button', form).forEach((b) => { b.disabled = on; });
+        if (btn) btn.innerHTML = on ? '<span class="spin"></span>Radim…' : label;
+      };
+      busy(true);
+      try { const out = await handler(r.data); r.close(); return out ?? true; } catch (e) {
+        fail(e);
+        busy(false);
+        // greška ostaje ispisana u prozoru: toast se lako propusti, pogotovo na telefonu
+        const clean = form.innerHTML.replace(/<div class="dlg-err">[\s\S]*?<\/div>/g, '');
+        const banner = `<div class="dlg-err">${esc(e.message || String(e))}</div>`;
+        html = clean.includes('class="dlg-actions"') ? clean.replace('<div class="dlg-actions"', banner + '<div class="dlg-actions"') : clean + banner;
+        restoreValues(r.data);
+      }
     }
   }
   function restoreValues(data) {
