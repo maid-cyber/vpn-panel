@@ -371,3 +371,14 @@ Valuta mora biti EUR, USD ili CHF. Bot prodaje aktivne planove sa cijenom (bez p
 - **Sajt:** novi izgled u bojama aplikacije, koraci "Kako radi", prekidač **Mjesečno / Godišnje** sa cijenom po mjesecu i uštedom, plaćanje **PayPalom ili karticom preko PayPala** (i Stripe, ako je uključen), dugme za kupovinu preko Telegram bota.
 - **Godišnji planovi:** pri prvom pokretanju 3.0.0 panel za svaki mjesečni plan napravi godišnji (365 dana, oko 40% jeftinije po mjesecu, npr. €5/mj → €35.99/god). Ako već imaš planove od 300+ dana, ne pravi ništa. Cijene mijenjaš u **Planovi**.
 - **Produženje bez Stripea:** kad Stripe nije uključen, kupac na svojoj stranici i u aplikaciji produžava preko PayPala.
+
+## 29. Novi sajt (3.1.0)
+
+Sajt je prerađen i sad ima:
+
+- **Traku statusa na vrhu**: posjetiocu pokaže njegovu pravu IP adresu, državu i provajdera dok nije spojen, a zeleno "Zaštićen si" kad jeste. Radi preko `/me.json`; IP se nigdje ne sprema.
+- **Sekciju Zaštita**: ispisuje samo one protokole koje si stvarno uključio (Postavke → Protokoli), plus blokadu reklama i malvera ako su uključene.
+- **Za šta ti treba**: javni WiFi, streaming, igrice, rad od kuće.
+- **Sekciju za preprodavače**: vidi se kad u Postavke → Reselleri uključiš "Reselleri se mogu sami registrovati" (vodi na registraciju), inače vodi na tvoju podršku.
+- **Podnožje** sa kolonama i linkovima na aplikacije, bota i reseller panel.
+- Besplatan probni nalog se spominje kod cijena samo ako je u Postavke → Aplikacija uključen "Probaj besplatno" i postoji probni plan.

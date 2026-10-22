@@ -93,6 +93,7 @@ async function onRequest(req, res) {
     if (settings.get('site_on')) {
       const site = require('./lib/site');
       if (p === '/' && req.method === 'GET') return await site.page(req, res);
+      if (p === '/me.json' && req.method === 'GET') return await site.visitor(req, res);
       if (p === '/buy' && req.method === 'POST') return await site.buy(req, res);
       if (p === '/buy/status' && req.method === 'GET') return site.status(req, res, url);
       if (p === '/kupljeno' && req.method === 'GET') return site.bought(req, res);

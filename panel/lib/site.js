@@ -8,7 +8,7 @@ const core = require('./core');
 const vpn = require('./vpn');
 const QR = require('../public/qr.js');
 const coupons = require('./coupons');
-const { send, esc, readBody } = require('./http');
+const { send, esc, readBody, clientIp } = require('./http');
 
 db.exec('CREATE TABLE IF NOT EXISTS purchases (session TEXT PRIMARY KEY, user_id INTEGER, email TEXT, ts INTEGER)');
 
@@ -71,6 +71,8 @@ function siteData(d) {
     blocks: { ads: !!s.block_ads, malware: !!s.block_malware },
     // preuzimanje ide sa tvoje adrese (panel skine sa GitHuba i čuva kod sebe)
     apk: d.apk ? '/download/android' : '', exe: d.exe ? '/download/windows' : '', releases: d.page,
+    trial: !!(s.app_trial && one('SELECT id FROM plans WHERE active = 1 AND trial = 1 LIMIT 1')),
+    reseller: s.res_portal !== false && s.res_signup ? (s.reseller_path || '/reseller') : '',
     coupons: !!one('SELECT id FROM coupons WHERE active = 1 AND (expires_at = 0 OR expires_at > ?) AND (max_uses = 0 OR used < max_uses) LIMIT 1', now()),
   };
 }
@@ -150,6 +152,16 @@ function paidBuy(ses, siteBase) {
   log('sajt', 'Kupljeno na sajtu', `${u.username} · ${plan.name} · €${amount}`);
 }
 
+/** GET /me.json → ko je posjetilac: IP, država i je li već spojen preko našeg servera. IP se nigdje ne sprema. */
+async function visitor(req, res) {
+  const ip = clientIp(req);
+  const mine = all("SELECT host FROM servers WHERE enabled = 1 AND host != ''").some((sv) => sv.host === ip);
+  const g = await require('./notify').geoIp(ip).catch(() => null);
+  return send(res, 200, {
+    ip, protected: mine, cc: g?.cc || '', country: g?.country || '', city: g?.city || '', isp: mine ? '' : (g?.isp || ''),
+  }, { 'cache-control': 'no-store' });
+}
+
 // GET /buy/status?s=cs_... → {ready, link, qr}
 function status(req, res, url) {
   const sid = String(url.searchParams.get('s') || url.searchParams.get('pp') || '');
@@ -204,4 +216,4 @@ function ensureYearly() {
   }
 }
 
-module.exports = { ensureYearly, page, buy, paidBuy, status, bought, siteData, downloads, downloadsCached, ghHeaders };
+module.exports = { ensureYearly, visitor, page, buy, paidBuy, status, bought, siteData, downloads, downloadsCached, ghHeaders };

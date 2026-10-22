@@ -53,9 +53,9 @@ async function geoIp(ip) {
   if (!ip || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|fc|fd)/.test(ip)) return null;
   if (geoCache.has(ip)) return geoCache.get(ip);
   try {
-    const r = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,countryCode,country,city,lat,lon`, { signal: AbortSignal.timeout(6000) });
+    const r = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,countryCode,country,city,lat,lon,isp`, { signal: AbortSignal.timeout(6000) });
     const j = await r.json();
-    const out = j.status === 'success' ? { cc: j.countryCode, country: j.country, city: j.city, lat: j.lat, lon: j.lon } : null;
+    const out = j.status === 'success' ? { cc: j.countryCode, country: j.country, city: j.city, lat: j.lat, lon: j.lon, isp: j.isp || '' } : null;
     if (geoCache.size > 5000) geoCache.clear();
     geoCache.set(ip, out);
     return out;

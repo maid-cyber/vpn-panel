@@ -8,10 +8,10 @@
 <meta name="theme-color" content="#0b0b10">
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
 <style>
-:root{--bg:#0b0b10;--bg2:#101017;--card:#14141c;--card2:#1b1b25;--line:#24242f;--line2:#33333f;--text:#f2f2f6;--soft:#c3c3cf;--muted:#8e8e9c;--red:#e3172b;--red2:#ff4a5a;--red3:#9e0c1a;--ok:#3ddc84;--acc-hi:#ff4a5a;--gl-b:255,74,90;--gl-1:#24161c;--gl-2:#0b0b10;--gl-dot:#8f8fa3}
+:root{--bg:#0b0b10;--bg2:#101017;--card:#14141c;--card2:#1b1b25;--line:#24242f;--line2:#33333f;--text:#f2f2f6;--soft:#c3c3cf;--muted:#8e8e9c;--red:#e3172b;--red2:#ff4a5a;--red3:#9e0c1a;--ok:#3ddc84;--warn:#f5a524;--acc-hi:#ff4a5a;--gl-b:255,74,90;--gl-1:#24161c;--gl-2:#0b0b10;--gl-dot:#8f8fa3}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 "Inter","Segoe UI",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(900px 520px at 80% -8%,rgba(227,23,43,.20),transparent 62%),radial-gradient(700px 500px at -5% 30%,rgba(227,23,43,.07),transparent 60%)}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(900px 520px at 80% -8%,rgba(227,23,43,.20),transparent 62%),radial-gradient(700px 500px at -5% 32%,rgba(227,23,43,.07),transparent 60%)}
 @font-face{font-family:Inter;src:url(/assets/fonts/Inter-Regular.woff) format("woff");font-weight:400;font-display:swap}
 @font-face{font-family:Inter;src:url(/assets/fonts/Inter-SemiBold.woff) format("woff");font-weight:600;font-display:swap}
 @font-face{font-family:Inter;src:url(/assets/fonts/Inter-Bold.woff) format("woff");font-weight:700;font-display:swap}
@@ -19,15 +19,25 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;ba
 a{color:inherit;text-decoration:none}
 .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
 h1,h2,h3{line-height:1.1;font-family:"Inter Display",Inter,system-ui,sans-serif;letter-spacing:-.02em;margin:0}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:52px;padding:0 26px;border-radius:14px;font-weight:600;font-size:16px;border:1px solid var(--line2);background:rgba(27,27,37,.7);color:var(--text);cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s,background .15s;font-family:inherit}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:52px;padding:0 26px;border-radius:14px;font-weight:600;font-size:16px;border:1px solid var(--line2);background:rgba(27,27,37,.7);color:var(--text);cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;font-family:inherit}
 .btn:hover{transform:translateY(-1px);border-color:#55556a}
 .btn.red{background:linear-gradient(180deg,var(--red2),var(--red));border-color:transparent;box-shadow:0 14px 34px -14px rgba(227,23,43,.9)}
 .btn.red:hover{box-shadow:0 18px 40px -14px rgba(255,74,90,.95)}
 .btn.sm{min-height:42px;padding:0 18px;font-size:14px;border-radius:12px}
-.btn svg{width:19px;height:19px}
+.btn svg{width:19px;height:19px;flex:none}
 .tag{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;border:1px solid var(--line2);background:rgba(20,20,28,.75);color:var(--soft);font-size:13px;font-weight:600}
 .tag i{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
 .tag.red{border-color:rgba(255,74,90,.35);color:#ffb3bb;background:rgba(227,23,43,.10)}
+/* traka statusa */
+.status{background:var(--card2);border-bottom:1px solid var(--line);font-size:14px}
+.status .wrap{display:flex;align-items:center;gap:10px;min-height:46px;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
+.status .d{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.status.on .d{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.status.off .d{background:var(--warn);box-shadow:0 0 10px rgba(245,165,36,.7)}
+.status b{font-weight:700}.status.on b{color:#7af0b0}.status.off b{color:#ffcd73}
+.status .meta{color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.status .meta code{font:13px ui-monospace,Consolas,monospace;color:var(--soft)}
+.status a{margin-left:auto;color:var(--red2);font-weight:600;white-space:nowrap}
 /* meni */
 header{position:sticky;top:0;z-index:20;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);background:rgba(11,11,16,.74);border-bottom:1px solid rgba(36,36,47,.8)}
 .nav{display:flex;align-items:center;gap:22px;height:70px}
@@ -36,21 +46,22 @@ header{position:sticky;top:0;z-index:20;backdrop-filter:blur(16px);-webkit-backd
 .logo b{font:800 20px "Inter Display",Inter,sans-serif;letter-spacing:.09em}
 .logo b em{font-style:normal;color:var(--red)}
 .logo small{font:700 9px Inter,sans-serif;letter-spacing:.55em;color:var(--red2);margin-top:4px}
-.links{display:flex;gap:28px;margin-left:auto;color:var(--soft);font-size:15px}
+.links{display:flex;gap:26px;margin-left:auto;color:var(--soft);font-size:15px}
 .links a:hover{color:var(--text)}
 .lang{display:flex;border:1px solid var(--line2);border-radius:10px;overflow:hidden}
 .lang button{background:none;border:0;color:var(--muted);font:600 12px Inter,sans-serif;padding:7px 10px;cursor:pointer}
 .lang button.on{background:var(--red);color:#fff}
 .burger{display:none;margin-left:auto;background:none;border:1px solid var(--line2);border-radius:10px;width:44px;height:44px;color:var(--text);font-size:20px;cursor:pointer}
 /* početak */
-.hero{display:grid;grid-template-columns:1.05fr 1fr;gap:40px;align-items:center;padding-top:72px;padding-bottom:30px}
+.hero{display:grid;grid-template-columns:1.05fr 1fr;gap:40px;align-items:center;padding-top:66px;padding-bottom:30px}
 .hero h1{font-size:clamp(42px,5.8vw,74px);line-height:1;font-weight:800;margin:22px 0 20px}
 .hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--red2),#ff9a6b);-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero p.lead{color:var(--soft);font-size:clamp(17px,1.6vw,20px);max-width:560px;margin:0 0 30px}
+.hero p.lead{color:var(--soft);font-size:clamp(17px,1.6vw,20px);max-width:560px;margin:0 0 24px}
+.ticks{list-style:none;padding:0;margin:0 0 28px;display:flex;flex-direction:column;gap:10px;color:var(--soft);font-size:16px}
+.ticks li{display:flex;gap:11px;align-items:center}
+.ticks svg{width:20px;height:20px;color:var(--ok);flex:none}
 .cta{display:flex;flex-wrap:wrap;gap:12px}
-.trust{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:28px;color:var(--soft);font-size:14px}
-.trust span{display:inline-flex;align-items:center;gap:8px}
-.trust svg{width:18px;height:18px;color:var(--ok)}
+.under{color:var(--muted);font-size:14px;margin:16px 0 0}
 .visual{position:relative;justify-self:center;width:100%;max-width:560px}
 .globe{position:relative;aspect-ratio:1/1;width:100%}
 .globe canvas{position:absolute;inset:0;width:100%;height:100%}
@@ -73,14 +84,26 @@ section{padding:90px 0}
 .head h2{font-size:clamp(30px,3.8vw,46px);font-weight:800;margin:16px 0 12px}
 .head p{color:var(--soft);margin:0;font-size:18px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .card{background:linear-gradient(180deg,rgba(27,27,37,.75),rgba(20,20,28,.95));border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
 .feat{transition:border-color .2s,transform .2s}.feat:hover{border-color:rgba(255,74,90,.4);transform:translateY(-2px)}
 .feat .ic{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;background:rgba(227,23,43,.12);border:1px solid rgba(227,23,43,.35);margin-bottom:18px;color:var(--red2)}
 .feat .ic svg{width:26px;height:26px}
 .feat h3{font-size:20px;margin-bottom:8px}
 .feat p{color:var(--muted);margin:0;font-size:15px}
+/* zaštita / protokoli */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center}
+.split h2{font-size:clamp(28px,3.4vw,40px);margin-bottom:14px}
+.split p.l{color:var(--soft);font-size:17px;margin:0 0 24px}
+.protos{display:flex;flex-direction:column;gap:12px}
+.proto{display:flex;gap:14px;align-items:flex-start;padding:18px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.proto .b{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:rgba(227,23,43,.12);border:1px solid rgba(227,23,43,.3);color:var(--red2);flex:none}
+.proto .b svg{width:21px;height:21px}
+.proto b{display:block;font-size:16px}.proto small{color:var(--muted);font-size:14px;line-height:1.5;display:block;margin-top:3px}
+.shieldart{display:grid;place-items:center;padding:30px}
+.shieldart svg{width:min(320px,70%);height:auto;filter:drop-shadow(0 30px 60px rgba(227,23,43,.35))}
 /* koraci */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 .step{position:relative;padding-top:30px}
 .step .n{position:absolute;top:-18px;left:26px;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(180deg,var(--red2),var(--red));font:800 17px "Inter Display",Inter,sans-serif;box-shadow:0 10px 24px -10px rgba(227,23,43,.9)}
 .step h3{font-size:20px;margin:6px 0 8px}.step p{color:var(--muted);margin:0;font-size:15px}
@@ -90,6 +113,11 @@ section{padding:90px 0}
 .flag{width:40px;height:30px;border-radius:7px;object-fit:cover;flex:none;background:var(--card2);border:1px solid var(--line2)}
 .loc b{display:block}.loc small{color:var(--muted)}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);margin-left:auto;flex:none}.dot.off{background:#5a5a6a;box-shadow:none}
+/* za šta */
+.use{text-align:center;padding:28px 22px}
+.use .ic{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;background:rgba(227,23,43,.1);border:1px solid rgba(227,23,43,.3);color:var(--red2)}
+.use .ic svg{width:26px;height:26px}
+.use h3{font-size:18px;margin-bottom:8px}.use p{color:var(--muted);font-size:15px;margin:0}
 /* cijene */
 .period{display:flex;justify-content:center;margin:-14px 0 36px}
 .seg{display:inline-flex;padding:5px;border-radius:16px;background:var(--card);border:1px solid var(--line2);gap:4px}
@@ -111,7 +139,11 @@ section{padding:90px 0}
 .price li{display:flex;gap:10px;align-items:flex-start}
 .price li::before{content:"";flex:none;width:18px;height:18px;margin-top:2px;border-radius:50%;background:rgba(61,220,132,.16) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233ddc84' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/11px no-repeat}
 .price .btn{margin-top:auto;width:100%}
-.pay{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;margin-top:30px;color:var(--muted);font-size:14px}
+.guar{display:flex;align-items:center;gap:16px;max-width:1060px;margin:26px auto 0;padding:20px 24px;border-radius:18px;border:1px solid rgba(61,220,132,.3);background:rgba(61,220,132,.07)}
+.guar .ic{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(61,220,132,.14);color:var(--ok);flex:none}
+.guar .ic svg{width:23px;height:23px}
+.guar b{display:block}.guar span{color:var(--soft);font-size:14px}
+.pay{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;margin-top:26px;color:var(--muted);font-size:14px}
 .pill{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:10px;border:1px solid var(--line2);background:var(--card);color:var(--soft);font-weight:600;font-size:13px}
 .pill svg{width:16px;height:16px}
 .note{text-align:center;color:var(--muted);font-size:14px;margin-top:14px}
@@ -124,6 +156,13 @@ section{padding:90px 0}
 .app .os i{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line2)}
 .app .os svg{width:26px;height:26px;color:var(--text)}
 .app h3{font-size:21px}.app p{color:var(--muted);margin:0;font-size:15px;flex:1}
+/* preprodaja */
+.resell{display:grid;grid-template-columns:1.15fr 1fr;gap:32px;align-items:center;padding:40px;border-radius:28px;border:1px solid var(--line2);background:radial-gradient(600px 300px at 90% 10%,rgba(227,23,43,.18),transparent 65%),var(--card)}
+.resell h2{font-size:clamp(26px,3.2vw,38px);margin-bottom:12px}
+.resell p{color:var(--soft);margin:0 0 22px;font-size:17px}
+.resell ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;color:var(--soft);font-size:15px}
+.resell li{display:flex;gap:11px;align-items:flex-start}
+.resell li svg{width:19px;height:19px;color:var(--ok);flex:none;margin-top:3px}
 /* pitanja */
 .faq{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
 details{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 22px;transition:border-color .2s}
@@ -137,9 +176,13 @@ details p{color:var(--soft);margin:12px 0 0}
 .final{position:relative;overflow:hidden;text-align:center;padding:70px 30px;border-radius:30px;background:radial-gradient(700px 320px at 50% 0%,rgba(227,23,43,.32),transparent 70%),var(--card);border:1px solid var(--line2)}
 .final h2{font-size:clamp(28px,3.6vw,46px);margin:18px 0 12px}
 .final .mark{width:64px;height:72px;margin:0 auto}
-footer{padding:44px 0 54px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
-footer .wrap{display:flex;flex-wrap:wrap;gap:18px 30px;justify-content:space-between;align-items:center}
-footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a:hover{color:var(--text)}
+footer{padding:54px 0 40px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);margin-top:40px}
+.fgrid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:30px;padding-bottom:34px}
+.fgrid h4{font:700 14px Inter,sans-serif;color:var(--text);margin:0 0 14px;letter-spacing:.02em}
+.fgrid ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.fgrid a:hover{color:var(--text)}
+.fbrand p{margin:14px 0 0;max-width:300px;line-height:1.6}
+.fbot{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;padding-top:24px;border-top:1px solid var(--line)}
 /* kupovina */
 dialog{border:1px solid var(--line2);border-radius:22px;background:var(--card);color:var(--text);padding:28px;width:min(450px,calc(100vw - 32px))}
 dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(4px)}
@@ -159,28 +202,40 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
 @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}.pulse{animation:none}}
 @media (max-width:960px){
   .hero{grid-template-columns:1fr;padding-top:26px;text-align:center}
-  .hero p.lead{margin-left:auto;margin-right:auto}.cta,.trust{justify-content:center}
+  .hero p.lead{margin-left:auto;margin-right:auto}.cta{justify-content:center}
+  .ticks{width:fit-content;margin-left:auto;margin-right:auto;text-align:left}
   .visual{max-width:440px;order:-1;margin-bottom:-10px}
   .conn{left:50%;transform:translateX(-50%);bottom:-2%;text-align:left}
   .grid3,.apps,.steps{grid-template-columns:1fr 1fr}.steps{gap:34px 18px}
+  .grid4{grid-template-columns:1fr 1fr}
   .strip{grid-template-columns:1fr 1fr}
+  .split,.resell{grid-template-columns:1fr}.shieldart{order:-1;padding:0 0 10px}
+  .fgrid{grid-template-columns:1fr 1fr;gap:26px}
   .links{display:none;position:absolute;top:70px;left:0;right:0;flex-direction:column;gap:0;background:rgba(11,11,16,.97);border-bottom:1px solid var(--line);padding:8px 20px 16px}
   .links.open{display:flex}.links a{padding:12px 0;border-bottom:1px solid var(--line)}
   .burger{display:block}.nav .lang{margin-left:8px}.nav .buy{display:none}
 }
 @media (max-width:620px){
-  section{padding:62px 0}.grid3,.apps,.steps{grid-template-columns:1fr}
+  section{padding:62px 0}.grid3,.apps,.steps,.grid4{grid-template-columns:1fr}
   .strip b{font-size:24px}.cta .btn{flex:1 1 100%}
   .seg button{padding:10px 14px;font-size:14px}
-  .conn{width:230px}
+  .conn{width:230px}.resell{padding:28px 22px}
+  .status a{margin-left:0;width:100%}
+  .fgrid{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
+<div class="status" id="status"><div class="wrap">
+  <span class="d"></span><b id="stTitle">Provjeravam…</b>
+  <span class="meta" id="stMeta"></span>
+  <a href="#cijene" id="stCta" hidden></a>
+</div></div>
+
 <header><div class="wrap nav">
   <a href="#" class="logo" aria-label="__BRAND__"><svg width="32" height="36" viewBox="0 0 200 224" aria-hidden="true"><path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M100 52 100 104 82 164H54z" fill="#E3172B"/><path d="M100 52 146 164h-28l-18-60z" fill="#9E0C1A"/><path d="M90.5 128h19l4.5 14h-28z" fill="#FF4A5A"/><path d="M100 52 111 78H89z" fill="#FF4A5A"/></svg><span class="wm"><b id="brandName"></b><small id="brandSub">VPN</small></span></a>
   <nav class="links" id="links">
-    <a href="#funkcije" data-t="nav1">Funkcije</a><a href="#lokacije" data-t="nav2">Lokacije</a><a href="#cijene" data-t="nav3">Cijene</a><a href="#aplikacije" data-t="nav4">Aplikacije</a><a href="#pitanja" data-t="nav5">Pitanja</a>
+    <a href="#zastita" data-t="nav0">Zaštita</a><a href="#funkcije" data-t="nav1">Funkcije</a><a href="#lokacije" data-t="nav2">Lokacije</a><a href="#cijene" data-t="nav3">Cijene</a><a href="#aplikacije" data-t="nav4">Aplikacije</a><a href="#pitanja" data-t="nav5">Pitanja</a>
   </nav>
   <div class="lang" role="group" aria-label="Jezik"><button data-l="bs">BS</button><button data-l="en">EN</button></div>
   <a href="#cijene" class="btn red sm buy" data-t="navcta">Kupi VPN</a>
@@ -193,26 +248,37 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     <span class="tag"><i></i><span id="liveTag"></span></span>
     <h1 data-th="h1">Privatan internet.<br><em>Bez granica.</em></h1>
     <p class="lead" data-t="sub">Brz VPN koji je teško blokirati.</p>
+    <ul class="ticks" id="ticks"></ul>
     <div class="cta"><a href="#cijene" class="btn red" data-t="cta1">Pogledaj cijene</a><a href="#aplikacije" class="btn" data-t="cta2">Preuzmi aplikaciju</a></div>
-    <div class="trust" id="trust"></div>
+    <p class="under" id="under"></p>
   </div>
   <div class="visual">
     <div class="globe"><canvas id="globe" data-fit="box" aria-hidden="true"></canvas></div>
     <div class="conn" aria-hidden="true">
       <div class="row"><span class="pw pulse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
         <span><b id="connT">Zaštićen</b><small id="connL"></small></span></div>
-      <div class="bars"><span><em id="connP">Protokol</em>VLESS Reality</span><span><em id="connIp">IP</em><span id="connIpV">skriven</span></span><span><em>DNS</em>✓</span></div>
+      <div class="bars"><span><em id="connP">Protokol</em><span id="connPV">VLESS Reality</span></span><span><em id="connIp">IP</em><span id="connIpV">skriven</span></span><span><em>DNS</em>✓</span></div>
     </div>
   </div>
 </div>
 <div class="wrap"><div class="strip" id="strip"></div></div>
 
-<section id="kako"><div class="wrap">
+<section id="zastita"><div class="wrap split">
+  <div class="reveal">
+    <span class="tag red" data-t="e_tag">Zaštita</span>
+    <h2 data-t="e_h">Jaka enkripcija i protokoli koje je teško blokirati</h2>
+    <p class="l" data-t="e_p"></p>
+    <div class="protos" id="protos"></div>
+  </div>
+  <div class="shieldart reveal"><svg viewBox="0 0 200 224" aria-hidden="true"><path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M100 52 100 104 82 164H54z" fill="#E3172B"/><path d="M100 52 146 164h-28l-18-60z" fill="#9E0C1A"/><path d="M90.5 128h19l4.5 14h-28z" fill="#FF4A5A"/><path d="M100 52 111 78H89z" fill="#FF4A5A"/></svg></div>
+</div></section>
+
+<section id="kako" style="padding-top:20px"><div class="wrap">
   <div class="head reveal"><span class="tag red" data-t="k_tag">Kako radi</span><h2 data-t="k_h">Spojen za manje od minute</h2></div>
   <div class="steps" id="steps"></div>
 </div></section>
 
-<section id="funkcije" style="padding-top:20px"><div class="wrap">
+<section id="funkcije"><div class="wrap">
   <div class="head reveal"><span class="tag red" data-t="f_tag">Zašto mi</span><h2 data-t="f_h">Sve što trebaš</h2><p data-t="f_p"></p></div>
   <div class="grid3" id="features"></div>
 </div></section>
@@ -222,10 +288,16 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   <div class="locs" id="locs"></div>
 </div></section>
 
+<section id="zasta" style="padding-top:20px"><div class="wrap">
+  <div class="head reveal"><span class="tag red" data-t="u_tag">Za šta ti treba</span><h2 data-t="u_h">Najčešće ga koriste ovako</h2></div>
+  <div class="grid4" id="uses"></div>
+</div></section>
+
 <section id="cijene"><div class="wrap">
   <div class="head reveal"><span class="tag red" data-t="p_tag">Cijene</span><h2 data-t="p_h">Jednostavne cijene</h2><p data-t="p_p"></p></div>
   <div class="period" id="period"></div>
   <div class="prices" id="prices"></div>
+  <div id="guar"></div>
   <div class="pay" id="pay"></div>
   <p class="note" id="priceNote"></p>
   <div id="tgbuy"></div>
@@ -235,6 +307,8 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   <div class="head reveal"><span class="tag red" data-t="a_tag">Aplikacije</span><h2 data-t="a_h">Na svim tvojim uređajima</h2><p data-t="a_p"></p></div>
   <div class="apps" id="apps"></div>
 </div></section>
+
+<section id="preprodaja" style="padding-top:0"><div class="wrap"><div id="resell"></div></div></section>
 
 <section id="pitanja"><div class="wrap">
   <div class="head reveal"><span class="tag red" data-t="q_tag">Pitanja</span><h2 data-t="q_h">Često postavljana pitanja</h2></div>
@@ -250,9 +324,11 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
 </main>
 
 <footer><div class="wrap">
-  <span>© <span id="year"></span> <span class="bn"></span></span>
-  <nav><a href="#funkcije" data-t="nav1">Funkcije</a><a href="#cijene" data-t="nav3">Cijene</a><a href="#aplikacije" data-t="nav4">Aplikacije</a><a href="#pitanja" data-t="nav5">Pitanja</a></nav>
-  <span id="foot"></span>
+  <div class="fgrid" id="fgrid"></div>
+  <div class="fbot">
+    <span>© <span id="year"></span> <span class="bn"></span></span>
+    <span id="foot"></span>
+  </div>
 </div></footer>
 
 <dialog id="buyDlg"><form method="dialog" id="buyForm" style="position:relative">
@@ -275,13 +351,25 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   const D = window.SITE || { brand: 'AdiLink VPN', plans: [], countries: [], currency: '€' };
   const T = {
     bs: {
-      nav1: 'Funkcije', nav2: 'Lokacije', nav3: 'Cijene', nav4: 'Aplikacije', nav5: 'Pitanja', navcta: 'Kupi VPN',
+      nav0: 'Zaštita', nav1: 'Funkcije', nav2: 'Lokacije', nav3: 'Cijene', nav4: 'Aplikacije', nav5: 'Pitanja', navcta: 'Kupi VPN',
+      st_wait: 'Provjeravam…', st_on: 'Zaštićen si', st_off: 'Nisi zaštićen', st_onm: 'Spojen si preko našeg servera.', st_cta: 'Zaštiti se →',
+      st_ip: 'Tvoja IP adresa', st_isp: 'Internet ti daje', st_loc: 'Vide te iz',
       h1: 'Privatan internet.<br><em>Bez granica.</em>',
       sub: 'Brz VPN koji je teško blokirati. Sakrij svoju IP adresu, zaštiti se na javnom WiFi-ju i gledaj sadržaj iz cijelog svijeta.',
+      ticks: ['Nalog dobiješ odmah, bez papirologije', 'Spajanje jednim dodirom', 'Bez logova i bez automatskog naplaćivanja'],
       cta1: 'Pogledaj cijene', cta2: 'Preuzmi aplikaciju', live: 'servera radi upravo sada', live0: 'Novi serveri stižu uskoro',
-      trust: ['Bez logova', 'Radi i gdje je VPN blokiran', 'PayPal i kartica'],
+      under: 'Plaćaš PayPalom ili karticom. Nema pretplate koja se sama obnavlja.',
       conn: 'Zaštićen', ip: 'IP adresa', ipv: 'skrivena', proto: 'Protokol',
       st: [['država', 'c'], ['servera', 's'], ['logova', 'Bez'], ['uređaja na nalogu', 'd']],
+      e_tag: 'Zaštita', e_h: 'Jaka enkripcija i protokoli koje je teško blokirati',
+      e_p: 'Svaki plan dobija sve protokole. Aplikacija sama bira najbolji za tvoju mrežu, a ti ga možeš promijeniti kad hoćeš.',
+      protos: {
+        vless: ['VLESS + Reality', 'Izgleda kao običan posjet velikom sajtu, pa prolazi i kroz mreže koje blokiraju VPN. Naš glavni protokol.'],
+        wg: ['WireGuard', 'Najbrži i najlakši za baterije. Savršen kad mreža ništa ne blokira.'],
+        ss: ['Shadowsocks 2022', 'Rezerva kad prva dva ne prođu. Aplikacija prelazi na njega sama.'],
+      },
+      p_ads: ['Blokada reklama i praćenja', 'Reklame i pratioci se blokiraju na serveru, za sve aplikacije na uređaju.'],
+      p_mal: ['Blokada malvera i phishinga', 'Opasne stranice se zaustave prije nego se otvore.'],
       k_tag: 'Kako radi', k_h: 'Spojen za manje od minute',
       k: [['Izaberi plan', 'Mjesečno ili godišnje. Sve lokacije i funkcije su u svakom planu.'], ['Plati PayPalom ili karticom', 'Nalog dobiješ odmah: link i QR kod na ekranu i na e-mail.'], ['Klikni Spoji', 'Instaliraj aplikaciju, otvori svoj link i spojen si jednim dodirom.']],
       f_tag: 'Zašto mi', f_h: 'Sve što trebaš, ništa što ne trebaš', f_p: 'Napravljeno da radi i tamo gdje drugi VPN-ovi budu blokirani.',
@@ -292,17 +380,27 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
         ['ad', 'Blokada reklama', 'Reklame, praćenje i opasne stranice se blokiraju već na serveru, za sve aplikacije.'],
         ['link', 'Double VPN i Multihop', 'Za najveću privatnost promet ide kroz dva ili više servera u različitim državama.']],
       l_tag: 'Uživo', l_h: 'Lokacije servera', l_p: 'Biraš državu jednim dodirom. Nove lokacije dodajemo stalno.', online: 'radi', offline: 'održavanje', nolocs: 'Lokacije se upravo dodaju.',
+      u_tag: 'Za šta ti treba', u_h: 'Najčešće ga koriste ovako',
+      u: [['wifi', 'Javni WiFi', 'U kafiću, hotelu i na aerodromu niko ne može presresti tvoj promet.'],
+        ['tv', 'Streaming', 'Gledaj ono što je dostupno samo u drugim državama, bez trzanja.'],
+        ['game', 'Igrice', 'Zaobiđi blokade i zaštiti se od DDoS napada u igri.'],
+        ['work', 'Rad od kuće', 'Sigurna veza do posla i kad si na tuđoj mreži.']],
       p_tag: 'Cijene', p_h: 'Jednostavne cijene, bez skrivenih troškova', p_p: 'Sve lokacije i sve funkcije u svakom planu. Bez automatskog naplaćivanja.',
       monthly: 'Mjesečno', yearly: 'Godišnje', saveUpTo: 'do −', mo: '/mj',
       billedM: 'Plaćaš mjesečno', billedY: (x) => `${x} jednom za 12 mjeseci`, billedN: (x, m) => `${x} za ${m} mjeseci`,
       best: 'Najpopularnije', bestY: 'Najbolja vrijednost', buy: 'Kupi', contact: 'Kontaktiraj nas', off: (n) => `−${n}%`,
       i1: 'Sve lokacije', i2: 'uređaja istovremeno', i3: 'Neograničen promet', i3b: 'prometa', i4: 'Android, Windows, iPhone', i5: 'Kill Switch i blokada reklama',
-      payBy: 'Plaćanje:', card: 'Kartica', note: 'Nalog dobiješ odmah poslije plaćanja. Bez automatskog obnavljanja.', noteNo: 'Za kupovinu nam se javi: ', noPlans: 'Cijene uskoro.',
+      gu_t: 'Probaj bez rizika', gu_p: 'Besplatan probni nalog dobiješ u aplikaciji, bez kartice. Ako ti nešto ne radi, javi se i riješićemo ili vratiti novac.',
+      gu_t2: 'Bez obaveze', gu_p2: 'Plaćanje je jednokratno. Ništa ti se ne naplaćuje samo od sebe kad plan istekne.',
+      payBy: 'Plaćanje:', note: 'Nalog dobiješ odmah poslije plaćanja.', noteNo: 'Za kupovinu nam se javi: ', noPlans: 'Cijene uskoro.',
       tg: 'Više voliš Telegram?', tgs: 'Kupi i produži nalog direktno u našem botu.', tgb: 'Otvori bota',
       a_tag: 'Aplikacije', a_h: 'Na svim tvojim uređajima', a_p: 'Jedan nalog za telefon i računar. Prijava jednim linkom ili QR kodom.',
-      apps: [['android', 'Android', 'Naša aplikacija: spajanje jednim dodirom, izbor servera i Kill Switch. Probaj besplatno u aplikaciji.', 'Preuzmi za Android'],
+      apps: [['android', 'Android', 'Naša aplikacija: spajanje jednim dodirom, izbor servera, Kill Switch i test brzine. Probni nalog dobiješ u samoj aplikaciji.', 'Preuzmi za Android'],
         ['windows', 'Windows', 'Ista aplikacija za Windows 10 i 11: izbor servera, split tunneling i test brzine.', 'Preuzmi za Windows'],
-        ['apple', 'iPhone i Mac', 'Koristi besplatnu aplikaciju Hiddify iz App Storea i otvori svoj link.', 'Preuzmi Hiddify']],
+        ['apple', 'iPhone i Mac', 'Instaliraj besplatnu aplikaciju Hiddify iz App Storea i otvori svoj link. Naša iPhone aplikacija stiže uskoro.', 'Preuzmi Hiddify']],
+      r_h: 'Prodaji VPN pod svojim imenom', r_p: 'Otvori svoj reseller nalog, dopuni kredit i pravi naloge za svoje kupce. Cijenu određuješ ti, a mi držimo servere.',
+      r: ['Svoj panel, svoji kupci i svoje cijene', 'Što više prodaješ, veći ti je popust', 'Svoj brend u aplikaciji kupca (ime, logo, boja)', 'Nema mjesečne članarine, plaćaš samo kredit'],
+      r_b: 'Otvori reseller nalog', r_b2: 'Pitaj za uslove',
       q_tag: 'Pitanja', q_h: 'Često postavljana pitanja',
       q: [['Kako dobijem pristup poslije kupovine?', 'Odmah poslije plaćanja vidiš svoj pristupni link i QR kod, a link stiže i na e-mail. Instaliraj aplikaciju, otvori link ili skeniraj QR kod i klikni Spoji.'],
         ['Kako mogu platiti?', 'PayPalom ili karticom (Visa, Mastercard) preko PayPala, bez otvaranja PayPal računa. Plaćanje je jednokratno, nema automatskog naplaćivanja.'],
@@ -310,20 +408,39 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
         ['Na koliko uređaja mogu koristiti VPN?', 'Svaki plan ima broj uređaja koji mogu biti spojeni istovremeno (piše kod plana). Isti nalog koristiš na telefonu i računaru.'],
         ['Da li čuvate logove?', 'Ne čuvamo historiju stranica koje posjećuješ. Za brojanje uređaja server privremeno, samo u memoriji, vidi broj spojenih IP adresa.'],
         ['Radi li na mrežama gdje je VPN blokiran?', 'Da, u većini slučajeva. Koristimo VLESS Reality koji izgleda kao običan HTTPS promet, a aplikacija sama prelazi na rezervni protokol ako treba.'],
-        ['Mogu li probati prije kupovine?', 'Da. U Android i Windows aplikaciji klikni "Probaj besplatno" i dobiješ probni nalog.'],
+        ['Hoće li mi usporiti internet?', 'Mala razlika se uvijek osjeti jer promet ide preko još jednog servera, ali kod nas je to obično nekoliko posto. Ako ti je sporo, promijeni lokaciju na bližu.'],
+        ['Je li VPN legalan?', 'U većini zemalja, uključujući BiH i EU, jeste. VPN ne daje pravo na nezakonite radnje i to nije dozvoljeno ni kod nas.'],
+        ['Mogu li probati prije kupovine?', 'Da. U Android i Windows aplikaciji klikni "Probaj besplatno" i dobiješ probni nalog, bez kartice.'],
         ['Kako produžim pretplatu?', 'U aplikaciji (Nalog → Produži), na stranici svog naloga ili u Telegram botu. Dani se dodaju na trenutni datum isteka.']],
       z_h: 'Spreman za privatan internet?', z_p: 'Izaberi plan i spoji se za manje od minute.',
       b_p: 'Na ovaj e-mail šaljemo tvoj pristupni link poslije plaćanja.', b_pp: 'Plati PayPalom ili karticom', b_card: 'Plati karticom (Stripe)', b_s: '🔒 Sigurno plaćanje. Podatke kartice ne vidimo.', b_wait: 'Otvaram plaćanje…', b_cc: 'Imaš kod za popust?', b_ca: 'Primijeni', b_cok: 'Kod prihvaćen', b_days: 'dana gratis',
-      support: 'Podrška: ', countries: (n) => n === 1 ? 'država' : 'države',
+      support: 'Podrška: ',
+      f_about: 'Brz i privatan VPN za telefon i računar. Bez logova, bez automatskog naplaćivanja.',
+      f_c1: 'Proizvod', f_c2: 'Aplikacije', f_c3: 'Pomoć',
+      f_l1: [['#zastita', 'Zaštita'], ['#funkcije', 'Funkcije'], ['#lokacije', 'Lokacije'], ['#cijene', 'Cijene']],
+      f_l3: [['#pitanja', 'Česta pitanja'], ['#cijene', 'Kupi VPN']],
+      f_mojnalog: 'Moj nalog', f_resell: 'Za preprodavače',
     },
     en: {
-      nav1: 'Features', nav2: 'Locations', nav3: 'Pricing', nav4: 'Apps', nav5: 'FAQ', navcta: 'Get VPN',
+      nav0: 'Security', nav1: 'Features', nav2: 'Locations', nav3: 'Pricing', nav4: 'Apps', nav5: 'FAQ', navcta: 'Get VPN',
+      st_wait: 'Checking…', st_on: 'You are protected', st_off: 'You are not protected', st_onm: 'You are connected through our server.', st_cta: 'Protect yourself →',
+      st_ip: 'Your IP address', st_isp: 'Your provider', st_loc: 'You appear to be in',
       h1: 'Private internet.<br><em>No borders.</em>',
       sub: 'A fast VPN that is hard to block. Hide your IP address, stay safe on public Wi-Fi and watch content from anywhere.',
+      ticks: ['Your account is ready in seconds', 'Connect with one tap', 'No logs and no auto-renewal'],
       cta1: 'See pricing', cta2: 'Download the app', live: 'servers online right now', live0: 'New servers coming soon',
-      trust: ['No logs', 'Works where VPNs are blocked', 'PayPal & card'],
+      under: 'Pay with PayPal or a card. Nothing renews by itself.',
       conn: 'Protected', ip: 'IP address', ipv: 'hidden', proto: 'Protocol',
       st: [['countries', 'c'], ['servers', 's'], ['logs', 'No'], ['devices per account', 'd']],
+      e_tag: 'Security', e_h: 'Strong encryption and protocols that are hard to block',
+      e_p: 'Every plan gets every protocol. The app picks the best one for your network, and you can change it any time.',
+      protos: {
+        vless: ['VLESS + Reality', 'Looks like a normal visit to a big website, so it gets through networks that block VPNs. Our main protocol.'],
+        wg: ['WireGuard', 'The fastest and easiest on battery. Perfect when nothing is being blocked.'],
+        ss: ['Shadowsocks 2022', 'A fallback when the first two do not get through. The app switches to it by itself.'],
+      },
+      p_ads: ['Ad and tracker blocking', 'Ads and trackers are blocked on the server, for every app on your device.'],
+      p_mal: ['Malware and phishing blocking', 'Dangerous sites are stopped before they open.'],
       k_tag: 'How it works', k_h: 'Connected in under a minute',
       k: [['Pick a plan', 'Monthly or yearly. Every location and feature in every plan.'], ['Pay with PayPal or card', 'You get your account instantly: link and QR code on screen and by email.'], ['Tap Connect', 'Install the app, open your link and connect with one tap.']],
       f_tag: 'Why us', f_h: 'Everything you need, nothing you don’t', f_p: 'Built to work even where other VPNs get blocked.',
@@ -334,17 +451,27 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
         ['ad', 'Ad blocking', 'Ads, trackers and dangerous sites are blocked right on the server, for every app.'],
         ['link', 'Double VPN & Multihop', 'For maximum privacy your traffic goes through two or more servers in different countries.']],
       l_tag: 'Live', l_h: 'Server locations', l_p: 'Pick a country with one tap. New locations are added all the time.', online: 'online', offline: 'maintenance', nolocs: 'Locations are being added.',
+      u_tag: 'What it is for', u_h: 'How people use it most',
+      u: [['wifi', 'Public Wi-Fi', 'In a cafe, hotel or airport nobody can intercept your traffic.'],
+        ['tv', 'Streaming', 'Watch what is only available in other countries, without buffering.'],
+        ['game', 'Gaming', 'Get around blocks and protect yourself from DDoS attacks in game.'],
+        ['work', 'Working from home', 'A safe connection to work even on someone else’s network.']],
       p_tag: 'Pricing', p_h: 'Simple pricing, no hidden fees', p_p: 'Every location and every feature in every plan. No auto-renewal.',
       monthly: 'Monthly', yearly: 'Yearly', saveUpTo: 'up to −', mo: '/mo',
       billedM: 'Billed monthly', billedY: (x) => `${x} once for 12 months`, billedN: (x, m) => `${x} for ${m} months`,
       best: 'Most popular', bestY: 'Best value', buy: 'Buy', contact: 'Contact us', off: (n) => `−${n}%`,
       i1: 'All locations', i2: 'devices at once', i3: 'Unlimited data', i3b: 'data', i4: 'Android, Windows, iPhone', i5: 'Kill Switch & ad blocking',
-      payBy: 'Pay with:', card: 'Card', note: 'You get access right after paying. No auto-renewal.', noteNo: 'To buy, contact us: ', noPlans: 'Pricing coming soon.',
+      gu_t: 'Try it risk-free', gu_p: 'You get a free trial account inside the app, no card needed. If something does not work, tell us and we will fix it or refund you.',
+      gu_t2: 'No commitment', gu_p2: 'Payment is one-time. Nothing is charged by itself when your plan runs out.',
+      payBy: 'Pay with:', note: 'You get access right after paying.', noteNo: 'To buy, contact us: ', noPlans: 'Pricing coming soon.',
       tg: 'Prefer Telegram?', tgs: 'Buy and renew right inside our bot.', tgb: 'Open the bot',
       a_tag: 'Apps', a_h: 'On all your devices', a_p: 'One account for phone and computer. Log in with one link or a QR code.',
-      apps: [['android', 'Android', 'Our app with one-tap connect, server choice and Kill Switch. Try it free inside the app.', 'Download for Android'],
+      apps: [['android', 'Android', 'Our app with one-tap connect, server choice, Kill Switch and a speed test. The free trial is inside the app.', 'Download for Android'],
         ['windows', 'Windows', 'The same app for Windows 10 and 11: server choice, split tunneling and speed test.', 'Download for Windows'],
-        ['apple', 'iPhone & Mac', 'Use the free Hiddify app from the App Store and open your link.', 'Get Hiddify']],
+        ['apple', 'iPhone & Mac', 'Install the free Hiddify app from the App Store and open your link. Our own iPhone app is coming soon.', 'Get Hiddify']],
+      r_h: 'Sell VPN under your own name', r_p: 'Open a reseller account, top up credit and create accounts for your own customers. You set the price, we keep the servers running.',
+      r: ['Your own panel, customers and prices', 'The more you sell, the bigger your discount', 'Your brand inside the customer’s app (name, logo, color)', 'No monthly fee, you only pay for credit'],
+      r_b: 'Open a reseller account', r_b2: 'Ask about terms',
       q_tag: 'FAQ', q_h: 'Frequently asked questions',
       q: [['How do I get access after buying?', 'Right after paying you see your access link and QR code, and the link is emailed to you. Install the app, open the link or scan the QR code and tap Connect.'],
         ['How can I pay?', 'With PayPal or a card (Visa, Mastercard) through PayPal, no PayPal account needed. It is a one-time payment with no auto-renewal.'],
@@ -352,11 +479,18 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
         ['How many devices can I use?', 'Each plan has a number of devices that can be connected at the same time (shown on the plan). Use one account on phone and computer.'],
         ['Do you keep logs?', 'We don’t keep a history of sites you visit. To count devices, the server briefly sees the number of connected IP addresses, in memory only.'],
         ['Does it work where VPNs are blocked?', 'Yes, in most cases. We use VLESS Reality, which looks like normal HTTPS traffic, and the app switches to a backup protocol if needed.'],
-        ['Can I try before buying?', 'Yes. In the Android and Windows app tap "Try free" to get a trial account.'],
+        ['Will it slow down my internet?', 'There is always a small difference because traffic passes through one more server, but with us it is usually a few percent. If it feels slow, switch to a closer location.'],
+        ['Is a VPN legal?', 'In most countries, including the EU, yes. A VPN does not permit unlawful activity, and that is not allowed with us either.'],
+        ['Can I try before buying?', 'Yes. In the Android and Windows app tap "Try free" to get a trial account, no card needed.'],
         ['How do I renew?', 'In the app (Account → Renew), on your account page or in the Telegram bot. Days are added to your current expiry date.']],
       z_h: 'Ready for private internet?', z_p: 'Pick a plan and connect in under a minute.',
       b_p: 'We send your access link to this email after payment.', b_pp: 'Pay with PayPal or card', b_card: 'Pay by card (Stripe)', b_s: '🔒 Secure payment. We never see your card details.', b_wait: 'Opening payment…', b_cc: 'Have a discount code?', b_ca: 'Apply', b_cok: 'Code applied', b_days: 'free days',
-      support: 'Support: ', countries: (n) => n === 1 ? 'country' : 'countries',
+      support: 'Support: ',
+      f_about: 'A fast, private VPN for phone and computer. No logs, no auto-renewal.',
+      f_c1: 'Product', f_c2: 'Apps', f_c3: 'Help',
+      f_l1: [['#zastita', 'Security'], ['#funkcije', 'Features'], ['#lokacije', 'Locations'], ['#cijene', 'Pricing']],
+      f_l3: [['#pitanja', 'FAQ'], ['#cijene', 'Get VPN']],
+      f_mojnalog: 'My account', f_resell: 'For resellers',
     },
   };
   const ICON = {
@@ -370,6 +504,13 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
     pp: '<path d="M7 21 9 7h6a4 4 0 0 1 0 8h-4l-1 6z"/><path d="M5 17 7 3h6a4 4 0 0 1 3.9 3"/>',
     tg: '<path d="m22 3-20 8 7 2 2 7 4-5 5 4z"/><path d="m9 13 8-6"/>',
+    wifi: '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M2 9a15 15 0 0 1 20 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/>',
+    tv: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+    game: '<rect x="2" y="7" width="20" height="11" rx="4"/><path d="M7 11v3M5.5 12.5h3M16 12h.01M18.5 14h.01"/>',
+    work: '<rect x="2" y="7" width="20" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M2 13h20"/>',
+    users: '<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 11.2A3 3 0 0 0 17 5.3M18.5 20a6 6 0 0 0-3-5.2"/>',
+    key: '<circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v4M15 12v3"/>',
+    gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M3 13h18M12 9v12M12 9S10 3 7.5 4.2 9 9 12 9zM12 9s2-6 4.5-4.8S15 9 12 9z"/>',
     android: '<path d="M6 9h12v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M8 9a4 4 0 0 1 8 0M9 5 8 3m7 2 1-2M4 11v4m16-4v4"/>',
     windows: '<path d="M3 5.5 10.5 4.5v7H3zM12 4.3 21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z"/>',
     apple: '<path d="M16 3c-1.2.1-2.6.9-3.3 2-.7 1-.9 2.2-.7 3.3 1.3.1 2.6-.7 3.3-1.8.7-1 1-2.2.7-3.5z"/><path d="M19 15.5c-.6 1.4-1.4 2.8-2.5 4-1 1-2 1-3 .5-1-.4-1.9-.4-3 0-1 .5-2 .5-3-.5C5.3 17.2 4 13.6 5.2 10.9 6 9.2 7.6 8.2 9.3 8.2c1 0 1.9.6 2.7.6.7 0 1.9-.7 3.2-.6 1.2.1 2.5.6 3.3 1.8-2.9 1.7-2.4 5.9.5 5.5z"/>',
@@ -385,7 +526,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   const all = D.plans.slice();
   const yearly = all.filter((p) => p.days >= 300).sort((a, b) => a.price - b.price);
   const monthly = all.filter((p) => p.days < 300).sort((a, b) => a.days - b.days || a.price - b.price);
-  const ref = (y) => {   // mjesečni plan sa kojim se godišnji poredi: isti broj uređaja, inače najskuplji
+  const ref = (y) => {
     const same = monthly.filter((m) => m.days <= 31 && (m.devices || 0) === (y.devices || 0));
     const pool = same.length ? same : monthly.filter((m) => m.days <= 31);
     return pool.sort((a, b) => Math.abs(a.price * 12 * 0.6 - y.price) - Math.abs(b.price * 12 * 0.6 - y.price))[0];
@@ -395,6 +536,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   let period = yearly.length ? 'y' : 'm';
   let lang = 'bs';
   try { lang = localStorage.getItem('vx-lang') || (/^(bs|hr|sr|sh|me)/i.test(navigator.language) ? 'bs' : 'en'); } catch { /* bez pamćenja */ }
+  let me = null;   // odgovor sa /me.json
 
   function priceCards(L) {
     const list = period === 'y' ? yearly : monthly;
@@ -412,6 +554,22 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     }).join('');
   }
 
+  function renderStatus(L) {
+    const box = document.getElementById('status'), t = document.getElementById('stTitle'), m = document.getElementById('stMeta'), a = document.getElementById('stCta');
+    if (!me) { box.className = 'status'; t.textContent = L.st_wait; m.innerHTML = ''; a.hidden = true; return; }
+    box.className = 'status ' + (me.protected ? 'on' : 'off');
+    t.textContent = me.protected ? L.st_on : L.st_off;
+    const bits = [];
+    if (me.protected) bits.push(esc(L.st_onm));
+    else {
+      if (me.ip) bits.push(`${esc(L.st_ip)}: <code>${esc(me.ip)}</code>`);
+      if (me.country) bits.push(`${esc(L.st_loc)}: ${esc(me.city ? me.city + ', ' : '')}${esc(me.country)}`);
+      if (me.isp) bits.push(`${esc(L.st_isp)}: ${esc(me.isp)}`);
+    }
+    m.innerHTML = bits.join(' · ');
+    a.hidden = !!me.protected; a.textContent = L.st_cta;
+  }
+
   function render() {
     const L = T[lang];
     document.documentElement.lang = lang;
@@ -422,33 +580,63 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     document.getElementById('brandName').innerHTML = esc(main.slice(0, -1).toUpperCase()) + '<em>' + esc(main.slice(-1).toUpperCase()) + '</em>';
     document.getElementById('brandSub').style.display = isVpn ? '' : 'none';
     document.querySelectorAll('.bn').forEach((e) => { e.textContent = D.brand; });
+    renderStatus(L);
     document.getElementById('liveTag').textContent = D.servers ? `${D.servers} ${L.live}` : L.live0;
-    document.getElementById('trust').innerHTML = L.trust.map((t) => `<span>${ico('check')}${esc(t)}</span>`).join('');
+    document.getElementById('ticks').innerHTML = L.ticks.map((t) => `<li>${ico('check')}${esc(t)}</li>`).join('');
+    document.getElementById('under').textContent = L.under;
     const c0 = D.countries.find((c) => c.online) || D.countries[0];
     document.getElementById('connT').textContent = L.conn;
     document.getElementById('connL').textContent = c0 ? `${ccName(c0.cc, lang)} · ${c0.cities[0] || ''}` : '';
-    document.getElementById('connIp').textContent = L.ip; document.getElementById('connP').textContent = L.proto; document.getElementById('connIpV').textContent = L.ipv;
+    document.getElementById('connP').textContent = L.proto;
+    document.getElementById('connPV').textContent = D.protocols && D.protocols.vless ? 'VLESS Reality' : D.protocols && D.protocols.wg ? 'WireGuard' : 'Shadowsocks';
+    document.getElementById('connIp').textContent = L.ip; document.getElementById('connIpV').textContent = L.ipv;
     const devs = Math.max(1, ...D.plans.map((p) => p.devices || 1));
     const val = { c: Math.max(D.countries.length, 1), s: Math.max(D.servers, 1), d: `${devs}` };
     document.getElementById('strip').innerHTML = L.st.map(([l, v]) => `<div class="reveal"><b>${esc(val[v] ?? v)}</b><span>${esc(l)}</span></div>`).join('');
+    // protokoli: samo oni koji su stvarno uključeni
+    const pr = D.protocols || {};
+    const rows = [];
+    for (const k of ['vless', 'wg', 'ss']) if (pr[k] && L.protos[k]) rows.push(['shield', ...L.protos[k]]);
+    if (D.blocks && D.blocks.ads) rows.push(['ad', ...L.p_ads]);
+    if (D.blocks && D.blocks.malware) rows.push(['lock', ...L.p_mal]);
+    document.getElementById('protos').innerHTML = rows.map(([i, h, p]) => `<div class="proto"><span class="b">${ico(i)}</span><span><b>${esc(h)}</b><small>${esc(p)}</small></span></div>`).join('');
     document.getElementById('steps').innerHTML = L.k.map(([h, p], i) => `<div class="card step reveal"><span class="n">${i + 1}</span><h3>${esc(h)}</h3><p>${esc(p)}</p></div>`).join('');
     document.getElementById('features').innerHTML = L.f.map(([i, h, p]) => `<div class="card feat reveal"><div class="ic">${ico(i)}</div><h3>${esc(h)}</h3><p>${esc(p)}</p></div>`).join('');
+    document.getElementById('uses').innerHTML = L.u.map(([i, h, p]) => `<div class="card use reveal"><div class="ic">${ico(i)}</div><h3>${esc(h)}</h3><p>${esc(p)}</p></div>`).join('');
     document.getElementById('locs').innerHTML = D.countries.length ? D.countries.map((c) => `<div class="loc reveal"><img class="flag" src="/assets/flags/${esc(c.cc.toLowerCase())}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div><b>${esc(ccName(c.cc, lang))}</b><small>${esc(c.cities.join(', '))}</small></div><span class="dot ${c.online ? '' : 'off'}" title="${c.online ? L.online : L.offline}"></span></div>`).join('') : `<p style="text-align:center;color:var(--muted);grid-column:1/-1">${esc(L.nolocs)}</p>`;
     document.getElementById('period').innerHTML = yearly.length && monthly.length ? `<div class="seg" role="tablist"><button role="tab" data-p="m" class="${period === 'm' ? 'on' : ''}">${esc(L.monthly)}</button><button role="tab" data-p="y" class="${period === 'y' ? 'on' : ''}">${esc(L.yearly)}${maxSave ? `<span class="save">${esc(L.saveUpTo)}${maxSave}%</span>` : ''}</button></div>` : '';
     document.getElementById('prices').innerHTML = priceCards(L);
+    const g = D.trial ? [ico('gift'), L.gu_t, L.gu_p] : [ico('check'), L.gu_t2, L.gu_p2];
+    document.getElementById('guar').innerHTML = D.buy ? `<div class="guar reveal"><span class="ic">${g[0]}</span><span><b>${esc(g[1])}</b><span>${esc(g[2])}</span></span></div>` : '';
     document.getElementById('pay').innerHTML = D.buy ? `<span>${esc(L.payBy)}</span>${D.paypal ? `<span class="pill">${ico('pp')}PayPal</span>` : ''}<span class="pill">${ico('card')}Visa · Mastercard</span>` : '';
     document.getElementById('priceNote').textContent = D.buy ? L.note : (D.support ? L.noteNo + D.support : '');
     document.getElementById('tgbuy').innerHTML = D.bot ? `<div class="tgbuy reveal"><div><b>${esc(L.tg)}</b><span>${esc(L.tgs)}</span></div><a class="btn sm" href="https://t.me/${esc(D.bot)}" target="_blank" rel="noopener">${ico('tg')}${esc(L.tgb)}</a></div>` : '';
     const hrefs = [D.apk || D.releases, D.exe || D.releases, 'https://hiddify.com/'];
     document.getElementById('apps').innerHTML = L.apps.map(([i, h, p, b], n) => `<div class="card app reveal"><div class="os"><i>${ico(i)}</i><h3>${esc(h)}</h3></div><p>${esc(p)}</p>${hrefs[n] ? `<a class="btn ${n === 0 ? 'red' : ''}" href="${esc(hrefs[n])}" ${n === 2 ? 'target="_blank" rel="noopener"' : ''}>${esc(b)}</a>` : ''}</div>`).join('');
+    // preprodaja
+    const rb = D.reseller ? `<a class="btn red" href="${esc(D.reseller)}">${ico('users')}${esc(L.r_b)}</a>` : (D.support ? `<a class="btn red" href="${esc(supportHref())}" target="_blank" rel="noopener">${ico('tg')}${esc(L.r_b2)}</a>` : '');
+    document.getElementById('resell').innerHTML = (D.reseller || D.support) ? `<div class="resell reveal">
+      <div><span class="tag red">${esc(L.f_resell)}</span><h2 style="margin-top:14px">${esc(L.r_h)}</h2><p>${esc(L.r_p)}</p>${rb}</div>
+      <ul>${L.r.map((x) => `<li>${ico('check')}${esc(x)}</li>`).join('')}</ul></div>` : '';
     document.getElementById('faq').innerHTML = L.q.map(([q, a], n) => `<details class="reveal" ${n === 0 ? 'open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('');
+    // podnožje
+    const col = (h, items) => `<div><h4>${esc(h)}</h4><ul>${items.map(([href, t, ext]) => `<li><a href="${esc(href)}"${ext ? ' target="_blank" rel="noopener"' : ''}>${esc(t)}</a></li>`).join('')}</ul></div>`;
+    const apps = [[D.apk || D.releases, 'Android'], [D.exe || D.releases, 'Windows'], ['https://hiddify.com/', 'iPhone · Hiddify', 1]].filter((x) => x[0]);
+    const help = L.f_l3.slice();
+    if (D.bot) help.push([`https://t.me/${D.bot}`, 'Telegram bot', 1]);
+    if (D.reseller) help.push([D.reseller, L.f_resell]);
+    document.getElementById('fgrid').innerHTML = `
+      <div class="fbrand"><div class="logo"><svg width="28" height="31" viewBox="0 0 200 224" aria-hidden="true"><path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 52 100 104 82 164H54z" fill="#E3172B"/><path d="M100 52 146 164h-28l-18-60z" fill="#9E0C1A"/><path d="M90.5 128h19l4.5 14h-28z" fill="#FF4A5A"/><path d="M100 52 111 78H89z" fill="#FF4A5A"/></svg><span class="wm"><b>${esc(main.slice(0, -1).toUpperCase())}<em>${esc(main.slice(-1).toUpperCase())}</em></b>${isVpn ? '<small>VPN</small>' : ''}</span></div><p>${esc(L.f_about)}</p></div>
+      ${col(L.f_c1, L.f_l1)}${col(L.f_c2, apps)}${col(L.f_c3, help)}`;
     document.getElementById('foot').textContent = D.support ? L.support + D.support : '';
     observe();
   }
-  function supportBtn(L, red) {
+  function supportHref() {
     const m = String(D.support || '').match(/@([A-Za-z0-9_]{4,})/);
-    const href = String(D.support).startsWith('http') ? D.support : m ? 'https://t.me/' + m[1] : '#';
-    return `<a class="btn ${red ? 'red' : ''}" href="${esc(href)}" target="_blank" rel="noopener">${esc(L.contact)}</a>`;
+    return String(D.support).startsWith('http') ? D.support : m ? 'https://t.me/' + m[1] : '#';
+  }
+  function supportBtn(L, red) {
+    return `<a class="btn ${red ? 'red' : ''}" href="${esc(supportHref())}" target="_blank" rel="noopener">${esc(L.contact)}</a>`;
   }
   // pojavljivanje pri skrolanju
   let io = null;
@@ -514,6 +702,8 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   });
   document.getElementById('year').textContent = new Date().getFullYear();
   render();
+  // ko je posjetilac: pokaži mu njegovu pravu IP adresu dok nije spojen
+  fetch('/me.json').then((r) => r.json()).then((j) => { me = j; renderStatus(T[lang]); }).catch(() => {});
   if (window.startGlobe) window.startGlobe(document.getElementById('globe'));
 })();
 </script>
