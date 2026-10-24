@@ -1952,6 +1952,8 @@
       return `<input class="input${r.mono ? ' mono' : ''}" data-set="${r.key}" value="${esc(v)}" ${r.type === 'number' ? 'inputmode="decimal"' : ''} ${r.type === 'secret' ? 'autocomplete="off"' : ''} aria-label="${esc(r.label)}" ${r.key === 'admin_path' && !owner ? 'disabled' : ''}>`;
     };
     const extra = {
+      hosteri: `<div class="set-row"><div class="lbl"><b>Provjera hostera</b><small>Prvo spremi ključ, pa provjeri. Panel napravi pravi poziv i javi s koje IP adrese zove.</small></div><div class="ctl" style="flex-wrap:wrap;gap:8px">
+          ${['hetzner', 'digitalocean', 'vultr', 'ovh', 'contabo'].map((id) => values[({ hetzner: 'hz_token', digitalocean: 'do_token', vultr: 'vultr_token', ovh: 'ovh_app_secret', contabo: 'contabo_client_secret' })[id]] ? `<button class="btn sm" data-a="testCloud" data-id="${id}">${ic('check')}Provjeri ${({ hetzner: 'Hetzner', digitalocean: 'DigitalOcean', vultr: 'Vultr', ovh: 'OVH', contabo: 'Contabo' })[id]}</button>` : '').join('') || '<span class="muted">Upiši ključ nekog hostera pa spremi, da se pojavi dugme za provjeru.</span>'}</div></div>`,
       sigurnost: owner ? `<div class="set-row"><div class="lbl"><b>Admin nalozi i uloge</b><small>Podrška vidi korisnike bez finansija, finansije vide samo novac</small></div><div class="ctl" style="flex-basis:100%;justify-content:stretch;flex-direction:column">
           ${admins.map((a) => `<div class="list-item"><span><b>${esc(a.username)}</b> · ${({ owner: 'Vlasnik', admin: 'Admin', support: 'Podrška', finance: 'Finansije' })[a.role]}${a.totp_on ? ' · 2FA' : ''}${a.disabled ? ' · <span class="bad">blokiran</span>' : ''}</span><span class="dim">${ago(a.last_login)}</span>${a.role !== 'owner' ? `<button class="btn sm" data-a="editAdmin" data-id="${a.id}">Uredi</button>` : '<span class="tag t-ok">Ti</span>'}</div>`).join('')}
           <button class="btn sm" style="align-self:flex-start" data-a="editAdmin">${ic('plus')}Dodaj admina</button></div></div>` : '',
@@ -2439,6 +2441,7 @@
       if (!(await ask('Ažuriraj panel', 'Panel skida novu verziju i restartuje se. Traje 1–3 minute. VPN serveri rade normalno.', 'Ažuriraj'))) return;
       try { await POST('system/update'); toast('Ažuriranje pokrenuto. Stranica će se osvježiti za 90 sekundi.'); setTimeout(() => location.reload(), 90000); } catch (e) { fail(e); }
     },
+    testCloud: async (d) => { try { const r = await POST(`cloud/${d.id}/test`); toast(`${r.name} radi${r.ip ? ` (panel zove sa ${r.ip})` : ''}.`); } catch (e) { fail(e); } },
     testPaypal: async () => { try { const r = await POST('settings/test-paypal'); toast(`PayPal radi (${r.mode === 'sandbox' ? 'probni Sandbox' : 'pravi novac'}).`); } catch (e) { fail(e); } },
     testTg: async () => { try { await POST('settings/test-telegram'); toast('Poruka poslana. Provjeri Telegram.'); } catch (e) { fail(e); } },
     editAdmin: (d) => editAdmin(d.id).catch(fail),

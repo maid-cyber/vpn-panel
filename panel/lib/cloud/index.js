@@ -30,6 +30,27 @@ async function options(id) {
   return v;
 }
 
+async function outboundIp() {
+  try {
+    const r = await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(6000) });
+    return r.ok ? (await r.text()).trim() : '';
+  } catch { return ''; }
+}
+
+/** Provjeri hoster ključ: napravi pravi poziv i reci tačno šta ne valja, plus s koje IP adrese panel zove. */
+async function test(id) {
+  const p = byId(id);
+  if (!p.configured()) fail(400, `Upiši ključ za ${p.name} u Postavke → Hosteri.`);
+  const ip = await outboundIp();
+  try {
+    await p.options();   // pravi poziv prema hosteru (zaobilazi keš)
+  } catch (e) {
+    const extra = ip ? ` Panel zove ${p.name} sa IP adrese ${ip} — provjeri da je baš ona na dozvoljenoj listi kod hostera (ne tvoja kućna adresa).` : '';
+    fail(400, (e.message || String(e)) + extra);
+  }
+  return { ok: true, name: p.name, ip };
+}
+
 const slug = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'vpn';
 
 // cloud-init: sačekaj da apt bude slobodan, pa pokreni instalaciju iz panela (do 3 pokušaja)
@@ -143,4 +164,4 @@ async function destroy(sv, actor) {
   log(actor, `${p.name}: server obrisan`, `${sv.name}${p.id === 'contabo' ? ' (ugovor otkazan, radi do kraja plaćenog perioda)' : ' (naplata prestaje)'}`, 'warn');
 }
 
-module.exports = { list, options, create, newIp, destroy, jobOf, PROVIDERS };
+module.exports = { list, options, create, newIp, destroy, jobOf, test, PROVIDERS };

@@ -400,3 +400,7 @@ Tekst se sam popunjava iz **Postavke → Pravno**: ko pruža uslugu, e-mail za z
 Politika opisuje tačno ono što sistem radi: šta se čuva (nalog, e-mail, promet u GB, vrijeme zadnjeg spajanja, verzija aplikacije, uplate), šta se ne čuva (stranice, DNS upiti, kućna IP adresa uz nalog), te tri mjesta gdje IP adresa ipak nastaje — probni nalozi (zaštita od zloupotrebe), dijagnostika koju kupac sam pošalje i provjera statusa na sajtu preko ip-api.com.
 
 Ako nešto od ovoga promijeniš u sistemu (npr. dodaš novi servis za e-mail), dopuni i tekst u `panel/lib/legal.js`.
+
+## 32. Provjera hostera (3.2.4)
+
+Postavke → Hosteri sada ima dugme **Provjeri** za svaki hoster kojem je upisan ključ. Napravi pravi poziv prema hosteru i javi radi li, a ako ne radi, kaže tačan razlog i **s koje IP adrese panel zove hostera** — da znaš baš tu adresu dodati na dozvoljenu listu (nije nužno ista kao tvoja kućna). API ključevi se čiste od nevidljivih razmaka pri spremanju i slanju.

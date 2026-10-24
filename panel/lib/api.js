@@ -547,6 +547,7 @@ const cloud = require('./cloud');
 const panelPublic = (c) => (settings.get('panel_url') || `${c.proto}://${c.req.headers.host}`).replace(/\/+$/, '');
 route('GET', 'cloud', 'servers', () => cloud.list());
 route('GET', 'cloud/:p/options', 'servers', async (c) => cloud.options(c.params.p));
+route('POST', 'cloud/:p/test', 'servers', async (c) => cloud.test(c.params.p));
 route('POST', 'cloud/:p/servers', 'servers', async (c) => cloud.create(c.params.p, c.body, panelPublic(c), createPanelServer, c.auth.me.username));
 route('POST', 'servers/:id/new-ip', 'servers', async (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
