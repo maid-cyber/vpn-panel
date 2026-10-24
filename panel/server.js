@@ -7,6 +7,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const crypto = require('node:crypto');
+// Izlazne veze preko IPv4 (hosteri poput Vultra dozvoljavaju IP adresu na listi; IPv6 servera obično nije tamo).
+try { require('node:dns').setDefaultResultOrder('ipv4first'); } catch { /* starije verzije */ }
 
 // vraćanje iz backupa: zamijeni bazu prije nego je otvorimo
 const DATA_DIR = process.env.VPN_DATA_DIR || path.join(__dirname, 'data');

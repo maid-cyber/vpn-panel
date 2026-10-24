@@ -404,3 +404,7 @@ Ako nešto od ovoga promijeniš u sistemu (npr. dodaš novi servis za e-mail), d
 ## 32. Provjera hostera (3.2.4)
 
 Postavke → Hosteri sada ima dugme **Provjeri** za svaki hoster kojem je upisan ključ. Napravi pravi poziv prema hosteru i javi radi li, a ako ne radi, kaže tačan razlog i **s koje IP adrese panel zove hostera** — da znaš baš tu adresu dodati na dozvoljenu listu (nije nužno ista kao tvoja kućna). API ključevi se čiste od nevidljivih razmaka pri spremanju i slanju.
+
+## 33. Izlazne veze preko IPv4 (3.2.7)
+
+Panel sad za izlazne pozive (hosteri, mail, itd.) koristi IPv4. Vultr i slični dozvoljavaju API pozive po IP adresi na listi; ako panel ima i IPv6, poziv zna otići preko njega i hoster ga odbije ("Unauthorized IP address: 2a01:…") iako je IPv4 na listi. Zato se GET (čitanje) i POST (zakup) nekad razlikuju. Rješeno postavkom ipv4first.
