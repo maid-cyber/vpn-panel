@@ -15,8 +15,11 @@ async function call(label, url, { method = 'GET', headers = {}, body, raw } = {}
   try { j = text ? JSON.parse(text) : {}; } catch { j = { message: text.slice(0, 200) }; }
   if (!r.ok) {
     const msg = j.error?.message || j.message || j.error_description || (typeof j.error === 'string' ? j.error : '') || `greška ${r.status}`;
-    if (r.status === 401) fail(400, `${label}: odbijen pristup (401). Dva su moguća razloga: (1) ključ je pogrešan ili obrisan — napravi novi u ${label} i upiši ga u Postavke → Hosteri; ili (2) IP adresa ovog panela nije na dozvoljenoj listi kod ${label} (Account → API → Access Control / Allowed IPs) — dodaj je tamo.`);
-    if (r.status === 403) fail(400, `${label}: ključ nema dozvolu za ovo (treba pravo pisanja). ${msg}`);
+    if (r.status === 401 || r.status === 403) {
+      // ako čitanje radi a baš ovo ne, uzrok je obično: nalog nije verifikovan / nema uplate, ili je ključ samo za čitanje
+      const why = msg && !/^greška /.test(msg) ? ` ${label} javlja: "${msg}".` : '';
+      fail(400, `${label} je odbio ovu radnju (${r.status}).${why} Ako Provjera hostera prolazi, ključ i IP su dobri — uzrok je najčešće da nalog kod ${label} nije verifikovan ili nema uplate (novi nalozi ne mogu praviti servere dok se ne doda sredstvo), ili je ključ samo za čitanje. Provjeri Billing kod ${label}.`);
+    }
     fail(502, `${label}: ${msg}`);
   }
   return j;
