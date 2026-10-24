@@ -101,7 +101,11 @@ async function create(id, b, base, createPanelServer, actor) {
   const svId = createPanelServer({ name, city: loc.city || '', country: loc.cc || '', capacity: Number(b.capacity) || Number(settings.get('hz_capacity')) || 400, provider: p.name.replace(/ \(.*\)$/, '') });
   const sv = one('SELECT * FROM servers WHERE id = ?', svId);
   let r;
-  try { r = await launch(p, { location, type, name, panelId: svId, token: sv.token, base }); } catch (e) { run('DELETE FROM servers WHERE id = ?', svId); throw e; }
+  try { r = await launch(p, { location, type, name, panelId: svId, token: sv.token, base }); } catch (e) {
+    run('DELETE FROM servers WHERE id = ?', svId);
+    if (/401|odbijen pristup/.test(e.message || '')) { const ip = await outboundIp(); if (ip) e.message = (e.message || '') + ` Panel zove hostera sa IP adrese ${ip} — baš ona mora biti na dozvoljenoj listi (ne tvoja kućna adresa).`; }
+    throw e;
+  }
   const geo = r.geo || p.LOC?.[location] || {};
   run('UPDATE servers SET cloud = ?, cloud_id = ?, cloud_loc = ?, cloud_type = ?, host = ?, cost = ?, lat = ?, lon = ? WHERE id = ?',
     p.id, r.id, location, type, r.ip || '', r.price || 0, geo.lat ?? null, geo.lon ?? null, svId);
