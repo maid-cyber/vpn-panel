@@ -382,3 +382,11 @@ Sajt je prerađen i sad ima:
 - **Sekciju za preprodavače**: vidi se kad u Postavke → Reselleri uključiš "Reselleri se mogu sami registrovati" (vodi na registraciju), inače vodi na tvoju podršku.
 - **Podnožje** sa kolonama i linkovima na aplikacije, bota i reseller panel.
 - Besplatan probni nalog se spominje kod cijena samo ako je u Postavke → Aplikacija uključen "Probaj besplatno" i postoji probni plan.
+
+## 30. Serveri: lista i pretraga (3.1.1)
+
+Kad imaš više servera, kartice postanu nepregledne. Zato stranica **Serveri** sada ima:
+
+- **Prekidač prikaza** (gore desno, pored pretrage): kartice ili kompaktna lista. Izbor se pamti u pregledniku. Ako nemaš izabrano, panel sam uzme listu čim imaš više od 8 servera.
+- **Pretragu** po imenu, gradu, državi, hosteru i IP adresi. Pojavi se kad imaš više od 5 servera.
+- U listi jedan red pokazuje zastavu, ime, državu i hostera, IP adresu (klik kopira), status, spojeno/kapacitet, CPU i RAM, promet i dugmad.

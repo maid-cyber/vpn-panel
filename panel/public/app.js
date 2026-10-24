@@ -18,6 +18,7 @@
     logs: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
     gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1',
     user: 'M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+    grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', list: 'M4 6h16M4 12h16M4 18h16',
     plus: 'M12 5v14M5 12h14', search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5',
     menu: 'M4 7h16M4 12h16M4 17h16', bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4', logout: 'M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3',
     edit: 'M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4',
@@ -117,6 +118,11 @@
   };
   const stTag = (s) => `<span class="tag ${ST[s]?.[1] || 't-grey'}">${ST[s]?.[0] || s}</span>`;
   const SRV = { online: 'Online', offline: 'Offline', pending: 'Čeka instalaciju', disabled: 'Ugašen', maintenance: 'Održavanje' };
+  // način prikaza servera: 'cards' ili 'list' (kad ih je puno, lista je preglednija)
+  let srvView = null, srvQ = '';
+  try { srvView = localStorage.getItem('vp-srvview'); } catch { /* bez pamćenja */ }
+  const setSrvView = (v) => { srvView = v; try { localStorage.setItem('vp-srvview', v); } catch { /* */ } };
+
   const srvStatus = (s) => `<span class="status s-${s.warn ? 'warn' : s.status}">${s.warn ? 'Skoro pun' : SRV[s.status] || s.status}</span>`;
   // okrugla zastava (assets/flags/xx.png); za nepoznatu državu ostaju slova
   const FLAGS = new Set('ad ae af ag ai al am ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bl bm bn bo bq br bs bt bv bw by bz ca cc cd cf cg ch ci ck cl cm cn co cp cr cu cv cw cx cy cz de dg dj dk dm do dz ec ee eg eh er es et eu fi fj fk fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hm hn hr ht hu ic id ie il im in io iq ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pc pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug um un us uy uz va vc ve vg vi vn vu wf ws xk xx ye yt za zm zw'.split(' '));
@@ -1450,6 +1456,9 @@
     const on = servers.filter((s) => s.status === 'online'), off = servers.filter((s) => s.status === 'offline');
     const cap = servers.filter((s) => s.enabled).reduce((a, s) => a + s.capacity, 0), conn = on.reduce((a, s) => a + s.online, 0);
     const tm = servers.reduce((a, s) => a + (s.traffic_month || 0), 0), cost = servers.filter((s) => s.enabled).reduce((a, s) => a + (s.cost || 0), 0);
+    // kad ih je puno, lista je preglednija od kartica
+    const view = srvView || (servers.length > 8 ? 'list' : 'cards');
+
     $('#view').innerHTML = `${top('Serveri', `${servers.length} servera · ${on.length} online`, `<button class="btn hide-m" data-a="reload">${ic('refresh')}Osvježi</button>${can('servers') ? `<button class="btn red" data-a="newServer">${ic('plus')}<span>Dodaj server</span></button>` : ''}`)}
       <section class="stats">
         <div class="stat"><div class="l"><span>Online</span>${ic('server')}</div><div class="v">${on.length} / ${servers.filter((s) => s.enabled).length}</div><div class="s ${off.length ? 'bad' : 'ok'}">${off.length ? off.map((s) => esc(s.name)).join(', ') + ' ne odgovara' : 'svi rade'}</div></div>
@@ -1458,13 +1467,65 @@
         <div class="stat"><div class="l"><span>Trošak servera</span>${ic('money')}</div><div class="v">${money(cost)}</div><div class="s muted">mjesečno</div></div>
       </section>
       ${chainsHtml(chains, servers)}
-      ${servers.length ? `<section class="srvgrid">${servers.map(srvCard).join('')}</section>`
+      ${servers.length > 5 ? `<div class="srvbar">
+        <label class="srvfind">${ic('search')}<input class="input" id="srvQ" placeholder="Traži po imenu, državi ili IP adresi…" value="${esc(srvQ)}" autocomplete="off"></label>
+        <div class="vswitch" role="group" aria-label="Prikaz">
+          <button class="${view === 'cards' ? 'on' : ''}" data-a="srvView" data-v="cards" title="Kartice">${ic('grid')}</button>
+          <button class="${view === 'list' ? 'on' : ''}" data-a="srvView" data-v="list" title="Lista">${ic('list')}</button>
+        </div></div>` : ''}
+      ${servers.length ? `${view === 'list'
+        ? `<section class="srvlist"><div class="srvrow head"><span></span><span>Server</span><span>IP adresa</span><span>Status</span><span>Spojeno</span><span>Opterećenje</span><span>Promet</span><span></span></div>${servers.map(srvRow).join('')}</section>`
+        : `<section class="srvgrid">${servers.map(srvCard).join('')}</section>`}
+        <section class="card p" id="srvEmpty" hidden style="text-align:center"><p class="muted" style="margin:0">Nema servera koji odgovara pretrazi.</p></section>`
       : `<section class="card p" style="text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center"><h2>Dodaj svoj prvi VPN server</h2>
           <p class="muted" style="max-width:520px;margin:0">Zakupi VPS (Ubuntu 22.04 ili 24.04), klikni "Dodaj server", pa zalijepi jednu komandu u server. Panel sve ostalo uradi sam.</p>
           <button class="btn red" data-a="newServer">${ic('plus')}Dodaj server</button></section>`}`;
+    const qi = $('#srvQ');
+    if (qi) {
+      qi.oninput = () => { srvQ = qi.value; applySrvFilter(); };
+      if (srvQ) { applySrvFilter(); }
+    } else srvQ = '';
     startLive();
   }
   // kartica servera: zastava, ime, država i hoster, IP sa kopiranjem, protokoli, opterećenje, akcije
+  const srvFind = (s) => [s.name, s.city, s.host, s.provider, s.country && ccName(s.country), s.country].filter(Boolean).join(' ').toLowerCase();
+
+  /** Sakrij servere koji ne odgovaraju pretrazi (bez ponovnog crtanja, da kursor ostane u polju). */
+  function applySrvFilter() {
+    const q = srvQ.trim().toLowerCase();
+    let n = 0;
+    $$('#view [data-find]').forEach((el) => {
+      const hit = !q || el.dataset.find.includes(q);
+      el.hidden = !hit;
+      if (hit) n++;
+    });
+    const empty = $('#srvEmpty');
+    if (empty) empty.hidden = n > 0;
+  }
+
+  /** Jedan server kao red u listi (za velik broj servera). */
+  function srvRow(s) {
+    const live = s.status === 'online';
+    const fill = s.capacity ? s.online / s.capacity * 100 : 0;
+    const lvl = (v) => v == null ? '' : v >= 85 ? 'bad' : v >= 65 ? 'w' : '';
+    const mini = (label, v) => `<span class="rm" title="${label}"><em>${label}</em><b class="${lvl(v)}">${v == null ? '—' : Math.round(v) + '%'}</b></span>`;
+    const country = s.country ? ccName(s.country) : '';
+    return `<article data-find="${esc(srvFind(s))}" class="srvrow ${s.status === 'offline' ? 'off' : ''} ${s.status === 'disabled' ? 'dis' : ''} ${s.maintenance ? 'mnt' : ''}">
+      <span class="srvflag sm">${s.country ? flag(s.country) : ic('server')}<i class="dot s-${s.warn ? 'warn' : s.status}"></i></span>
+      <a class="rname" href="#/server/${s.id}"><b title="${esc(s.name)}">${esc(s.city && s.city !== s.name ? s.name : s.city || s.name)}</b><span>${esc([country, s.provider].filter(Boolean).join(' · ') || 'čeka prvo javljanje')}</span></a>
+      ${s.host ? `<button class="rip mono" data-a="copy" data-v="${esc(s.host)}" title="Kopiraj IP adresu">${esc(s.host)}</button>` : '<span class="rip dim">—</span>'}
+      <span class="rst" data-live-srv="${s.id}">${srvStatus(s)}</span>
+      <span class="rconn ${lvl(fill)}">${s.online}<small>/${s.capacity}</small></span>
+      <span class="rmet">${mini('CPU', live ? s.cpu : null)}${mini('RAM', live ? s.ram : null)}</span>
+      <span class="rtr">${bytes(s.traffic_month)}</span>
+      <span class="ra">
+        ${s.status === 'pending' && !s.cloud ? `<button class="btn sm red" data-a="install" data-id="${s.id}">Komanda</button>` : ''}
+        <a class="btn sm icon" href="#/server/${s.id}" title="Detalji">${ic('chart')}</a>
+        <button class="btn sm icon" data-a="editServer" data-id="${s.id}" title="Uredi">${ic('edit')}</button>
+        <button class="btn sm icon" data-a="srvMore" data-id="${s.id}" aria-label="Više">${ic('more')}</button>
+      </span></article>`;
+  }
+
   function srvCard(s) {
     const live = s.status === 'online';
     const fill = s.capacity ? s.online / s.capacity * 100 : 0;
@@ -1473,7 +1534,7 @@
     const country = s.country ? ccName(s.country) : '';
     const sub = [country, s.provider].filter(Boolean).join(' · ') || 'čeka prvo javljanje';
     const proto = (ok, name) => ok == null ? '' : `<span class="pchip ${ok ? 'ok' : 'bad'}" title="${ok ? 'radi' : 'ne radi'}"><i></i>${name}</span>`;
-    return `<article class="card srv2 ${s.status === 'offline' ? 'off' : ''} ${s.status === 'disabled' ? 'dis' : ''} ${s.maintenance ? 'mnt' : ''}">
+    return `<article data-find="${esc(srvFind(s))}" class="card srv2 ${s.status === 'offline' ? 'off' : ''} ${s.status === 'disabled' ? 'dis' : ''} ${s.maintenance ? 'mnt' : ''}">
       <header>
         <span class="srvflag">${s.country ? flag(s.country) : ic('server')}<i class="dot s-${s.warn ? 'warn' : s.status}"></i></span>
         <a class="srv-t" href="#/server/${s.id}"><b title="${esc(s.name)}">${esc(s.city && s.city !== s.name ? s.name : s.city || s.name)}</b><span>${esc(sub)}</span></a>
@@ -2313,6 +2374,7 @@
     },
     bulk: () => bulk().catch(fail),
     editPlan: (d) => editPlan(d.id).catch(fail),
+    srvView: (d) => { setSrvView(d.v); pageServers().catch(fail); },
     newServer: () => newServerPick().catch(fail),
     cloudNewIp: (d) => cloudNewIp(d.id).catch(fail),
     anDays: (d) => pageAnalytics(Number(d.n)).catch(fail),
