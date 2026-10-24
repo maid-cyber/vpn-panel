@@ -447,8 +447,8 @@ body { background: radial-gradient(900px 500px at 12% -10%, rgba(47, 107, 255, .
   .srvrow > .ra { grid-column: 1 / -1; justify-content: flex-start; }
   .srvrow.head { display: none; }
 }
-.srvgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 16px; }
-.srv2 { padding: 18px; display: flex; flex-direction: column; gap: 14px; position: relative; overflow: hidden; transition: border-color .15s, transform .15s; }
+.srvgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 12px; }
+.srv2 { padding: 14px; display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden; transition: border-color .15s, transform .15s; }
 .srv2:hover { border-color: var(--line2); }
 .srv2::before { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: linear-gradient(90deg, transparent, var(--ok), transparent); opacity: .5; }
 .srv2.off::before { background: linear-gradient(90deg, transparent, var(--bad), transparent); opacity: .9; }
@@ -456,31 +456,31 @@ body { background: radial-gradient(900px 500px at 12% -10%, rgba(47, 107, 255, .
 .srv2.off { border-color: var(--acc-line); }
 .srv2.dis > :not(.srv-a) { opacity: .55; }
 .srv2.dis::before { display: none; }
-.srv2 header { display: flex; align-items: center; gap: 13px; }
-.srvflag { position: relative; width: 46px; height: 46px; flex: none; border-radius: 50%; background: var(--row, var(--card2)); display: grid; place-items: center; box-shadow: 0 0 0 2px rgba(255,255,255,.07), 0 6px 18px -8px rgba(0,0,0,.8); }
+.srv2 header { display: flex; align-items: center; gap: 11px; }
+.srvflag { position: relative; width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--row, var(--card2)); display: grid; place-items: center; box-shadow: 0 0 0 2px rgba(255,255,255,.07), 0 6px 18px -8px rgba(0,0,0,.8); }
 .srvflag > img { border-radius: 50%; }
-.srvflag .dot { position: absolute; right: -1px; bottom: -1px; width: 13px; height: 13px; border-radius: 50%; background: currentColor; border: 2.5px solid var(--card); }
+.srvflag .dot { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: currentColor; border: 2.5px solid var(--card); }
 .srv-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.srv-t b { font: 700 16.5px var(--display); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srv-t b { font: 700 15px var(--display); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .srv-t span { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.iprow { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card2); color: var(--soft); font-size: 13px; cursor: pointer; text-align: left; }
+.iprow { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 6px 11px; border-radius: 9px; font-size: 13px; border: 1px solid var(--line); background: var(--card2); color: var(--soft); font-size: 13px; cursor: pointer; text-align: left; }
 .iprow:hover { border-color: var(--line2); color: var(--text); }
 .iprow svg { width: 15px; height: 15px; opacity: .6; flex: none; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
 .pchip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--soft); background: var(--card2); border: 1px solid var(--line); }
 .pchip i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
 .pchip.bad i { background: var(--bad); box-shadow: none; }
-.srv-m { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.sm-m { padding: 10px 11px 11px; border-radius: 11px; background: var(--card2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.srv-m { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sm-m { padding: 8px 9px; border-radius: 10px; background: var(--card2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .sm-l { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.sm-l span { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
-.sm-l b { font: 700 19px var(--display); letter-spacing: -.01em; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sm-l span { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.sm-l b { font: 700 16px var(--display); letter-spacing: -.01em; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sm-l b small { color: var(--dim); font-weight: 500; font-size: 11.5px; }
 .sm-l b.w { color: var(--warn); } .sm-l b.bad { color: var(--bad); }
 .sm-bar { height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .sm-bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #2f6bff, #6f8dff); }
 .sm-bar i.w { background: var(--warn); } .sm-bar i.bad { background: linear-gradient(90deg, var(--acc), var(--acc-hi)); }
-.srv-f { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--soft); padding-top: 12px; border-top: 1px solid var(--line); }
+.srv-f { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--soft); padding-top: 10px; border-top: 1px solid var(--line); }
 .srv-f > span:first-child { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .srv-f svg { width: 15px; height: 15px; opacity: .7; }
 .srv-f small { color: var(--muted); font-weight: 400; }
