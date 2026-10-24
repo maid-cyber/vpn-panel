@@ -1457,7 +1457,7 @@
     const cap = servers.filter((s) => s.enabled).reduce((a, s) => a + s.capacity, 0), conn = on.reduce((a, s) => a + s.online, 0);
     const tm = servers.reduce((a, s) => a + (s.traffic_month || 0), 0), cost = servers.filter((s) => s.enabled).reduce((a, s) => a + (s.cost || 0), 0);
     // kad ih je puno, lista je preglednija od kartica
-    const view = srvView || (servers.length > 8 ? 'list' : 'cards');
+    const view = srvView || (servers.length > 5 ? 'list' : 'cards');
 
     $('#view').innerHTML = `${top('Serveri', `${servers.length} servera · ${on.length} online`, `<button class="btn hide-m" data-a="reload">${ic('refresh')}Osvježi</button>${can('servers') ? `<button class="btn red" data-a="newServer">${ic('plus')}<span>Dodaj server</span></button>` : ''}`)}
       <section class="stats">
@@ -1470,8 +1470,8 @@
       ${servers.length > 5 ? `<div class="srvbar">
         <label class="srvfind">${ic('search')}<input class="input" id="srvQ" placeholder="Traži po imenu, državi ili IP adresi…" value="${esc(srvQ)}" autocomplete="off"></label>
         <div class="vswitch" role="group" aria-label="Prikaz">
-          <button class="${view === 'cards' ? 'on' : ''}" data-a="srvView" data-v="cards" title="Kartice">${ic('grid')}</button>
-          <button class="${view === 'list' ? 'on' : ''}" data-a="srvView" data-v="list" title="Lista">${ic('list')}</button>
+          <button class="${view === 'cards' ? 'on' : ''}" data-a="srvView" data-v="cards" title="Prikaži kao kartice">${ic('grid')}<span>Kartice</span></button>
+          <button class="${view === 'list' ? 'on' : ''}" data-a="srvView" data-v="list" title="Prikaži kao listu">${ic('list')}<span>Lista</span></button>
         </div></div>` : ''}
       ${servers.length ? `${view === 'list'
         ? `<section class="srvlist"><div class="srvrow head"><span></span><span>Server</span><span>IP adresa</span><span>Status</span><span>Spojeno</span><span>Opterećenje</span><span>Promet</span><span></span></div>${servers.map(srvRow).join('')}</section>`

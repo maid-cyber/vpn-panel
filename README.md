@@ -387,6 +387,6 @@ Sajt je prerađen i sad ima:
 
 Kad imaš više servera, kartice postanu nepregledne. Zato stranica **Serveri** sada ima:
 
-- **Prekidač prikaza** (gore desno, pored pretrage): kartice ili kompaktna lista. Izbor se pamti u pregledniku. Ako nemaš izabrano, panel sam uzme listu čim imaš više od 8 servera.
+- **Prekidač prikaza** (gore desno, pored pretrage): kartice ili kompaktna lista. Izbor se pamti u pregledniku. Ako nemaš izabrano, panel sam uzme listu čim imaš više od 5 servera.
 - **Pretragu** po imenu, gradu, državi, hosteru i IP adresi. Pojavi se kad imaš više od 5 servera.
 - U listi jedan red pokazuje zastavu, ime, državu i hostera, IP adresu (klik kopira), status, spojeno/kapacitet, CPU i RAM, promet i dugmad.
