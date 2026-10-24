@@ -252,6 +252,7 @@ function clean(key, value) {
   if (r.type === 'select' || r.type === 'chips') return r.options.includes(String(value)) ? String(value) : r.def;
   if (r.type === 'secret' && String(value ?? '').includes('••')) return undefined;   // nije mijenjano
   let v = String(value ?? '').slice(0, 2000);
+  if (r.type === 'secret') v = v.replace(/\s+/g, '');   // ključevi i tokeni nemaju razmake; skida nevidljivi novi red iz copy-paste
   if (key === 'admin_path') {
     v = '/' + v.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
     if (v.length < 5) throw new Error('Tajna putanja mora imati bar 4 znaka (slova, brojevi, - i _).');

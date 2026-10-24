@@ -9,12 +9,12 @@ const REG = {
   fra: ['Frankfurt', 'DE'], tor: ['Toronto', 'CA'], blr: ['Bangalore', 'IN'], syd: ['Sydney', 'AU'], atl: ['Atlanta', 'US'], ric: ['Richmond', 'US'],
 };
 const geo = (slug) => { const r = REG[String(slug).replace(/\d+$/, '')]; return r ? { city: r[0], cc: r[1] } : { city: slug, cc: '' }; };
-const doApi = (method, path, body) => call('DigitalOcean', API() + path, { method, body, headers: { authorization: `Bearer ${settings.get('do_token')}` } });
+const doApi = (method, path, body) => call('DigitalOcean', API() + path, { method, body, headers: { authorization: `Bearer ${String(settings.get('do_token') || '').trim()}` } });
 
 module.exports = {
   id: 'digitalocean', name: 'DigitalOcean', currency: '$', billing: 'po satu', swapIp: false, replace: true,
   note: 'Cijene su u dolarima. Promet je uključen prema veličini (od 500 GB mjesečno).',
-  configured: () => !!settings.get('do_token'),
+  configured: () => !!String(settings.get('do_token') || '').trim(),
   async options() {
     const [regs, sizes] = await Promise.all([doApi('GET', '/regions?per_page=200'), doApi('GET', '/sizes?per_page=200')]);
     const avail = new Set((regs.regions || []).filter((r) => r.available).map((r) => r.slug));

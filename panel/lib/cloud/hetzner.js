@@ -9,7 +9,7 @@ const LOC = {
   hel1: { city: 'Helsinki', cc: 'FI', lat: 60.17, lon: 24.94 }, ash: { city: 'Ashburn', cc: 'US', lat: 39.04, lon: -77.49 },
   hil: { city: 'Hillsboro', cc: 'US', lat: 45.52, lon: -122.99 }, sin: { city: 'Singapore', cc: 'SG', lat: 1.29, lon: 103.85 },
 };
-const hz = (method, path, body) => call('Hetzner', API() + path, { method, body, headers: { authorization: `Bearer ${settings.get('hz_token')}` } });
+const hz = (method, path, body) => call('Hetzner', API() + path, { method, body, headers: { authorization: `Bearer ${String(settings.get('hz_token') || '').trim()}` } });
 
 async function waitAction(action, maxMs = 180000) {
   if (!action?.id) return;
@@ -26,7 +26,7 @@ async function waitAction(action, maxMs = 180000) {
 module.exports = {
   id: 'hetzner', name: 'Hetzner', currency: '€', billing: 'po satu', swapIp: true, replace: true,
   note: 'U Evropi je uključeno 20 TB prometa mjesečno, u SAD-u i Singapuru znatno manje.',
-  configured: () => !!settings.get('hz_token'),
+  configured: () => !!String(settings.get('hz_token') || '').trim(),
   LOC,
   async options() {
     const [locs, types] = await Promise.all([hz('GET', '/locations'), hz('GET', '/server_types?per_page=50')]);
