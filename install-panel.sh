@@ -150,6 +150,11 @@ if ! command -v caddy >/dev/null; then
 fi
 # isti proxy za sve adrese; uz domenu ostaje i stara adresa preko IP-a (port 80),
 # da agenti na serverima i stari linkovi kupaca (http://IP/...) rade i dalje
+# sslip.io adresa ovog servera (npr. 178-104-237-74.sslip.io): agenti na VPN
+# serverima se javljaju baš na nju preko HTTPS-a, pa je čuvamo i kad se doda domena
+MYIP4="$(curl -fsS4 --max-time 8 https://api.ipify.org 2>/dev/null || ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' || true)"
+SSLIP=""
+[ -n "$MYIP4" ] && SSLIP="$(printf '%s' "$MYIP4" | tr '.' '-').sslip.io"
 cat > /etc/caddy/Caddyfile <<EOF
 # Napravio install-panel.sh
 (panel) {
@@ -167,7 +172,10 @@ cat > /etc/caddy/Caddyfile <<EOF
 
 EOF
 if [ -n "$DOMAIN" ]; then
-  printf '%s {\n\timport panel\n}\n\n# stara adresa preko IP-a: agenti i stari linkovi kupaca\n:80 {\n\timport panel\n}\n' "$DOMAIN" >> /etc/caddy/Caddyfile
+  printf '%s {\n\timport panel\n}\n\n' "$DOMAIN" >> /etc/caddy/Caddyfile
+  # zadrži HTTPS na sslip.io adresi da se postojeći agenti na serverima i dalje javljaju
+  [ -n "$SSLIP" ] && printf '# sslip.io adresa servera: agenti na VPN serverima se javljaju ovdje\n%s {\n\timport panel\n}\n\n' "$SSLIP" >> /etc/caddy/Caddyfile
+  printf '# stara adresa preko IP-a (http): stari linkovi kupaca\n:80 {\n\timport panel\n}\n' >> /etc/caddy/Caddyfile
 else
   printf ':80 {\n\timport panel\n}\n' >> /etc/caddy/Caddyfile
 fi
