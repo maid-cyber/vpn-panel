@@ -390,3 +390,13 @@ Kad imaš više servera, kartice postanu nepregledne. Zato stranica **Serveri** 
 - **Prekidač prikaza** (gore desno, pored pretrage): kartice ili kompaktna lista. Izbor se pamti u pregledniku. Ako nemaš izabrano, panel sam uzme listu čim imaš više od 5 servera.
 - **Pretragu** po imenu, gradu, državi, hosteru i IP adresi. Pojavi se kad imaš više od 5 servera.
 - U listi jedan red pokazuje zastavu, ime, državu i hostera, IP adresu (klik kopira), status, spojeno/kapacitet, CPU i RAM, promet i dugmad.
+
+## 31. Politika privatnosti i uslovi korištenja (3.2.0)
+
+Sajt ima dvije pravne stranice: **/privatnost** i **/uslovi** (rade i engleski nazivi `/privacy` i `/terms`). Linkovi su u podnožju sajta.
+
+Tekst se sam popunjava iz **Postavke → Pravno**: ko pruža uslugu, e-mail za zahtjeve kupaca, adresa, država čije pravo važi i rok za povrat novca. Datum "Važi od" se sam pomjeri kad promijeniš neki od tih podataka.
+
+Politika opisuje tačno ono što sistem radi: šta se čuva (nalog, e-mail, promet u GB, vrijeme zadnjeg spajanja, verzija aplikacije, uplate), šta se ne čuva (stranice, DNS upiti, kućna IP adresa uz nalog), te tri mjesta gdje IP adresa ipak nastaje — probni nalozi (zaštita od zloupotrebe), dijagnostika koju kupac sam pošalje i provjera statusa na sajtu preko ip-api.com.
+
+Ako nešto od ovoga promijeniš u sistemu (npr. dodaš novi servis za e-mail), dopuni i tekst u `panel/lib/legal.js`.

@@ -102,6 +102,15 @@ const SCHEMA = [
     { key: 'vat', type: 'select', label: 'PDV na fakturama', options: ['0', '17', '19', '20'], labels: ['Bez PDV-a', '17%', '19%', '20%'], def: '0' },
     { key: 'mail_invoices', type: 'toggle', label: 'Šalji fakturu resellerima na e-mail', sub: 'Treba podešen e-mail (Obavještenja) i e-mail resellera u njegovom profilu', def: true },
   ] },
+  { id: 'pravno', title: 'Pravno (privatnost i uslovi)', desc: 'Podaci koji se upisuju u politiku privatnosti i uslove korištenja na sajtu.', rows: [
+    { key: 'legal_on', type: 'toggle', label: 'Prikaži Politiku privatnosti i Uslove korištenja', sub: 'Stranice /privatnost i /uslovi, plus linkovi u podnožju sajta', def: true },
+    { key: 'legal_entity', type: 'text', label: 'Ko pruža uslugu', sub: 'Ime firme, ili tvoje ime i prezime ako radiš kao fizičko lice. Prazno = piše samo ime brenda', def: '' },
+    { key: 'legal_email', type: 'text', label: 'E-mail za privatnost i zahtjeve kupaca', sub: 'Tu kupci traže uvid u podatke i brisanje naloga. Prazno = uzima se adresa pošiljaoca e-maila', def: '' },
+    { key: 'legal_address', type: 'textarea', label: 'Adresa (opcionalno)', sub: 'Prazno = uzima se adresa sa fakture, ako je upisana', def: '' },
+    { key: 'legal_country', type: 'text', label: 'Država čije pravo se primjenjuje', def: 'Bosna i Hercegovina' },
+    { key: 'legal_refund_days', type: 'number', label: 'Rok za povrat novca (dana)', sub: 'Koliko dana kupac ima pravo tražiti povrat ako usluga ne radi', def: 14 },
+    { key: 'legal_updated', type: 'number', label: 'Datum verzije (automatski)', sub: 'Postavi se sam kad promijeniš nešto iznad', def: 0 },
+  ] },
   { id: 'obavijesti', title: 'Obavještenja i Telegram bot', desc: 'Šta ti javlja panel.', rows: [
     { key: 'tg_token', type: 'secret', label: 'Telegram bot token', sub: 'Napravi bota kod @BotFather', def: '' },
     { key: 'tg_chat', type: 'text', label: 'Tvoj Telegram chat ID', sub: 'Pošalji botu /start, pa klikni "Pošalji probnu poruku"', def: '', mono: true },
@@ -232,6 +241,8 @@ function load() {
 
 function get(key) { return load()[key]; }
 
+const LEGAL = ['legal_entity', 'legal_email', 'legal_address', 'legal_country', 'legal_refund_days'];
+
 function clean(key, value) {
   const r = ROWS[key];
   if (!r) return undefined;
@@ -263,6 +274,10 @@ function set(patch) {
     if (c === undefined) continue;
     run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', k, JSON.stringify(c));
     changed.push(k);
+  }
+  // datum verzije pravnih stranica se sam pomjeri kad se neki od tih podataka promijeni
+  if (changed.some((k) => LEGAL.includes(k))) {
+    run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', 'legal_updated', JSON.stringify(Date.now()));
   }
   cache = null;
   return changed;

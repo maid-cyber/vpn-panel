@@ -327,6 +327,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   <div class="fgrid" id="fgrid"></div>
   <div class="fbot">
     <span>© <span id="year"></span> <span class="bn"></span></span>
+    <span id="flegal"></span>
     <span id="foot"></span>
   </div>
 </div></footer>
@@ -419,7 +420,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
       f_c1: 'Proizvod', f_c2: 'Aplikacije', f_c3: 'Pomoć',
       f_l1: [['#zastita', 'Zaštita'], ['#funkcije', 'Funkcije'], ['#lokacije', 'Lokacije'], ['#cijene', 'Cijene']],
       f_l3: [['#pitanja', 'Česta pitanja'], ['#cijene', 'Kupi VPN']],
-      f_mojnalog: 'Moj nalog', f_resell: 'Za preprodavače',
+      f_mojnalog: 'Moj nalog', f_resell: 'Za preprodavače', f_priv: 'Politika privatnosti', f_terms: 'Uslovi korištenja',
     },
     en: {
       nav0: 'Security', nav1: 'Features', nav2: 'Locations', nav3: 'Pricing', nav4: 'Apps', nav5: 'FAQ', navcta: 'Get VPN',
@@ -490,7 +491,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
       f_c1: 'Product', f_c2: 'Apps', f_c3: 'Help',
       f_l1: [['#zastita', 'Security'], ['#funkcije', 'Features'], ['#lokacije', 'Locations'], ['#cijene', 'Pricing']],
       f_l3: [['#pitanja', 'FAQ'], ['#cijene', 'Get VPN']],
-      f_mojnalog: 'My account', f_resell: 'For resellers',
+      f_mojnalog: 'My account', f_resell: 'For resellers', f_priv: 'Privacy policy', f_terms: 'Terms of use',
     },
   };
   const ICON = {
@@ -625,9 +626,11 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     const help = L.f_l3.slice();
     if (D.bot) help.push([`https://t.me/${D.bot}`, 'Telegram bot', 1]);
     if (D.reseller) help.push([D.reseller, L.f_resell]);
+    const legal = D.legal ? [['/privatnost', L.f_priv], ['/uslovi', L.f_terms]] : [];
     document.getElementById('fgrid').innerHTML = `
       <div class="fbrand"><div class="logo"><svg width="28" height="31" viewBox="0 0 200 224" aria-hidden="true"><path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 52 100 104 82 164H54z" fill="#E3172B"/><path d="M100 52 146 164h-28l-18-60z" fill="#9E0C1A"/><path d="M90.5 128h19l4.5 14h-28z" fill="#FF4A5A"/><path d="M100 52 111 78H89z" fill="#FF4A5A"/></svg><span class="wm"><b>${esc(main.slice(0, -1).toUpperCase())}<em>${esc(main.slice(-1).toUpperCase())}</em></b>${isVpn ? '<small>VPN</small>' : ''}</span></div><p>${esc(L.f_about)}</p></div>
-      ${col(L.f_c1, L.f_l1)}${col(L.f_c2, apps)}${col(L.f_c3, help)}`;
+      ${col(L.f_c1, L.f_l1)}${col(L.f_c2, apps)}${col(L.f_c3, legal.length ? help.concat(legal) : help)}`;
+    document.getElementById('flegal').innerHTML = D.legal ? `<a href="/privatnost">${esc(L.f_priv)}</a> · <a href="/uslovi">${esc(L.f_terms)}</a>` : '';
     document.getElementById('foot').textContent = D.support ? L.support + D.support : '';
     observe();
   }

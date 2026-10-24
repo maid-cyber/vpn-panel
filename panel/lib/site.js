@@ -71,6 +71,7 @@ function siteData(d) {
     blocks: { ads: !!s.block_ads, malware: !!s.block_malware },
     // preuzimanje ide sa tvoje adrese (panel skine sa GitHuba i čuva kod sebe)
     apk: d.apk ? '/download/android' : '', exe: d.exe ? '/download/windows' : '', releases: d.page,
+    legal: s.legal_on !== false,
     trial: !!(s.app_trial && one('SELECT id FROM plans WHERE active = 1 AND trial = 1 LIMIT 1')),
     reseller: s.res_portal !== false && s.res_signup ? (s.reseller_path || '/reseller') : '',
     coupons: !!one('SELECT id FROM coupons WHERE active = 1 AND (expires_at = 0 OR expires_at > ?) AND (max_uses = 0 OR used < max_uses) LIMIT 1', now()),
