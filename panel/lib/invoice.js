@@ -56,11 +56,11 @@ function details(t) {
       username = u.username;
       buyer = u.email || u.contact || u.username;
       const p = u.plan_id && one('SELECT name, days FROM plans WHERE id = ?', u.plan_id);
-      if (p) { planName = p.name; period = p.days ? `${p.days} dana` : ''; }
+      if (p) { planName = p.name; period = p.days ? `${p.days} days` : ''; }
     }
   }
-  if (!planName) planName = String(t.note || '').split('·').pop().trim() || 'VPN usluga';
-  const kind = t.type === 'topup' ? 'Kredit za VPN usluge' : (/produ/i.test(t.note || '') ? 'Produženje pretplate' : 'VPN pretplata');
+  if (!planName) planName = String(t.note || '').split('·').pop().trim() || 'VPN service';
+  const kind = t.type === 'topup' ? 'Account credit' : (/produ|renew/i.test(t.note || '') ? 'Subscription renewal' : 'VPN subscription');
   return { buyer, username, planName, period, kind };
 }
 
@@ -71,7 +71,7 @@ function pageHtml(t) {
   const vat = Number(s.vat || 0);
   const net = vat ? t.amount / (1 + vat / 100) : t.amount;
   const d = details(t);
-  const date = new Date(t.ts).toLocaleDateString('bs-BA');
+  const date = new Date(t.ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   const company = esc(s.inv_company || s.brand || 'VPN');
   const addr = esc(s.inv_address || '');
   return `<!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -111,32 +111,32 @@ td{padding:14px 0;border-bottom:1px solid #f0f0f4;vertical-align:top}
 @media print{body{background:#fff}.sheet{box-shadow:none;margin:0;max-width:none}.btnbar{display:none}}
 @media(max-width:560px){.pad{padding:26px 20px}.inv{text-align:left}}
 </style></head><body>
-<div class="btnbar" style="max-width:820px;margin:22px auto 0"><button class="btn" onclick="print()">Štampaj / Sačuvaj PDF</button></div>
+<div class="btnbar" style="max-width:820px;margin:22px auto 0"><button class="btn" onclick="print()">Print / Save as PDF</button></div>
 <div class="sheet"><div class="bar"></div><div class="pad">
   <div class="top">
     <div class="brand"><svg viewBox="0 0 200 224" aria-hidden="true">${MARK}</svg>
       <div><div class="nm">${company.slice(0, -1)}<em>${company.slice(-1)}</em></div>${addr ? `<small>${addr}</small>` : ''}</div>
     </div>
-    <div class="inv"><h1>FAKTURA</h1><div class="no">${esc(no)}</div><div class="paid">● PLAĆENO</div></div>
+    <div class="inv"><h1>INVOICE</h1><div class="no">${esc(no)}</div><div class="paid">● PAID</div></div>
   </div>
   <div class="meta">
-    <div class="blk"><h4>Kupac</h4><div class="big">${esc(d.buyer)}</div>${d.username ? `<div class="sub">Nalog: ${esc(d.username)}</div>` : ''}</div>
-    <div class="blk" style="text-align:right"><h4>Datum</h4><div class="big">${esc(date)}</div><div class="sub">Način: ${esc(t.method || '—')}</div></div>
+    <div class="blk"><h4>Bill to</h4><div class="big">${esc(d.buyer)}</div>${d.username ? `<div class="sub">Account: ${esc(d.username)}</div>` : ''}</div>
+    <div class="blk" style="text-align:right"><h4>Date</h4><div class="big">${esc(date)}</div><div class="sub">Payment: ${esc(t.method || '—')}</div></div>
   </div>
   <table>
-    <tr><th>Opis</th><th class="r">Količina</th><th class="r">Cijena</th><th class="r">Iznos</th></tr>
+    <tr><th>Description</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Amount</th></tr>
     <tr><td><b>${esc(d.planName)}</b>${d.period ? `<br><span style="color:#888;font-size:13px">${esc(d.period)}</span>` : ''}<br><span style="color:#aaa;font-size:12.5px">${esc(d.kind)}</span></td><td class="r">1</td><td class="r">${fmt(net)}</td><td class="r">${fmt(net)}</td></tr>
   </table>
   <div class="tot">
-    <div class="ln"><span>Osnovica</span><span>${fmt(net)}</span></div>
-    ${vat ? `<div class="ln"><span>PDV ${vat}%</span><span>${fmt(t.amount - net)}</span></div>` : ''}
-    <div class="ln grand"><span>Ukupno</span><span>${fmt(t.amount)}</span></div>
+    <div class="ln"><span>Subtotal</span><span>${fmt(net)}</span></div>
+    ${vat ? `<div class="ln"><span>VAT ${vat}%</span><span>${fmt(t.amount - net)}</span></div>` : ''}
+    <div class="ln grand"><span>Total</span><span>${fmt(t.amount)}</span></div>
   </div>
-  <div class="pay">Plaćeno putem <b>${esc(t.method || '—')}</b> · ${esc(date)}. Iznos je u cijelosti izmiren, hvala!</div>
+  <div class="pay">Paid via <b>${esc(t.method || '—')}</b> on ${esc(date)}. Amount paid in full — thank you!</div>
   <div class="foot">
-    ${s.inv_company ? `${company} · ` : ''}${addr ? esc(addr.replace(/\n/g, ', ')) + ' · ' : ''}${s.support_contact ? `Kontakt: ${esc(s.support_contact)}` : ''}
-    ${vat ? '' : '<br>Oslobođeno PDV-a.'}
-    <br>Hvala na povjerenju. Ova faktura je izdata elektronski i važeća je bez potpisa i pečata.
+    ${s.inv_company ? `${company} · ` : ''}${addr ? esc(addr.replace(/\n/g, ', ')) + ' · ' : ''}${s.support_contact ? `Contact: ${esc(s.support_contact)}` : ''}
+    ${vat ? '' : '<br>VAT exempt.'}
+    <br>Thank you for your business. This invoice was issued electronically and is valid without signature or stamp.
   </div>
 </div></div>
 </body></html>`;
@@ -151,23 +151,24 @@ function email(t) {
   const d = details(t);
   const base = (s.panel_url || s.sub_url || '').replace(/\/+$/, '');
   const link = base ? `${base}/faktura/${token(t.id)}` : '';
+  const date = new Date(t.ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   const html = layout({
-    badge: 'FAKTURA',
-    head: `Hvala na kupovini! 🎉`,
-    intro: `Ovo je potvrda i faktura za tvoju ${esc(s.brand)} pretplatu. Iznos je uspješno naplaćen.`,
-    stats: [['Faktura', esc(no)], ['Ukupno', fmt(t.amount)], ['Datum', new Date(t.ts).toLocaleDateString('bs-BA')]],
+    badge: 'INVOICE',
+    head: `Thank you for your purchase! 🎉`,
+    intro: `Here's your receipt and invoice for your ${esc(s.brand)} subscription. Your payment was successful.`,
+    stats: [['Invoice', esc(no)], ['Total', fmt(t.amount)], ['Date', date]],
     rows: [
-      ['Usluga', esc(d.planName)],
-      ...(d.period ? [['Trajanje', esc(d.period)]] : []),
-      ...(vat ? [['Osnovica', fmt(net)], [`PDV ${vat}%`, fmt(t.amount - net)]] : []),
-      ['Ukupno', `${fmt(t.amount)}`],
-      ['Način plaćanja', esc(t.method || '—')],
+      ['Service', esc(d.planName)],
+      ...(d.period ? [['Duration', esc(d.period)]] : []),
+      ...(vat ? [['Subtotal', fmt(net)], [`VAT ${vat}%`, fmt(t.amount - net)]] : []),
+      ['Total', `${fmt(t.amount)}`],
+      ['Payment method', esc(t.method || '—')],
     ],
-    cta: link ? { href: link, label: 'Preuzmi fakturu (PDF)' } : null,
-    footer: `${s.inv_company ? `Izdavalac: <b style="color:#f2f2f6">${esc(s.inv_company)}</b><br>` : ''}${s.support_contact ? `Pitanja? Javi se: <b style="color:#f2f2f6">${esc(s.support_contact)}</b>` : 'Pitanja? Odgovori na ovaj e-mail.'}`,
+    cta: link ? { href: link, label: 'Download invoice (PDF)' } : null,
+    footer: `${s.inv_company ? `Issued by: <b style="color:#f2f2f6">${esc(s.inv_company)}</b><br>` : ''}${s.support_contact ? `Questions? Contact us: <b style="color:#f2f2f6">${esc(s.support_contact)}</b>` : 'Questions? Just reply to this email.'}`,
   });
-  const text = `Faktura ${no} · ${s.brand}\n\n${d.planName}${d.period ? ' · ' + d.period : ''}\nUkupno: ${fmt(t.amount)}\nNačin plaćanja: ${t.method || '—'}\nDatum: ${new Date(t.ts).toLocaleDateString('bs-BA')}\n${link ? '\nFaktura (PDF): ' + link : ''}\n\nHvala na povjerenju!`;
-  return { subject: `Faktura ${no} · ${s.brand}`, html, text };
+  const text = `Invoice ${no} · ${s.brand}\n\n${d.planName}${d.period ? ' · ' + d.period : ''}\nTotal: ${fmt(t.amount)}\nPayment method: ${t.method || '—'}\nDate: ${date}\n${link ? '\nInvoice (PDF): ' + link : ''}\n\nThank you for your business!`;
+  return { subject: `Invoice ${no} · ${s.brand}`, html, text };
 }
 
 /** Pošalji fakturu kupcu za njegovu zadnju uplatu (kupovina ili produženje). */
@@ -191,9 +192,9 @@ async function sendForUser(userId, to) {
 /** GET /faktura/<id>.<potpis> → bijela faktura za štampu/PDF (javno, uz potpis). */
 function handle(req, res, p) {
   const id = parseToken(p.replace(/^\/faktura\//, ''));
-  if (!id) return send(res, 404, 'Faktura nije pronađena.');
+  if (!id) return send(res, 404, 'Invoice not found.');
   const t = one('SELECT * FROM transactions WHERE id = ?', id);
-  if (!t) return send(res, 404, 'Faktura nije pronađena.');
+  if (!t) return send(res, 404, 'Invoice not found.');
   return send(res, 200, pageHtml(t), { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
 }
 
