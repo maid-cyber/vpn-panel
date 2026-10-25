@@ -414,7 +414,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
         ['Mogu li probati prije kupovine?', 'Da. U Android i Windows aplikaciji klikni "Probaj besplatno" i dobiješ probni nalog, bez kartice.'],
         ['Kako produžim pretplatu?', 'U aplikaciji (Nalog → Produži), na stranici svog naloga ili u Telegram botu. Dani se dodaju na trenutni datum isteka.']],
       z_h: 'Spreman za privatan internet?', z_p: 'Izaberi plan i spoji se za manje od minute.',
-      b_p: 'Na ovaj e-mail šaljemo tvoj pristupni link poslije plaćanja.', b_pp: 'Plati PayPalom ili karticom', b_card: 'Plati karticom (Stripe)', b_s: '🔒 Sigurno plaćanje. Podatke kartice ne vidimo.', b_wait: 'Otvaram plaćanje…', b_cc: 'Imaš kod za popust?', b_ca: 'Primijeni', b_cok: 'Kod prihvaćen', b_days: 'dana gratis',
+      b_p: 'Na ovaj e-mail šaljemo tvoj pristupni link poslije plaćanja.', b_pp: 'Plati PayPalom ili karticom', b_card: 'Plati karticom (Stripe)', b_cardpp: 'Plati karticom', b_s: '🔒 Sigurno plaćanje. Podatke kartice ne vidimo.', b_wait: 'Otvaram plaćanje…', b_cc: 'Imaš kod za popust?', b_ca: 'Primijeni', b_cok: 'Kod prihvaćen', b_days: 'dana gratis',
       support: 'Podrška: ',
       f_about: 'Brz i privatan VPN za telefon i računar. Bez logova, bez automatskog naplaćivanja.',
       f_c1: 'Proizvod', f_c2: 'Aplikacije', f_c3: 'Pomoć',
@@ -485,7 +485,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
         ['Can I try before buying?', 'Yes. In the Android and Windows app tap "Try free" to get a trial account, no card needed.'],
         ['How do I renew?', 'In the app (Account → Renew), on your account page or in the Telegram bot. Days are added to your current expiry date.']],
       z_h: 'Ready for private internet?', z_p: 'Pick a plan and connect in under a minute.',
-      b_p: 'We send your access link to this email after payment.', b_pp: 'Pay with PayPal or card', b_card: 'Pay by card (Stripe)', b_s: '🔒 Secure payment. We never see your card details.', b_wait: 'Opening payment…', b_cc: 'Have a discount code?', b_ca: 'Apply', b_cok: 'Code applied', b_days: 'free days',
+      b_p: 'We send your access link to this email after payment.', b_pp: 'Pay with PayPal or card', b_card: 'Pay by card (Stripe)', b_cardpp: 'Pay by card', b_s: '🔒 Secure payment. We never see your card details.', b_wait: 'Opening payment…', b_cc: 'Have a discount code?', b_ca: 'Apply', b_cok: 'Code applied', b_days: 'free days',
       support: 'Support: ',
       f_about: 'A fast, private VPN for phone and computer. No logs, no auto-renewal.',
       f_c1: 'Product', f_c2: 'Apps', f_c3: 'Help',
@@ -661,6 +661,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     const b = [];
     if (D.paypal) b.push(`<button class="btn red" value="paypal" data-m="paypal">${ico('pp')}${esc(L.b_pp)}</button>`);
     if (D.card) b.push(`<button class="btn ${D.paypal ? '' : 'red'}" value="card" data-m="card">${ico('card')}${esc(L.b_card)}</button>`);
+    else if (D.cardpp) b.push(`<button class="btn" value="card" data-m="card">${ico('card')}${esc(L.b_cardpp || L.b_card)}</button>`);
     document.getElementById('payBtns').innerHTML = b.join('');
   }
   document.getElementById('cpnShow').addEventListener('click', (e) => { e.target.hidden = true; document.getElementById('cpnRow').classList.add('on'); document.getElementById('cpnIn').focus(); });

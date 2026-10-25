@@ -55,7 +55,7 @@ function baseUrl() {
 const money = (n) => `${CUR[settings.get('currency')] || '€'}${Number(n || 0).toFixed(2)}`;
 
 /** Napravi narudžbu. kind: 'buy' | 'renew' (Telegram bot) | 'site' (web sajt). Vraća { id, url }. */
-async function createOrder({ chat, kind, plan, userId, tgName, email, price, couponId, discount }) {
+async function createOrder({ chat, kind, plan, userId, tgName, email, price, couponId, discount, card }) {
   const s = settings.load();
   if (!ready()) throw new Error('PayPal nije podešen.');
   const b = baseUrl();
@@ -73,7 +73,7 @@ async function createOrder({ chat, kind, plan, userId, tgName, email, price, cou
       amount: { currency_code: cur, value: amount },
     }],
     payment_source: { paypal: { experience_context: {
-      brand_name: String(s.brand || 'VPN').slice(0, 127), user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING', landing_page: 'NO_PREFERENCE',
+      brand_name: String(s.brand || 'VPN').slice(0, 127), user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING', landing_page: card ? 'GUEST_CHECKOUT' : 'NO_PREFERENCE',
       return_url: `${b}/paypal/return`, cancel_url: `${b}/paypal/cancel`,
     } } },
   }, { 'PayPal-Request-Id': `veltrix-bot-${oid}` });

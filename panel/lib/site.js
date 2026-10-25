@@ -65,7 +65,7 @@ function siteData(d) {
   }
   return {
     brand: s.brand || 'AdiLink VPN', currency: CUR[s.currency] || '€', support: s.support_contact || '',
-    buy: !!(s.stripe_on && s.stripe_secret) || require('./paypal').ready(), card: !!(s.stripe_on && s.stripe_secret), paypal: require('./paypal').ready(), plans,
+    buy: !!(s.stripe_on && s.stripe_secret) || require('./paypal').ready(), card: !!(s.stripe_on && s.stripe_secret), cardpp: require('./paypal').ready() && !(s.stripe_on && s.stripe_secret), paypal: require('./paypal').ready(), plans,
     countries: [...byCountry.values()].map((c) => ({ cc: c.cc, cities: [...c.cities], online: c.online })),
     servers: servers.length, protocols: { vless: !!s.proto_vless, ss: !!s.proto_ss, wg: !!s.proto_wg },
     blocks: { ads: !!s.block_ads, malware: !!s.block_malware },
@@ -104,7 +104,7 @@ async function buy(req, res) {
   try { k = coupons.apply(b.coupon, plan); } catch (e) { return send(res, 400, { error: e.message }); }
   if (usePaypal) {
     try {
-      const o = await pp.createOrder({ kind: 'site', plan, email, price: k.price, couponId: k.coupon?.id, discount: k.discount });
+      const o = await pp.createOrder({ kind: 'site', plan, email, price: k.price, couponId: k.coupon?.id, discount: k.discount, card: b.method === 'card' });
       if (!o.url) return send(res, 502, { error: 'PayPal nije vratio link za plaćanje.' });
       log('sajt', 'Kupovina započeta na sajtu (PayPal)', `${plan.name} · ${email}`);
       return send(res, 200, { url: o.url });
