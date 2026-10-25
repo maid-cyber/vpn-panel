@@ -100,7 +100,7 @@ const SCHEMA = [
     { key: 'inv_address', type: 'textarea', label: 'Adresa i porezni broj', def: '' },
     { key: 'inv_prefix', type: 'text', label: 'Prefiks broja fakture', def: 'F-', mono: true },
     { key: 'vat', type: 'select', label: 'PDV na fakturama', options: ['0', '17', '19', '20'], labels: ['Bez PDV-a', '17%', '19%', '20%'], def: '0' },
-    { key: 'mail_invoices', type: 'toggle', label: 'Šalji fakturu resellerima na e-mail', sub: 'Treba podešen e-mail (Obavještenja) i e-mail resellera u njegovom profilu', def: true },
+    { key: 'mail_invoices', type: 'toggle', label: 'Šalji fakturu na e-mail (kupcima i resellerima)', sub: 'Kupac dobije profesionalnu fakturu čim plati (sajt, bot, produženje); reseller pri dopuni kredita. Treba podešen e-mail (Obavještenja) i e-mail primaoca.', def: true },
   ] },
   { id: 'pravno', title: 'Pravno (privatnost i uslovi)', desc: 'Podaci koji se upisuju u politiku privatnosti i uslove korištenja na sajtu.', rows: [
     { key: 'legal_on', type: 'toggle', label: 'Prikaži Politiku privatnosti i Uslove korištenja', sub: 'Stranice /privatnost i /uslovi, plus linkovi u podnožju sajta', def: true },

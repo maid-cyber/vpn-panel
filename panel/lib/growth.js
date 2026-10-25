@@ -135,6 +135,8 @@ function paidRenew(ses) {
   const trx = one('SELECT id FROM transactions WHERE user_id = ? AND ext_id IS NULL ORDER BY id DESC LIMIT 1', uid);
   if (trx) run('UPDATE transactions SET ext_id = ? WHERE id = ?', ses.id, trx.id);
   require('./coupons').used(ses, uid);
+  // faktura kupcu na e-mail (ako ima e-mail i uključeno slanje faktura)
+  if (u.email) require('./invoice').sendForUser(uid, u.email).catch((e) => log('sistem', 'Faktura kupcu nije poslana', String(e.message || e), 'warn'));
   // preporuka: prva uplata pozvanog kupca → gratis dani obojici
   const s = settings.load();
   if (!u.paid_once) {

@@ -72,6 +72,7 @@ async function onRequest(req, res) {
     if (p.startsWith('/agent/') || p.startsWith('/install/')) return await nodes.handle(req, res, p);
     if (p.startsWith('/api/v1/')) return await apiv1.handle(req, res, p);
     if ((p === '/paypal/return' || p === '/paypal/cancel') && req.method === 'GET') return await require('./lib/paypal').handle(req, res, url);
+    if (p.startsWith('/faktura/') && req.method === 'GET') return require('./lib/invoice').handle(req, res, p);
     if (p === '/stripe/webhook' && req.method === 'POST') return await require('./lib/stripe').webhook(req, res);
     // provjera koda za popust (sajt i stranica kupca)
     if (p === '/coupon' && req.method === 'POST') return await require('./lib/coupons').check(req, res, (id) => one('SELECT id, name, price FROM plans WHERE id = ? AND active = 1 AND trial = 0 AND price > 0', id));

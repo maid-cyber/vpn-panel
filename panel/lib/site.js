@@ -148,6 +148,7 @@ function paidBuy(ses, siteBase) {
     const mail = require('./mail');
     if (mail.configured()) {
       require('./welcome').send(u.id, 'buy', email, b).catch((e) => log('sistem', 'E-mail kupcu nije poslan', String(e.message || e), 'warn'));
+      require('./invoice').sendForUser(u.id, email).catch((e) => log('sistem', 'Faktura kupcu nije poslana', String(e.message || e), 'warn'));
     }
   }
   log('sajt', 'Kupljeno na sajtu', `${u.username} · ${plan.name} · €${amount}`);

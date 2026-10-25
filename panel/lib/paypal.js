@@ -139,7 +139,10 @@ function fulfil(o, cap) {
   const done = one('SELECT * FROM bot_orders WHERE id = ?', o.id);
   log(o.kind === 'site' ? 'sajt' : 'sistem', { site: 'Kupljeno na sajtu (PayPal)', buy: 'Kupljeno preko bota (PayPal)', renew: 'Produženo preko bota (PayPal)', renew_web: 'Kupac produžio nalog (PayPal)' }[o.kind], `#${o.id} · ${money(o.amount)}`);
   if (o.kind === 'site') {
-    if (o.email && require('./mail').configured()) require('./welcome').send(userId, 'buy', o.email, baseUrl()).catch((e) => log('sistem', 'E-mail kupcu nije poslan', String(e.message || e), 'warn'));
+    if (o.email && require('./mail').configured()) {
+      require('./welcome').send(userId, 'buy', o.email, baseUrl()).catch((e) => log('sistem', 'E-mail kupcu nije poslan', String(e.message || e), 'warn'));
+      require('./invoice').sendForUser(userId, o.email).catch((e) => log('sistem', 'Faktura kupcu nije poslana', String(e.message || e), 'warn'));
+    }
   } else if (o.chat) require('./cbot').delivered(done).catch((e) => console.error('cbot delivered', e));
   return done;
 }
