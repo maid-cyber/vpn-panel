@@ -20,36 +20,36 @@ function build(u, kind, baseOverride = '') {
   const link = `${base}/s/${u.sub_token}`;
   const plan = u.plan_id ? one('SELECT name FROM plans WHERE id = ?', u.plan_id) : null;
   const tz = s.timezone || 'Europe/Sarajevo';
-  const until = new Date(u.expires_at).toLocaleDateString('bs-BA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: tz });
+  const until = new Date(u.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: tz });
   const apps = String(s.apps || '').split(',');
   const veltrix = apps.includes('veltrix') && !wl;
   // aplikacije se skidaju sa tvoje adrese (/download/…), ne sa GitHuba
   const dl = veltrix ? `${base}/download/android` : '';
   const dlWin = veltrix ? `${base}/download/windows` : '';
 
-  const head = { new: 'Tvoj VPN je spreman ✅', newlink: 'Tvoj novi pristupni link', buy: 'Hvala na kupovini! Tvoj VPN je spreman ✅' }[kind] || 'Tvoj VPN pristup';
+  const head = { new: 'Your VPN is ready ✅', newlink: 'Your new access link', buy: 'Thank you for your purchase! Your VPN is ready ✅' }[kind] || 'Your VPN access';
   const intro = kind === 'newlink'
-    ? 'Napravili smo ti novi pristupni link. Stari više ne radi, pa ovaj novi uvezi u aplikaciju.'
-    : 'Ispod je tvoj lični pristupni link. Ne dijeli ga ni sa kim: s njim se bilo ko može spojiti na tvoj nalog.';
-  const subject = { new: `${brand} · tvoj pristup`, newlink: `${brand} · novi pristupni link`, buy: `${brand} · tvoj pristup` }[kind] || `${brand} · pristup`;
-  const appLine = veltrix ? `${brand} za Android: ${dl}\n${brand} za Windows: ${dlWin}\nZa iPhone: Hiddify ili Streisand iz App Storea.` : 'Aplikacija: Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.';
+    ? 'We’ve created a new access link for you. The old one no longer works, so import this new one into the app.'
+    : 'Below is your personal access link. Don’t share it with anyone — whoever has it can connect to your account.';
+  const subject = { new: `${brand} · your access`, newlink: `${brand} · new access link`, buy: `${brand} · your access` }[kind] || `${brand} · access`;
+  const appLine = veltrix ? `${brand} for Android: ${dl}\n${brand} for Windows: ${dlWin}\nFor iPhone: Hiddify or Streisand from the App Store.` : 'App: Hiddify (iPhone, Android, desktop), free on the App Store and Google Play.';
 
   const text = `${head}
 
 ${intro}
 
-Korisnik: ${u.username}
+Username: ${u.username}
 Plan: ${plan?.name || '—'}
-Vrijedi do: ${until}
+Valid until: ${until}
 
-Tvoj pristupni link:
+Your access link:
 ${link}
 
-Kako se spojiti:
-1. Instaliraj aplikaciju. ${appLine}
-2. Otvori link iznad na telefonu ili računaru: tamo su QR kod i dugme koje sve podesi samo.
-3. U aplikaciji klikni Spoji se.
-${support ? `\nPomoć: ${support}` : ''}
+How to connect:
+1. Install the app. ${appLine}
+2. Open the link above on your phone or computer: it has a QR code and a button that sets everything up automatically.
+3. In the app, tap Connect.
+${support ? `\nHelp: ${support}` : ''}
 ${brand}`;
 
   // izgled kao aplikacija i panel: tamna pozadina, akcenat brenda, štit logo, ime sa zadnjim slovom u boji.
@@ -92,22 +92,22 @@ a { color:inherit; }
   <tr><td class="px" style="padding:32px 30px 8px">
     ${t(`<div class="h1" style="${F};font-weight:800;font-size:24px;line-height:1.3;color:${TXT};margin:0 0 10px">${esc(head)}</div><div style="${F};font-size:15px;line-height:1.6;color:${SOFT};margin:0 0 24px">${esc(intro)}</div>`)}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${bg(CARD2)};border:1px solid ${LINE};border-radius:14px;margin-bottom:26px"><tr>
-      ${stat('Plan', esc(plan?.name || '—'))}${stat('Vrijedi do', esc(until.replace(/\s\d{4}\.?$/, '')))}${stat('Uređaja', devices || '—')}
-    </tr><tr><td colspan="3" style="border-top:1px solid ${LINE};padding:11px 14px;text-align:center;${F};font-size:13px">${t(`<span style="color:${MUTED}">Korisnik</span>&nbsp; <b style="color:${TXT}">${esc(u.username)}</b>`)}</td></tr></table>
-    <div style="text-align:center;margin:0 0 12px">${btn(link + '?open=1', 'Otvori u aplikaciji i spoji se', true)}</div>
-    ${t(`<div style="text-align:center;${F};font-size:12px;line-height:1.5;color:${MUTED};margin:0 0 22px">Na telefonu: dugme otvori aplikaciju i sve podesi samo.</div>`)}
+      ${stat('Plan', esc(plan?.name || '—'))}${stat('Valid until', esc(until.replace(/\s\d{4}\.?$/, '')))}${stat('Devices', devices || '—')}
+    </tr><tr><td colspan="3" style="border-top:1px solid ${LINE};padding:11px 14px;text-align:center;${F};font-size:13px">${t(`<span style="color:${MUTED}">Username</span>&nbsp; <b style="color:${TXT}">${esc(u.username)}</b>`)}</td></tr></table>
+    <div style="text-align:center;margin:0 0 12px">${btn(link + '?open=1', 'Open in the app & connect', true)}</div>
+    ${t(`<div style="text-align:center;${F};font-size:12px;line-height:1.5;color:${MUTED};margin:0 0 22px">On your phone: this button opens the app and sets everything up.</div>`)}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="${bg(CARD2)};border:1px solid ${LINE};border-radius:14px;margin:0 0 26px"><tr>
-      <td width="132" style="padding:14px"><img src="${esc(link)}/qr.png" width="116" height="116" alt="QR kod" style="display:block;border:0;border-radius:8px;width:116px;height:116px"></td>
-      <td style="padding:14px 16px 14px 4px;${F};font-size:14px;line-height:1.5;vertical-align:middle">${t(`<b style="color:${TXT}">Čitaš ovo na računaru?</b><br><span style="color:${SOFT}">Otvori aplikaciju na telefonu, klikni <b style="color:${TXT}">Skeniraj QR kod</b> i usmjeri kameru na ovaj kod.</span>`)}</td>
+      <td width="132" style="padding:14px"><img src="${esc(link)}/qr.png" width="116" height="116" alt="QR code" style="display:block;border:0;border-radius:8px;width:116px;height:116px"></td>
+      <td style="padding:14px 16px 14px 4px;${F};font-size:14px;line-height:1.5;vertical-align:middle">${t(`<b style="color:${TXT}">Reading this on a computer?</b><br><span style="color:${SOFT}">Open the app on your phone, tap <b style="color:${TXT}">Scan QR code</b> and point the camera at this code.</span>`)}</td>
     </tr></table>
     <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 26px"><tr>
-      ${badge('🔒 Bez logova')}${s.proto_vless ? badge('⚡ VLESS Reality') : ''}${countries ? badge(`🌍 ${countries} ${countries === 1 ? 'zemlja' : countries < 5 ? 'zemlje' : 'zemalja'}`) : ''}
+      ${badge('🔒 No logs')}${s.proto_vless ? badge('⚡ VLESS Reality') : ''}${countries ? badge(`🌍 ${countries} ${countries === 1 ? 'country' : 'countries'}`) : ''}
     </tr></table>
-    ${t(`<div style="${F};font-weight:700;font-size:15px;color:${TXT};margin:0 0 16px">Kako se spojiti</div>`)}
+    ${t(`<div style="${F};font-weight:700;font-size:15px;color:${TXT};margin:0 0 16px">How to connect</div>`)}
     <table role="presentation" cellpadding="0" cellspacing="0">
-      ${step(1, 'Instaliraj aplikaciju', veltrix ? `${esc(brand)} za Android ili Windows (dugmad ispod). Za iPhone: Hiddify iz App Storea.` : 'Hiddify (iPhone, Android, računar), besplatna u App Storeu i Google Playu.')}
-      ${step(2, 'Klikni crveno dugme iznad', 'Otvori se aplikacija i sama uveze tvoj nalog. Na računaru možeš skenirati QR kod telefonom.')}
-      ${step(3, 'Dozvoli VPN i spoji se', 'Telefon jednom pita za dozvolu za VPN: klikni OK. Lokaciju mijenjaš kad hoćeš.')}
+      ${step(1, 'Install the app', veltrix ? `${esc(brand)} for Android or Windows (buttons below). For iPhone: Hiddify from the App Store.` : 'Hiddify (iPhone, Android, desktop), free on the App Store and Google Play.')}
+      ${step(2, 'Tap the red button above', 'The app opens and imports your account automatically. On a computer, scan the QR code with your phone.')}
+      ${step(3, 'Allow VPN & connect', 'Your phone asks for VPN permission once — tap OK. Change location whenever you like.')}
     </table>
     ${veltrix ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 22px"><tr>
       <td width="50%" style="padding-right:6px">${btn(dl, '🤖 Android', false).replace('display:inline-block', 'display:block;text-align:center')}</td>
@@ -116,13 +116,13 @@ a { color:inherit; }
   </td></tr>
   <tr><td class="px" style="padding:20px 30px 24px;border-top:1px solid ${LINE}">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="${F};font-size:13px;line-height:1.6;vertical-align:middle">${t(`<span style="color:${TXT};font-weight:700">Treba ti pomoć?</span><br><span style="color:${MUTED}">${support ? esc(support) : 'Odgovori na ovaj e-mail.'}</span>`)}</td>
-      ${supportUrl ? `<td align="right" style="vertical-align:middle">${btn(supportUrl, tg ? 'Piši na Telegram' : 'Kontakt', false)}</td>` : ''}
+      <td style="${F};font-size:13px;line-height:1.6;vertical-align:middle">${t(`<span style="color:${TXT};font-weight:700">Need help?</span><br><span style="color:${MUTED}">${support ? esc(support) : 'Reply to this email.'}</span>`)}</td>
+      ${supportUrl ? `<td align="right" style="vertical-align:middle">${btn(supportUrl, tg ? 'Message on Telegram' : 'Contact', false)}</td>` : ''}
     </tr></table>
   </td></tr>
   </table>
 </td></tr>
-<tr><td align="center" style="padding:20px 10px 0;${F};font-size:12px;line-height:1.6">${t(`<span style="color:#6c6c7a">🔒 Ne dijeli ovaj link: on je tvoj lični ključ.<br>© ${new Date().getFullYear()} ${esc(brand)}</span>`)}</td></tr>
+<tr><td align="center" style="padding:20px 10px 0;${F};font-size:12px;line-height:1.6">${t(`<span style="color:#6c6c7a">🔒 Don’t share this link — it’s your personal key.<br>© ${new Date().getFullYear()} ${esc(brand)}</span>`)}</td></tr>
 </table>
 </td></tr></table></body></html>`;
   return { subject, text, html };
