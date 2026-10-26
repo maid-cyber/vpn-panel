@@ -444,6 +444,13 @@
   ];
   const LAND_D = LAND.map((poly) => poly.map(([lo, la], i) => (i ? 'L' : 'M') + P(lo, la).map((v) => v.toFixed(1)).join(' ')).join('') + 'Z').join('');
   const mapColor = (s) => s.status === 'online' ? (s.warn ? '#f5a524' : '#3ddc84') : s.status === 'offline' ? '#ff4d5e' : '#8b8b98';
+  const regionOf = (lat, lon) => lat == null || lon == null ? 'all'
+    : lon >= -12 && lon <= 42 && lat >= 34 && lat <= 73 ? 'EU'
+    : lon >= 110 && lat <= 0 ? 'OCE'
+    : lon >= 25 && lon <= 180 && lat <= 38 && lat >= -35 ? (lon <= 52 && lat <= 35 && lat >= -35 && lon >= -20 ? 'AF' : 'ASIA')
+    : lon >= 40 ? 'ASIA'
+    : lat < 12 && lon < -30 ? 'SA'
+    : lon < -30 ? 'NA' : 'AF';
   function markers(servers) {
     // više servera u istom gradu = jedna tačka i jedna oznaka ("Falkenstein ×2")
     const groups = new Map();
@@ -454,7 +461,8 @@
     const rank = (s) => s.status === 'offline' ? 3 : s.warn ? 2 : s.status === 'online' ? 1 : 0;
     return [...groups.values()].map((g) => {
       const s = g.reduce((a, b) => (rank(b) > rank(a) ? b : a)), c = mapColor(s), [x, y] = P(s.lon, s.lat);
-      return `<div class="mk" style="left:${(x / 7.2).toFixed(2)}%;top:${(y / 3.6).toFixed(2)}%" title="${esc(g.map((v) => v.name).join(', '))}"><b style="background:${c}"></b><i style="background:${c};box-shadow:0 0 10px ${c}"></i><span>${esc(s.city || s.name)}${g.length > 1 ? ` ×${g.length}` : ''}</span></div>`;
+      const st = s.status === 'disabled' ? 'off' : s.warn ? 'warn' : s.status;
+      return `<div class="mk mk-${st}" data-sid="${s.id}" data-st="${st}" data-reg="${regionOf(s.lat, s.lon)}" style="left:${(x / 7.2).toFixed(2)}%;top:${(y / 3.6).toFixed(2)}%;--mkc:${c}" title="${esc(g.map((v) => v.name).join(', '))}"><b style="background:${c}"></b><i style="background:${c};box-shadow:0 0 10px ${c}"></i><span>${esc(s.city || s.name)}${g.length > 1 ? ` ×${g.length}` : ''}</span></div>`;
     }).join('');
   }
   // spajanja uživo: luk od približne lokacije kupca do servera, sa svjetlom koje putuje po luku
@@ -478,7 +486,7 @@
     <defs><pattern id="dg" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.25" fill="var(--map-dot)"/></pattern></defs>
     <path d="${LAND_D}" fill="url(#dg)"/></svg><svg class="flows" id="mapFlows" viewBox="0 0 720 360" preserveAspectRatio="none">${flowsSvg(flows, servers)}</svg><div id="mapMk">${markers(servers)}</div></div>`;
   function updateMap(servers, flows) {
-    const m = $('#mapMk'); if (m) { m.innerHTML = markers(servers); placeLabels(); }
+    const m = $('#mapMk'); if (m) { m.innerHTML = markers(servers); placeLabels(); if (S.nocApply) S.nocApply(); }
     const f = $('#mapFlows'); if (f && flows) { f.innerHTML = flowsSvg(flows, servers); const n = $('#flowN'); if (n) n.textContent = flowCount(flows); }
   }
   // oznake gradova koji su blizu (npr. Falkenstein i Helsinki) ne smiju se preklapati:
@@ -1191,26 +1199,146 @@
     return servers.filter((s) => s.status !== 'disabled').map((s) => `<a class="lsrv" href="#/server/${s.id}"><span class="ccb sm">${s.country ? flag(s.country) : ic('server')}</span>
       <span class="lsrv-t"><b>${esc(s.city || s.name)}</b><small class="s-${s.warn ? 'warn' : s.status}">● ${s.status === 'online' ? `${s.online ?? 0} spojeno · CPU ${Math.round(s.cpu || 0)}%` : esc(SRV[s.status] || s.status)}</small></span></a>`).join('');
   }
+  // ---------------- NOC (Network Operations Center) na stranici Uživo ----------------
+  function nocBar(servers, stats) {
+    const S2 = servers.filter((s) => s.status !== 'disabled');
+    const online = S2.filter((s) => s.status === 'online' && !s.warn).length;
+    const warn = S2.filter((s) => s.status === 'online' && s.warn).length;
+    const off = S2.filter((s) => s.status === 'offline').length;
+    const users = stats ? stats.online : S2.reduce((a, s) => a + (s.online || 0), 0);
+    const mbps = S2.reduce((a, s) => a + (s.net || 0), 0);
+    const health = S2.length ? Math.round((online + warn) * 100 / S2.length) : 0;
+    const k = (label, val, cls, sub) => `<div class="noc-k ${cls || ''}"><small>${label}</small><b>${val}</b>${sub ? `<u>${sub}</u>` : ''}</div>`;
+    return k('Serveri', S2.length, '', `${S2.length} lokacija`)
+      + k('Online', online, 'ok', 'zdravo')
+      + k('Degraded', warn, warn ? 'warn' : 'dim', 'opterećeno')
+      + k('Offline', off, off ? 'bad' : 'dim', off ? 'provjeri' : 'nema')
+      + k('Korisnici', users, 'cyan', 'spojeno sada')
+      + k('Protok', `${mbps.toFixed(0)} <span>Mbps</span>`, 'cyan', 'trenutno')
+      + k('Promet danas', stats ? bytes(stats.trafficToday) : 'N/A', '', 'ukupno')
+      + k('Mreža', `${health}%`, health >= 90 ? 'ok' : health >= 60 ? 'warn' : 'bad', 'dostupnost')
+      + k('Latencija', 'N/A', 'dim', 'uskoro');
+  }
+  const REGIONS = { all: 'Sve regije', EU: 'Evropa', NA: 'Sjeverna Amerika', SA: 'Južna Amerika', ASIA: 'Azija', AF: 'Afrika', OCE: 'Okeanija' };
+  function nocControls() {
+    const seg = ['all', 'online', 'warn', 'offline'].map((v, i) => `<button class="${i === 0 ? 'on' : ''}" data-st="${v}">${({ all: 'Svi', online: 'Online', warn: 'Degraded', offline: 'Offline' })[v]}</button>`).join('');
+    const tg = (kk, label, on) => `<button class="noc-t${on ? ' on' : ''}" data-noc="${kk}">${label}</button>`;
+    return `<div class="noc-ctl">
+      <div class="noc-seg" data-nocfilter>${seg}</div>
+      <select class="noc-reg" data-nocreg>${Object.entries(REGIONS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
+      <div class="noc-tgs">${tg('lines', 'Linije', true)}${tg('particles', 'Čestice', true)}${tg('labels', 'Oznake', true)}${tg('detail', 'Detaljno', false)}</div>
+    </div>`;
+  }
+  const stOf = (s) => s.status === 'disabled' ? 'off' : s.warn ? 'warn' : s.status;
+  const stLabel = (s) => s.status === 'online' ? (s.warn ? 'Degraded' : 'Online') : (SRV[s.status] || s.status);
+  function nocTipHtml(s) {
+    const dot = { online: 'ok', warn: 'warn', offline: 'bad' }[stOf(s)] || 'dim';
+    const on = s.status === 'online';
+    const row = (l, v) => `<div><span>${l}</span><b>${v}</b></div>`;
+    return `<div class="nt-h"><span class="ccb sm">${s.country ? flag(s.country) : ic('server')}</span><div><b>${esc(s.name)}</b><small>${esc([s.city, ccName(s.country)].filter(Boolean).join(', '))}</small></div><i class="nt-dot ${dot}"></i></div>
+      <div class="nt-g">${row('Status', stLabel(s))}${row('Korisnici', on ? (s.online ?? 0) : '—')}${row('CPU', on ? Math.round(s.cpu || 0) + '%' : '—')}${row('RAM', on ? Math.round(s.ram || 0) + '%' : '—')}${row('Protok', on ? (s.net || 0).toFixed(1) + ' Mbps' : '—')}${row('Latencija', 'N/A')}</div>`;
+  }
+  function nocSpark(series) {
+    if (!series || !series.length) return '<div class="muted" style="font-size:12px;padding:16px 0;text-align:center">Nema istorije.</div>';
+    const key = ['cpu', 'net', 'online'].find((kk) => series.some((p) => p[kk] != null)) || 'cpu';
+    const vals = series.map((p) => +p[key] || 0), max = Math.max(1, ...vals), W = 300, H = 66;
+    const pts = vals.map((v, i) => `${(i / (vals.length - 1 || 1) * W).toFixed(1)},${(H - v / max * (H - 8) - 4).toFixed(1)}`).join(' ');
+    return `<div class="np-sparkh"><small>${key.toUpperCase()} · 7 dana</small><b>max ${max.toFixed(0)}${key === 'cpu' ? '%' : ''}</b></div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="np-spark"><polygon class="np-fill" points="0,${H} ${pts} ${W},${H}"/><polyline points="${pts}" fill="none"/></svg>`;
+  }
+  function applyNocFilter() {
+    const card = $('#nocCard'); if (!card) return;
+    const f = S.nocF || { status: 'all', region: 'all' };
+    card.querySelectorAll('.mk').forEach((m) => {
+      const okS = f.status === 'all' || m.dataset.st === f.status;
+      const okR = f.region === 'all' || m.dataset.reg === f.region;
+      m.classList.toggle('mk-hid', !(okS && okR));
+    });
+  }
+  function closeNocPanel() {
+    const p = $('#nocPanel'), o = $('#nocOv');
+    if (p) { p.classList.remove('on'); setTimeout(() => { p.hidden = true; }, 280); }
+    if (o) { o.classList.remove('on'); setTimeout(() => { o.hidden = true; }, 280); }
+  }
+  async function nocCmd(id, cmd, label, danger) {
+    if (danger && !confirm(`${label}? Ovo privremeno prekida rad servera.`)) return;
+    try { await POST(`servers/${id}/cmd`, { cmd }); toast(`Komanda poslana: ${label}`); } catch (e) { fail(e); }
+  }
+  async function openNocPanel(id) {
+    const s = S.servers.find((x) => x.id === id); if (!s) return;
+    const panel = $('#nocPanel'), ov = $('#nocOv'), on = s.status === 'online';
+    const dot = { online: 'ok', warn: 'warn', offline: 'bad' }[stOf(s)] || 'dim';
+    const m = (l, v, idm) => `<div class="np-m"${idm ? ` id="${idm}"` : ''}><small>${l}</small><b>${v}</b></div>`;
+    panel.innerHTML = `<div class="np-top"><div class="np-h"><span class="ccb">${s.country ? flag(s.country) : ic('server')}</span><div><b>${esc(s.name)}</b><small>${esc([s.city, ccName(s.country)].filter(Boolean).join(', '))}</small></div></div><button class="iconbtn" data-npclose aria-label="Zatvori">✕</button></div>
+      <div class="np-st s-${stOf(s)}"><i class="nt-dot ${dot}"></i> ${on ? (s.warn ? 'Degraded · opterećen' : 'Online · zdravo') : stLabel(s)}</div>
+      <div class="np-grid">${m('Korisnici', on ? (s.online ?? 0) : '—')}${m('CPU', on ? Math.round(s.cpu || 0) + '%' : '—')}${m('RAM', on ? Math.round(s.ram || 0) + '%' : '—')}${m('Protok', on ? (s.net || 0).toFixed(1) + ' Mbps' : '—')}${m('Uptime', '—', 'npUp')}${m('Latencija', 'N/A')}</div>
+      <div class="np-chart" id="npChart"><div class="muted" style="font-size:12px;padding:20px 0;text-align:center">Učitavam istoriju…</div></div>
+      <div class="np-act"><button class="btn sm" data-npcmd="speedtest">Speedtest</button><button class="btn sm" data-npcmd="restart_vpn">Restart VPN</button><button class="btn sm danger" data-npcmd="reboot">Reboot</button><a class="btn sm ghost" href="#/server/${id}" data-npclose>Detalji & konfiguracija</a></div>
+      <div class="np-note">Latencija/ping se ne mjeri (N/A) dok se ne doda u agenta. „Speedtest" testira brzinu servera.</div>`;
+    panel.hidden = false; ov.hidden = false;
+    requestAnimationFrame(() => { panel.classList.add('on'); ov.classList.add('on'); });
+    panel.querySelectorAll('[data-npclose]').forEach((b) => b.addEventListener('click', closeNocPanel));
+    panel.querySelectorAll('[data-npcmd]').forEach((b) => b.addEventListener('click', () => nocCmd(id, b.dataset.npcmd, b.textContent.trim(), b.dataset.npcmd === 'reboot')));
+    ov.onclick = closeNocPanel;
+    try {
+      const det = await GET(`servers/${id}`);
+      const up = $('#npUp b'); if (up && det.uptime != null) up.textContent = det.uptime.toFixed(1) + '%';
+      const ch = $('#npChart'); if (ch) ch.innerHTML = nocSpark(det.series);
+    } catch (e) { const ch = $('#npChart'); if (ch) ch.innerHTML = '<div class="muted" style="font-size:12px;padding:16px 0;text-align:center">Istorija nedostupna.</div>'; }
+  }
+  function nocWire() {
+    S.nocF = { status: 'all', region: 'all' };
+    S.nocApply = applyNocFilter;
+    const card = $('#nocCard'); if (!card) return;
+    const map = card.querySelector('.map'), tip = $('#nocTip');
+    map.addEventListener('mousemove', (e) => {
+      const mk = e.target.closest('.mk');
+      if (!mk) { tip.hidden = true; tip.dataset.sid = ''; return; }
+      if (tip.dataset.sid !== mk.dataset.sid) { tip.dataset.sid = mk.dataset.sid; const s = S.servers.find((x) => x.id === Number(mk.dataset.sid)); if (s) { tip.innerHTML = nocTipHtml(s); tip.hidden = false; } }
+      tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 240) + 'px';
+      tip.style.top = Math.min(e.clientY + 14, window.innerHeight - 30) + 'px';
+    });
+    map.addEventListener('mouseleave', () => { tip.hidden = true; tip.dataset.sid = ''; });
+    map.addEventListener('click', (e) => { const mk = e.target.closest('.mk'); if (mk) openNocPanel(Number(mk.dataset.sid)); });
+    card.querySelector('[data-nocfilter]').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; card.querySelectorAll('[data-nocfilter] button').forEach((x) => x.classList.toggle('on', x === b)); S.nocF.status = b.dataset.st; applyNocFilter(); });
+    card.querySelector('[data-nocreg]').addEventListener('change', (e) => { S.nocF.region = e.target.value; applyNocFilter(); });
+    card.querySelectorAll('[data-noc]').forEach((b) => b.addEventListener('click', () => {
+      b.classList.toggle('on'); const kk = b.dataset.noc, on = b.classList.contains('on');
+      if (kk === 'lines') card.classList.toggle('hide-lines', !on);
+      if (kk === 'particles') card.classList.toggle('hide-particles', !on);
+      if (kk === 'labels') card.classList.toggle('hide-labels', !on);
+      if (kk === 'detail') card.classList.toggle('detailed', on);
+    }));
+    applyNocFilter();
+  }
+
   async function pageLive() {
     const [d, f] = await Promise.all([GET('dash?days=7'), GET('live/feed')]);
-    S.servers = d.servers; S.feedLast = f.events[0]?.id || 0;
-    $('#view').innerHTML = `${top('Uživo', `<span class="livebadge"><i></i>UŽIVO</span> Sve što se dešava na mreži, u stvarnom vremenu`)}
-      <section class="lstats" id="lStats">${liveStats(f.stats)}</section>
-      <div class="livegrid">
-        <section class="card p livemap"><div class="ch"><h2>${ic('globe')}Mreža</h2><span class="dim" style="font-size:12.5px"><span class="flowleg"><i></i>Linije: <b id="flowN">${flowCount(d.flows)}</b></span> · <span id="liveTime">osvježeno ${fmtTime(Date.now())}</span></span></div>
-          ${mapHtml(d.servers, d.flows)}
-          <div class="lsrvs" id="lSrvs">${liveServers(d.servers)}</div></section>
+    S.servers = d.servers; S.feedLast = f.events[0]?.id || 0; S.nocStats = f.stats;
+    $('#view').innerHTML = `${top('Mreža', `<span class="livebadge"><i></i>UŽIVO</span> Globalni nadzor infrastrukture u stvarnom vremenu`)}
+      <section class="noc-bar" id="nocBar">${nocBar(d.servers, f.stats)}</section>
+      <div class="noc-grid">
+        <section class="card p noc" id="nocCard">
+          ${nocControls()}
+          <div class="noc-map">${mapHtml(d.servers, d.flows)}</div>
+          <div class="noc-foot"><span class="flowleg"><i></i>Linije uživo: <b id="flowN">${flowCount(d.flows)}</b></span> · <span id="liveTime">osvježeno ${fmtTime(Date.now())}</span> · <span class="dim">klikni server za detalje</span></div>
+        </section>
         <section class="card p feed"><div class="ch"><h2>${ic('act')}Događaji</h2><span class="pill">uživo</span></div>
           <div class="feed-l" id="feedL">${f.events.map((a) => feedItem(a)).join('') || '<div class="muted" style="font-size:13px">Još nema događaja danas.</div>'}</div></section>
-      </div>`;
+      </div>
+      <div class="noc-tip" id="nocTip" hidden></div>
+      <div class="noc-ov" id="nocOv" hidden></div>
+      <aside class="noc-panel" id="nocPanel" hidden></aside>`;
     placeLabels();
-    S.liveHook = (x) => { const el = $('#lSrvs'); if (el) el.innerHTML = liveServers(x.servers); };
+    nocWire();
+    S.liveHook = (x) => { const bar = $('#nocBar'); if (bar) bar.innerHTML = nocBar(x.servers, S.nocStats); };
     startLive();
     clearInterval(S.feedPoll);
     S.feedPoll = setInterval(async () => {
-      if (location.hash !== '#/uzivo') { clearInterval(S.feedPoll); S.liveHook = null; return; }
+      if (location.hash !== '#/uzivo') { clearInterval(S.feedPoll); S.liveHook = null; S.nocApply = null; return; }
       const x = await GET(`live/feed?after=${S.feedLast}`).catch(() => null); if (!x) return;
-      const st = $('#lStats'); if (st) st.innerHTML = liveStats(x.stats);
+      S.nocStats = x.stats;
+      const bar = $('#nocBar'); if (bar) bar.innerHTML = nocBar(S.servers, x.stats);
       if (x.events.length) {
         S.feedLast = x.events[0].id;
         const l = $('#feedL'); if (!l) return;
