@@ -482,12 +482,29 @@
     }).join('');
   }
   const flowCount = (flows) => (flows || []).reduce((a, f) => a + f.n, 0);
-  const mapHtml = (servers, flows) => `<div class="map" id="map"><svg viewBox="0 0 720 360" preserveAspectRatio="none" aria-hidden="true">
+  // backbone: svjetleći lukovi koji povezuju online servere (vizuelna topologija mreže)
+  function netArcs(servers) {
+    const pts = servers.filter((s) => s.lat != null && s.lon != null && s.status === 'online').map((s) => ({ id: s.id, p: P(s.lon, s.lat) }));
+    if (pts.length < 2) return '';
+    const seen = new Set(), arcs = [];
+    pts.forEach((a, i) => {
+      pts.map((b, j) => ({ b, d: j === i ? 1e9 : Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]) })).sort((x, y) => x.d - y.d).slice(0, 2)
+        .forEach(({ b }) => { const key = [a.id, b.id].sort((x, y) => x - y).join('-'); if (!seen.has(key)) { seen.add(key); arcs.push([a.p, b.p]); } });
+    });
+    return arcs.slice(0, 28).map(([p1, p2], i) => {
+      const [x1, y1] = p1, [x2, y2] = p2, d = Math.hypot(x2 - x1, y2 - y1);
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - Math.min(80, d * 0.3);
+      const path = `M${x1.toFixed(1)} ${y1.toFixed(1)}Q${mx.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+      const dur = (3 + d / 120).toFixed(2), delay = ((i * 0.31) % 3).toFixed(2);
+      return `<path class="narc" d="${path}"/><path class="nbeam" d="${path}" pathLength="100" style="animation-duration:${dur}s;animation-delay:-${delay}s"/>`;
+    }).join('');
+  }
+  const mapHtml = (servers, flows, noc) => `<div class="map" id="map"><svg viewBox="0 0 720 360" preserveAspectRatio="none" aria-hidden="true">
     <defs><pattern id="dg" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.25" fill="var(--map-dot)"/></pattern></defs>
-    <path d="${LAND_D}" fill="url(#dg)"/></svg><svg class="flows" id="mapFlows" viewBox="0 0 720 360" preserveAspectRatio="none">${flowsSvg(flows, servers)}</svg><div id="mapMk">${markers(servers)}</div></div>`;
+    <path d="${LAND_D}" fill="url(#dg)"/></svg><svg class="flows" id="mapFlows" viewBox="0 0 720 360" preserveAspectRatio="none">${noc ? netArcs(servers) : ''}${flowsSvg(flows, servers)}</svg><div id="mapMk">${markers(servers)}</div></div>`;
   function updateMap(servers, flows) {
     const m = $('#mapMk'); if (m) { m.innerHTML = markers(servers); placeLabels(); if (S.nocApply) S.nocApply(); }
-    const f = $('#mapFlows'); if (f && flows) { f.innerHTML = flowsSvg(flows, servers); const n = $('#flowN'); if (n) n.textContent = flowCount(flows); }
+    const f = $('#mapFlows'); if (f && flows) { const noc = !!document.getElementById('nocCard'); f.innerHTML = (noc ? netArcs(servers) : '') + flowsSvg(flows, servers); const n = $('#flowN'); if (n) n.textContent = flowCount(flows); }
   }
   // oznake gradova koji su blizu (npr. Falkenstein i Helsinki) ne smiju se preklapati:
   // svaka oznaka uzme prvo slobodno mjesto oko svoje tačke
@@ -1202,22 +1219,25 @@
   // ---------------- NOC (Network Operations Center) na stranici Uživo ----------------
   function nocBar(servers, stats) {
     const S2 = servers.filter((s) => s.status !== 'disabled');
-    const online = S2.filter((s) => s.status === 'online' && !s.warn).length;
+    const online = S2.filter((s) => s.status === 'online').length;
     const warn = S2.filter((s) => s.status === 'online' && s.warn).length;
     const off = S2.filter((s) => s.status === 'offline').length;
     const users = stats ? stats.online : S2.reduce((a, s) => a + (s.online || 0), 0);
     const mbps = S2.reduce((a, s) => a + (s.net || 0), 0);
-    const health = S2.length ? Math.round((online + warn) * 100 / S2.length) : 0;
-    const k = (label, val, cls, sub) => `<div class="noc-k ${cls || ''}"><small>${label}</small><b>${val}</b>${sub ? `<u>${sub}</u>` : ''}</div>`;
-    return k('Serveri', S2.length, '', `${S2.length} lokacija`)
-      + k('Online', online, 'ok', 'zdravo')
-      + k('Degraded', warn, warn ? 'warn' : 'dim', 'opterećeno')
-      + k('Offline', off, off ? 'bad' : 'dim', off ? 'provjeri' : 'nema')
-      + k('Korisnici', users, 'cyan', 'spojeno sada')
-      + k('Protok', `${mbps.toFixed(0)} <span>Mbps</span>`, 'cyan', 'trenutno')
-      + k('Promet danas', stats ? bytes(stats.trafficToday) : 'N/A', '', 'ukupno')
-      + k('Mreža', `${health}%`, health >= 90 ? 'ok' : health >= 60 ? 'warn' : 'bad', 'dostupnost')
-      + k('Latencija', 'N/A', 'dim', 'uskoro');
+    const it = (led, val, label) => `<span class="ntl-i"><i class="nt-led ${led}"></i><b>${val}</b> ${label}</span>`;
+    return `<div class="ntl-l">
+        <span class="ntl-brand"><i class="nt-led ok live"></i>LIVE NETWORK</span>
+        <span class="ntl-sep"></span>
+        ${it('glob', S2.length, 'LOKACIJA')}
+        ${it('ok', online, 'ONLINE')}
+        ${warn ? it('warn', warn, 'DEGRADED') : ''}
+        ${it('bad', off, 'OFFLINE')}
+        ${it('cyan', users, 'KORISNICI')}
+        ${it('cyan', mbps.toFixed(0), 'Mbps')}
+      </div>
+      <div class="ntl-leg">
+        <span><i class="nt-led ok"></i>Online</span><span><i class="nt-led warn"></i>Degraded</span><span><i class="nt-led bad"></i>Offline</span><span class="ntl-na">Latencija N/A</span>
+      </div>`;
   }
   const REGIONS = { all: 'Sve regije', EU: 'Evropa', NA: 'Sjeverna Amerika', SA: 'Južna Amerika', ASIA: 'Azija', AF: 'Afrika', OCE: 'Okeanija' };
   function nocControls() {
@@ -1316,11 +1336,11 @@
     const [d, f] = await Promise.all([GET('dash?days=7'), GET('live/feed')]);
     S.servers = d.servers; S.feedLast = f.events[0]?.id || 0; S.nocStats = f.stats;
     $('#view').innerHTML = `${top('Mreža', `<span class="livebadge"><i></i>UŽIVO</span> Globalni nadzor infrastrukture u stvarnom vremenu`)}
-      <section class="noc-bar" id="nocBar">${nocBar(d.servers, f.stats)}</section>
       <div class="noc-grid">
         <section class="card p noc" id="nocCard">
+          <div class="noc-topline" id="nocBar">${nocBar(d.servers, f.stats)}</div>
           ${nocControls()}
-          <div class="noc-map">${mapHtml(d.servers, d.flows)}</div>
+          <div class="noc-map">${mapHtml(d.servers, d.flows, true)}</div>
           <div class="noc-foot"><span class="flowleg"><i></i>Linije uživo: <b id="flowN">${flowCount(d.flows)}</b></span> · <span id="liveTime">osvježeno ${fmtTime(Date.now())}</span> · <span class="dim">klikni server za detalje</span></div>
         </section>
         <section class="card p feed"><div class="ch"><h2>${ic('act')}Događaji</h2><span class="pill">uživo</span></div>
