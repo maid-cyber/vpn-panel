@@ -503,7 +503,8 @@
         if (score === 0) break;
       }
       m.className = 'mk' + (best.s ? ' ' + best.s.split(' ').map((c) => 'mk-' + c).join(' ') : '');
-      placed.push(best.r);
+      if (bestScore >= 1000) m.classList.add('mk-q');   // oznaka bi pala preko druge → sakrij je (vidi se na hover)
+      else placed.push(best.r);
     }
   }
 

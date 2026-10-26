@@ -1,6 +1,6 @@
 {
   "name": "vpn-panel",
-  "version": "3.7.0",
+  "version": "3.7.1",
   "private": true,
   "description": "Admin i reseller panel za VPN biznis (Xray VLESS Reality + WireGuard)",
   "main": "server.js",
