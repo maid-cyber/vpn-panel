@@ -84,11 +84,28 @@ async function remindCustomers(s) {
     run('UPDATE users SET reminded_at = ? WHERE id = ?', t, u.id);
     const wl = s.res_whitelabel && u.rbrand;
     const brand = wl ? u.rbrand : s.brand, support = (wl ? u.rcontact : s.support_contact) || '';
-    const when = u.expires_at < t ? 'je istekao' : `ističe ${new Date(u.expires_at).toLocaleDateString('bs-BA')}`;
-    const text = `⏳ Tvoj ${brand} nalog (${u.username}) ${when}.\nDa ti VPN ne prestane raditi, produži na vrijeme.${support ? `\nZa produženje: ${support}` : ''}`;
+    const expired = u.expires_at < t;
+    const dateStr = new Date(u.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    const when = expired ? 'has expired' : `expires on ${dateStr}`;
+    const base = (s.sub_url || s.panel_url || '').replace(/\/+$/, '');
+    const link = base ? `${base}/s/${u.sub_token}` : '';
+    const text = `⏳ Your ${brand} account (${u.username}) ${when}.\nRenew in time so your VPN keeps working.${link ? `\nRenew: ${link}` : (support ? `\nTo renew: ${support}` : '')}`;
     if (u.tg_chat) cbot.send(u.tg_chat, text).catch(() => {});
     const to = u.email || (isMail(u.contact) ? u.contact.trim() : '');
-    if (to && mail.configured()) mail.sendMail({ to, subject: `${brand}: nalog ${when}`, text }).catch((e) => log('sistem', 'Podsjetnik mailom nije poslan', e.message, 'warn'));
+    if (to && mail.configured()) {
+      const { layout, esc } = require('./mailtpl');
+      const html = layout({
+        badge: expired ? 'Account expired' : 'Renewal reminder',
+        head: expired ? 'Your VPN has expired' : 'Your VPN is about to expire',
+        intro: expired
+          ? `Your <b style="color:#f2f2f6">${esc(brand)}</b> account <b style="color:#f2f2f6">${esc(u.username)}</b> has expired. Renew now to get back online.`
+          : `Your <b style="color:#f2f2f6">${esc(brand)}</b> account <b style="color:#f2f2f6">${esc(u.username)}</b> ${when}. Renew on time so your connection keeps working without interruption.`,
+        stats: [['Account', esc(u.username)], [expired ? 'Expired' : 'Expires', esc(dateStr)]],
+        cta: link ? { href: link, label: expired ? 'Renew now' : 'Renew my VPN' } : null,
+        footer: support ? `Questions? Contact us: <b style="color:#f2f2f6">${esc(support)}</b>` : 'Questions? Just reply to this email.',
+      });
+      mail.sendMail({ to, subject: `${brand}: account ${expired ? 'expired' : 'expires ' + dateStr}`, text, html }).catch((e) => log('sistem', 'Podsjetnik mailom nije poslan', e.message, 'warn'));
+    }
     core.history(u.id, `Podsjetnik poslan (${[u.tg_chat && 'Telegram', to && 'e-mail'].filter(Boolean).join(', ')})`);
   }
 }
