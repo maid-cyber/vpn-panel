@@ -156,6 +156,19 @@ section{padding:90px 0}
 .app .os i{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line2)}
 .app .os svg{width:26px;height:26px;color:var(--text)}
 .app h3{font-size:21px}.app p{color:var(--muted);margin:0;font-size:15px;flex:1}
+/* dodaci / add-ons */
+.addons{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:1060px;margin:0 auto}
+.addon{position:relative;padding:26px 24px;border-radius:22px;border:1px solid var(--line2);background:var(--card);display:flex;flex-direction:column;gap:12px;transition:transform .2s,border-color .2s}
+.addon:hover{transform:translateY(-3px);border-color:rgba(227,23,43,.5)}
+.addon .ai{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line2);color:#e3172b}
+.addon .ai svg{width:24px;height:24px}
+.addon .an{font-size:19px;font-weight:700;display:flex;align-items:center;gap:9px}
+.addon .anew{font-size:11px;font-weight:800;letter-spacing:.5px;color:#fff;background:#e3172b;padding:3px 8px;border-radius:999px}
+.addon .ad{color:var(--muted);font-size:14.5px;margin:0;flex:1;line-height:1.55}
+.addon .ap{font-size:24px;font-weight:800;color:var(--text);margin-top:4px}
+.addon .ap span{font-size:14px;font-weight:600;color:var(--muted)}
+#dodaci .note{text-align:center;max-width:640px;margin:22px auto 0;color:var(--muted);font-size:14px}
+@media(max-width:820px){.addons{grid-template-columns:1fr}}
 /* preprodaja */
 .resell{display:grid;grid-template-columns:1.15fr 1fr;gap:32px;align-items:center;padding:40px;border-radius:28px;border:1px solid var(--line2);background:radial-gradient(600px 300px at 90% 10%,rgba(227,23,43,.18),transparent 65%),var(--card)}
 .resell h2{font-size:clamp(26px,3.2vw,38px);margin-bottom:12px}
@@ -235,7 +248,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
 <header><div class="wrap nav">
   <a href="#" class="logo" aria-label="__BRAND__"><svg width="32" height="36" viewBox="0 0 200 224" aria-hidden="true"><path d="M100 4 190 38v64c0 56-36 98-90 118-54-20-90-62-90-118V38z" fill="#E3172B"/><path d="M100 22 174 50v52c0 46-29 80-74 97-45-17-74-51-74-97V50z" fill="#121216"/><path d="M100 22 174 50v52c0 46-29 80-74 97z" fill="#000" fill-opacity=".18"/><path d="M100 52 100 104 82 164H54z" fill="#E3172B"/><path d="M100 52 146 164h-28l-18-60z" fill="#9E0C1A"/><path d="M90.5 128h19l4.5 14h-28z" fill="#FF4A5A"/><path d="M100 52 111 78H89z" fill="#FF4A5A"/></svg><span class="wm"><b id="brandName"></b><small id="brandSub">VPN</small></span></a>
   <nav class="links" id="links">
-    <a href="#zastita" data-t="nav0">Zaštita</a><a href="#funkcije" data-t="nav1">Funkcije</a><a href="#lokacije" data-t="nav2">Lokacije</a><a href="#cijene" data-t="nav3">Cijene</a><a href="#aplikacije" data-t="nav4">Aplikacije</a><a href="#pitanja" data-t="nav5">Pitanja</a>
+    <a href="#zastita" data-t="nav0">Zaštita</a><a href="#funkcije" data-t="nav1">Funkcije</a><a href="#lokacije" data-t="nav2">Lokacije</a><a href="#cijene" data-t="nav3">Cijene</a><a href="#dodaci" data-t="navAdd">Dodaci</a><a href="#aplikacije" data-t="nav4">Aplikacije</a><a href="#pitanja" data-t="nav5">Pitanja</a>
   </nav>
   <div class="lang" role="group" aria-label="Jezik"><button data-l="bs">BS</button><button data-l="en">EN</button></div>
   <a href="#cijene" class="btn red sm buy" data-t="navcta">Kupi VPN</a>
@@ -301,6 +314,12 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   <div class="pay" id="pay"></div>
   <p class="note" id="priceNote"></p>
   <div id="tgbuy"></div>
+</div></section>
+
+<section id="dodaci"><div class="wrap">
+  <div class="head reveal"><span class="tag red" data-t="ao_tag">Dodaci</span><h2 data-t="ao_h">Pojačaj svoj plan</h2><p data-t="ao_p"></p></div>
+  <div class="addons" id="addons"></div>
+  <p class="note" id="addNote"></p>
 </div></section>
 
 <section id="aplikacije"><div class="wrap">
@@ -395,6 +414,14 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
       gu_t2: 'Bez obaveze', gu_p2: 'Plaćanje je jednokratno. Ništa ti se ne naplaćuje samo od sebe kad plan istekne.',
       payBy: 'Plaćanje:', note: 'Nalog dobiješ odmah poslije plaćanja.', noteNo: 'Za kupovinu nam se javi: ', noPlans: 'Cijene uskoro.',
       tg: 'Više voliš Telegram?', tgs: 'Kupi i produži nalog direktno u našem botu.', tgb: 'Otvori bota',
+      navAdd: 'Dodaci',
+      ao_tag: 'Dodaci', ao_h: 'Pojačaj svoj plan', ao_p: 'Opcije koje dodaješ na bilo koji plan — uključuje ih podrška na tvom nalogu.',
+      ao_new: 'NOVO', ao_per: '/mj',
+      ao_note: 'Dodatke uključuje podrška na tvom nalogu. Trebaš neki? Javi nam se.',
+      addons: [
+        ['dip', 'Dedicated IP', 'Tvoja privatna IP adresa — bez dijeljenja i bez blok-lista. Idealno za banke, posao i stabilan pristup.', 2.99],
+        ['mh', 'Double VPN', 'Promet kroz dva servera (MultiHop) za dodatni sloj privatnosti i zaštite.', 1.49],
+        ['pf', 'Port forwarding', 'Otvoreni port za hosting, P2P ili daljinski pristup tvom uređaju preko VPN-a.', 0.99]],
       a_tag: 'Aplikacije', a_h: 'Na svim tvojim uređajima', a_p: 'Jedan nalog za telefon i računar. Prijava jednim linkom ili QR kodom.',
       apps: [['android', 'Android', 'Naša aplikacija: spajanje jednim dodirom, izbor servera, Kill Switch i test brzine. Probni nalog dobiješ u samoj aplikaciji.', 'Preuzmi za Android'],
         ['windows', 'Windows', 'Ista aplikacija za Windows 10 i 11: izbor servera, split tunneling i test brzine.', 'Preuzmi za Windows'],
@@ -466,6 +493,14 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
       gu_t2: 'No commitment', gu_p2: 'Payment is one-time. Nothing is charged by itself when your plan runs out.',
       payBy: 'Pay with:', note: 'You get access right after paying.', noteNo: 'To buy, contact us: ', noPlans: 'Pricing coming soon.',
       tg: 'Prefer Telegram?', tgs: 'Buy and renew right inside our bot.', tgb: 'Open the bot',
+      navAdd: 'Add-ons',
+      ao_tag: 'Add-ons', ao_h: 'Power up your plan', ao_p: 'Optional extras you can attach to any plan — enabled by support on your account.',
+      ao_new: 'NEW', ao_per: '/mo',
+      ao_note: 'Add-ons are enabled by support on your account. Need one? Get in touch.',
+      addons: [
+        ['dip', 'Dedicated IP', 'Your own private IP — no sharing, no blocklists. Great for banking, work and stable access.', 2.99],
+        ['mh', 'Double VPN', 'Route your traffic through two servers (MultiHop) for an extra layer of privacy.', 1.49],
+        ['pf', 'Port forwarding', 'Open a port for hosting, P2P or remote access to your device over the VPN.', 0.99]],
       a_tag: 'Apps', a_h: 'On all your devices', a_p: 'One account for phone and computer. Log in with one link or a QR code.',
       apps: [['android', 'Android', 'Our app with one-tap connect, server choice, Kill Switch and a speed test. The free trial is inside the app.', 'Download for Android'],
         ['windows', 'Windows', 'The same app for Windows 10 and 11: server choice, split tunneling and speed test.', 'Download for Windows'],
@@ -612,6 +647,9 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     document.getElementById('pay').innerHTML = D.buy ? `<span>${esc(L.payBy)}</span>${D.paypal ? `<span class="pill">${ico('pp')}PayPal</span>` : ''}<span class="pill">${ico('card')}Visa · Mastercard</span>` : '';
     document.getElementById('priceNote').textContent = D.buy ? L.note : (D.support ? L.noteNo + D.support : '');
     document.getElementById('tgbuy').innerHTML = D.bot ? `<div class="tgbuy reveal"><div><b>${esc(L.tg)}</b><span>${esc(L.tgs)}</span></div><a class="btn sm" href="https://t.me/${esc(D.bot)}" target="_blank" rel="noopener">${ico('tg')}${esc(L.tgb)}</a></div>` : '';
+    const aico = { dip: 'key', mh: 'shield', pf: 'link' };
+    document.getElementById('addons').innerHTML = (L.addons || []).map(([id, nm, ds, pr]) => `<div class="addon reveal"><div class="ai">${ico(aico[id] || 'bolt')}</div><div class="an">${esc(nm)}<span class="anew">${esc(L.ao_new)}</span></div><p class="ad">${esc(ds)}</p><div class="ap">+${esc(money(pr))}<span>${esc(L.ao_per)}</span></div></div>`).join('');
+    document.getElementById('addNote').textContent = L.ao_note || '';
     const hrefs = [D.apk || D.releases, D.exe || D.releases, 'https://hiddify.com/'];
     document.getElementById('apps').innerHTML = L.apps.map(([i, h, p, b], n) => `<div class="card app reveal"><div class="os"><i>${ico(i)}</i><h3>${esc(h)}</h3></div><p>${esc(p)}</p>${hrefs[n] ? `<a class="btn ${n === 0 ? 'red' : ''}" href="${esc(hrefs[n])}" ${n === 2 ? 'target="_blank" rel="noopener"' : ''}>${esc(b)}</a>` : ''}</div>`).join('');
     // preprodaja
