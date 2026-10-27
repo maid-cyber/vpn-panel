@@ -152,6 +152,7 @@ const SCHEMA = [
     { key: 'app_trial', grp: 'nalog', type: 'toggle', label: 'Probaj besplatno', sub: 'Dugme na prijavi. Koristi prvi aktivni plan označen kao probni (Planovi). Jedan po uređaju, jedan po IP adresi sedmično.', def: false },
     { key: 'app_trial_cap', grp: 'nalog', type: 'number', label: 'Najviše probnih naloga dnevno', sub: 'Zaštita od zloupotrebe', def: 20 },
     { key: 'renew_on', grp: 'nalog', type: 'toggle', label: 'Produži karticom', sub: 'Dugme "Produži pretplatu" u aplikaciji i na stranici kupca. Samo za tvoje kupce. Treba uključen Stripe.', def: true },
+    { key: 'pf_on', grp: 'nalog', type: 'toggle', label: 'Port forwarding', sub: 'Dozvoli dodjelu otvorenog porta korisniku (za hosting, P2P, daljinski pristup). Radi kad je kupac spojen preko WireGuarda. Dodjeljuje se kod korisnika.', def: false },
     { key: 'ref_on', grp: 'nalog', type: 'toggle', label: 'Pozovi prijatelja', sub: 'Kupac dijeli svoj kod; kad prijatelj prvi put plati, obojica dobiju gratis dane', def: false },
     { key: 'ref_days', grp: 'nalog', type: 'number', label: 'Gratis dana za preporuku', def: 7 },
     { key: 'app_devices', grp: 'nalog', type: 'toggle', label: 'Uređaji', sub: 'Kupac vidi koliko uređaja je spojeno od dozvoljenih', def: true },

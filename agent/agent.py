@@ -413,6 +413,34 @@ def apply_xray(cfg):
     return True
 
 
+def apply_forwards(forwards, iface):
+    # Port forwarding: otvoreni port na serveru -> uredjaj kupca preko WireGuarda.
+    # Drzimo pravila u zasebnim lancima (VPNFWD/VPNFWDF) pa ih svaki put ispraznimo i iznova dodamo (idempotentno).
+    if DRY:
+        return
+    for tbl, chain, jump in (("nat", "VPNFWD", ["PREROUTING", "-i", iface]), ("filter", "VPNFWDF", ["FORWARD"])):
+        subprocess.run(["iptables", "-t", tbl, "-N", chain], capture_output=True)
+        subprocess.run(["iptables", "-t", tbl, "-F", chain], capture_output=True)
+        if subprocess.run(["iptables", "-t", tbl, "-C"] + jump + ["-j", chain], capture_output=True).returncode != 0:
+            subprocess.run(["iptables", "-t", tbl, "-I", jump[0], "1"] + jump[1:] + ["-j", chain], capture_output=True)
+    n = 0
+    for f in (forwards or []):
+        ip = f.get("ip")
+        try:
+            port = int(f.get("port", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if not ip or not (0 < port < 65536):
+            continue
+        for proto in ("tcp", "udp"):
+            subprocess.run(["iptables", "-t", "nat", "-A", "VPNFWD", "-p", proto, "--dport", str(port), "-j", "DNAT", "--to-destination", f"{ip}:{port}"], capture_output=True)
+            subprocess.run(["iptables", "-t", "filter", "-A", "VPNFWDF", "-p", proto, "-d", ip, "--dport", str(port), "-j", "ACCEPT"], capture_output=True)
+        subprocess.run(["ufw", "allow", str(port)], capture_output=True)
+        n += 1
+    if n:
+        log("Port forwarding:", n, "portova")
+
+
 def apply_wg(wg, iface):
     if not wg:
         sh("systemctl disable --now wg-quick@wg0")
@@ -442,6 +470,7 @@ def apply_wg(wg, iface):
         os.unlink(f.name)
     if changed:
         log("WireGuard primijenjen,", len(wg["peers"]), "korisnika")
+    apply_forwards(wg.get("forwards"), iface)
     return subprocess.run(["ip", "link", "show", "wg0"], capture_output=True).returncode == 0
 
 

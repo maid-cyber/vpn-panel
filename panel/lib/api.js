@@ -375,6 +375,8 @@ function userDetail(c, me) {
     vless: settings.get('proto_vless') ? servers.filter((s) => s.reality_pub).map((s) => ({ server: s.name, link: vpn.vlessLink(u, s) })) : [],
     ss: settings.get('proto_ss') ? servers.filter((s) => s.reality_pub).map((s) => ({ server: s.name, link: vpn.ssLink(u, s) })) : [],
     wg: settings.get('proto_wg') ? servers.filter((s) => s.wg_pub).map((s) => ({ id: s.id, server: s.name, url: `${link}/wg/${s.id}` })) : [],
+    pf_on: !!settings.get('pf_on'), pf_port: u.pf_port || 0,
+    pf_hosts: u.pf_port ? servers.filter((s) => s.wg_pub && s.host).map((s) => ({ server: s.name, host: s.host })) : [],
     history: all('SELECT ts, text FROM user_history WHERE user_id = ? ORDER BY id DESC LIMIT 30', u.id),
   };
 }
@@ -413,6 +415,33 @@ route('PUT', 'users/:id', 'users', (c) => {
   if (fields.length) run(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, ...args, u.id);
   core.history(u.id, `Izmijenjeno · ${c.auth.me.username}`);
   log(c.auth.me.username, 'Korisnik izmijenjen', u.username);
+  return { ok: true };
+});
+// ---------- Port forwarding (otvoreni port po korisniku) ----------
+function freePfPort() {
+  const used = new Set();
+  for (const s of all('SELECT vless_port, wg_port, ss_port FROM servers')) { used.add(s.vless_port); used.add(s.wg_port); used.add(s.ss_port); }
+  for (const c of all('SELECT port FROM chains')) used.add(c.port);
+  for (const u of all('SELECT pf_port FROM users WHERE pf_port > 0')) used.add(u.pf_port);
+  for (let i = 0; i < 3000; i++) { const p = 30000 + Math.floor(Math.random() * 10000); if (!used.has(p)) return p; }
+  return 0;
+}
+route('POST', 'users/:id/portforward', 'users', (c) => {
+  if (!settings.get('pf_on')) fail(400, 'Port forwarding nije uključen (Postavke → Pretplata i aplikacije).');
+  const u = core.getUser(c.params.id);
+  if (u.pf_port) return { port: u.pf_port };
+  const p = freePfPort();
+  if (!p) fail(400, 'Nema slobodnog porta. Pokušaj ponovo.');
+  run('UPDATE users SET pf_port = ? WHERE id = ?', p, u.id);
+  core.history(u.id, `Port forwarding uključen · port ${p}`);
+  log(c.auth.me.username, 'Port forwarding', `${u.username} · port ${p}`);
+  return { port: p };
+});
+route('DELETE', 'users/:id/portforward', 'users', (c) => {
+  const u = core.getUser(c.params.id);
+  run('UPDATE users SET pf_port = 0 WHERE id = ?', u.id);
+  core.history(u.id, 'Port forwarding isključen');
+  log(c.auth.me.username, 'Port forwarding isključen', u.username);
   return { ok: true };
 });
 route('PUT', 'res/users/:id', 'res', (c) => {

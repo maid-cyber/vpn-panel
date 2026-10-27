@@ -108,6 +108,7 @@ addCol('admins', 'email', "TEXT DEFAULT ''");
 addCol('users', 'app_os', "TEXT DEFAULT ''");
 addCol('users', 'app_build', 'INTEGER DEFAULT 0');
 addCol('users', 'app_seen', 'INTEGER DEFAULT 0');
+addCol('users', 'pf_port', 'INTEGER DEFAULT 0');
 addCol('servers', 'dedicated_to', "TEXT DEFAULT ''");
 addCol('servers', 'ss_port', 'INTEGER DEFAULT 8388');
 addCol('servers', 'xray_version', "TEXT DEFAULT ''");

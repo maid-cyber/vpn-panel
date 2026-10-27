@@ -89,7 +89,7 @@ function filterDns(s) {
 function nodeConfig(server) {
   const plans = Object.fromEntries(all('SELECT * FROM plans').map((p) => [p.id, p]));
   const t = now();
-  const users = all('SELECT id, uuid, wg_pub, disabled, blocked_until, expires_at, traffic_limit, traffic_up, traffic_down, plan_id FROM users')
+  const users = all('SELECT id, uuid, wg_pub, pf_port, disabled, blocked_until, expires_at, traffic_limit, traffic_up, traffic_down, plan_id FROM users')
     .filter((u) => CAN_CONNECT.has(userStatus(u, t)) && userCanUse(u, plans[u.plan_id], server));
   const s = settings.load();
 
@@ -138,6 +138,8 @@ function nodeConfig(server) {
     wg = {
       private_key: server.wg_priv, port: server.wg_port, address: '10.66.0.1/16',
       peers: users.filter((u) => u.wg_pub).map((u) => ({ id: u.id, pub: u.wg_pub, ip: wgIp(u.id) })),
+      // port forwarding: otvoreni port na serveru -> uređaj kupca preko WireGuarda
+      forwards: users.filter((u) => u.wg_pub && u.pf_port > 0).map((u) => ({ ip: wgIp(u.id), port: Number(u.pf_port) })),
     };
   }
   const body = { xray, wg, user_ids: users.map((u) => u.id) };

@@ -87,6 +87,7 @@ ${s.maintenance ? `<div class="note">${esc(s.maintenance_msg)}</div>` : ''}
 <span class="badge" style="color:${color}"><span class="dot" style="background:${color}"></span>${label}</span></div>
 <div style="margin-top:12px"><div class="row"><span class="muted">Ističe</span><span>${new Date(u.expires_at).toLocaleDateString('bs-BA')}${days > 0 ? ` · još ${days} ${days === 1 ? 'dan' : 'dana'}` : ''}</span></div>
 <div class="row"><span class="muted">Promet</span><span>${fmtBytes(used)}${u.traffic_limit ? ` od ${fmtBytes(u.traffic_limit)}` : ' · neograničeno'}</span></div>
+${u.pf_port ? `<div class="row"><span class="muted">Otvoreni port</span><span>${u.pf_port} <span class="muted" style="font-size:12px">· preko WireGuarda</span></span></div>` : ''}
 ${u.traffic_limit ? `<div class="bar"><i style="width:${pct.toFixed(1)}%"></i></div>` : ''}</div></section>
 ${paid ? '<div class="note" style="background:#0f2419;border-color:#1b4a33;color:#5fe0a0">Hvala! Uplata je primljena, nalog se produžava za par sekundi. Osvježi stranicu.</div>' : ''}
 ${renew.length ? `<section class="card"><h2>Produži pretplatu</h2><p class="muted" style="margin-top:0">${s.stripe_on && s.stripe_secret ? 'Plaćanje karticom (Stripe).' : 'Plaćanje PayPalom ili karticom preko PayPala.'} Dani se dodaju na trenutni datum isteka.</p>
