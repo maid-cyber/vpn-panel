@@ -109,6 +109,9 @@ addCol('users', 'app_os', "TEXT DEFAULT ''");
 addCol('users', 'app_build', 'INTEGER DEFAULT 0');
 addCol('users', 'app_seen', 'INTEGER DEFAULT 0');
 addCol('users', 'pf_port', 'INTEGER DEFAULT 0');
+addCol('users', 'mh_on', 'INTEGER DEFAULT 0');
+addCol('users', 'addons', "TEXT DEFAULT ''");
+addCol('users', 'ded_pending', 'INTEGER DEFAULT 0');
 addCol('servers', 'dedicated_to', "TEXT DEFAULT ''");
 addCol('servers', 'ss_port', 'INTEGER DEFAULT 8388');
 addCol('servers', 'xray_version', "TEXT DEFAULT ''");
@@ -161,6 +164,7 @@ CREATE INDEX IF NOT EXISTS bot_orders_status ON bot_orders(status);`);
 addCol('bot_orders', 'email', "TEXT DEFAULT ''");
 addCol('bot_orders', 'coupon_id', 'INTEGER');
 addCol('bot_orders', 'discount', 'REAL DEFAULT 0');
+addCol('bot_orders', 'addons', "TEXT DEFAULT ''");
 
 function tx(fn) {
   db.exec('BEGIN');

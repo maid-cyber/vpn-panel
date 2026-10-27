@@ -180,6 +180,9 @@ function addChains(xray, server, users, plans) {
 
 /** Lanci koje kupac smije koristiti (izlazni server mora biti u njegovom planu). */
 function chainsForUser(u) {
+  // Double VPN kao plaćeni dodatak: dok se prodaje na sajtu, lanci su dostupni samo kupcima dodatka
+  const s = settings.load();
+  if (s.ao_on && s.ao_mh_on && !u.mh_on) return [];
   const plan = u.plan_id ? one('SELECT * FROM plans WHERE id = ?', u.plan_id) : null;
   return all('SELECT * FROM chains WHERE enabled = 1 ORDER BY id').map((c) => ({ c, hops: chainServers(c) }))
     .filter(({ c, hops }) => chainUsable(c, hops) && userCanUse(u, plan, hops[hops.length - 1]));

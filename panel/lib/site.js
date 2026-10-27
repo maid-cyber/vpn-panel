@@ -75,6 +75,7 @@ function siteData(d) {
     trial: !!(s.app_trial && one('SELECT id FROM plans WHERE active = 1 AND trial = 1 LIMIT 1')),
     reseller: s.res_portal !== false && s.res_signup ? (s.reseller_path || '/reseller') : '',
     coupons: !!one('SELECT id FROM coupons WHERE active = 1 AND (expires_at = 0 OR expires_at > ?) AND (max_uses = 0 OR used < max_uses) LIMIT 1', now()),
+    addons: require('./addons').forSite(),
   };
 }
 
@@ -102,24 +103,39 @@ async function buy(req, res) {
   const site = base(req);
   let k;
   try { k = coupons.apply(b.coupon, plan); } catch (e) { return send(res, 400, { error: e.message }); }
+  const addons = require('./addons');
+  const ao = addons.quote(b.addons, plan);          // provjereni dodaci + cijena (× broj mjeseci)
+  const total = Math.round((k.price + ao.total) * 100) / 100;
   if (usePaypal) {
     try {
-      const o = await pp.createOrder({ kind: 'site', plan, email, price: k.price, couponId: k.coupon?.id, discount: k.discount, card: b.method === 'card' });
+      const o = await pp.createOrder({ kind: 'site', plan, email, price: total, couponId: k.coupon?.id, discount: k.discount, addons: ao.ids, card: b.method === 'card' });
       if (!o.url) return send(res, 502, { error: 'PayPal nije vratio link za plaćanje.' });
       log('sajt', 'Kupovina započeta na sajtu (PayPal)', `${plan.name} · ${email}`);
       return send(res, 200, { url: o.url });
     } catch (e) { return send(res, 502, { error: e.message }); }
   }
+  const cur = String(s.currency || 'EUR').toLowerCase();
   const form = new URLSearchParams({
     mode: 'payment', customer_email: email,
     success_url: `${site}/kupljeno?s={CHECKOUT_SESSION_ID}`, cancel_url: `${site}/#cijene`,
     'metadata[purpose]': 'buy', 'metadata[plan_id]': String(plan.id), 'metadata[email]': email,
     'line_items[0][quantity]': '1',
-    'line_items[0][price_data][currency]': String(s.currency || 'EUR').toLowerCase(),
+    'line_items[0][price_data][currency]': cur,
     'line_items[0][price_data][unit_amount]': String(Math.round(k.price * 100)),
     'line_items[0][price_data][product_data][name]': `${s.brand} · ${plan.name}${k.coupon ? ` (kod ${k.coupon.code})` : ''}`,
   });
   if (k.coupon) { form.set('metadata[coupon_id]', String(k.coupon.id)); form.set('metadata[discount]', String(k.discount)); }
+  if (ao.ids.length) {
+    form.set('metadata[addons]', ao.ids.join(','));
+    const AO_NAME = { dip: 'Dedicated IP', mh: 'Double VPN', pf: 'Port forwarding' };
+    ao.ids.forEach((id, n) => {
+      const i = n + 1;
+      form.set(`line_items[${i}][quantity]`, '1');
+      form.set(`line_items[${i}][price_data][currency]`, cur);
+      form.set(`line_items[${i}][price_data][unit_amount]`, String(Math.round(addons.priceOf(id) * ao.months * 100)));
+      form.set(`line_items[${i}][price_data][product_data][name]`, `${AO_NAME[id] || id}${ao.months > 1 ? ` · ${ao.months} mj` : ''}`);
+    });
+  }
   const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST', headers: { authorization: `Bearer ${s.stripe_secret}`, 'content-type': 'application/x-www-form-urlencoded' }, body: form.toString(), signal: AbortSignal.timeout(20000),
   });
@@ -139,6 +155,8 @@ function paidBuy(ses, siteBase) {
   const id = core.createUser(SYSTEM, { plan_id: plan.id, email, paid: amount, method: 'Stripe (kartica)', note: 'Kupljeno na sajtu', contact: email });
   run('INSERT INTO purchases (session, user_id, email, ts) VALUES (?,?,?,?)', ses.id, id, email, now());
   coupons.used(ses, id);
+  const aoIds = String(ses.metadata?.addons || '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (aoIds.length) try { require('./addons').provision(id, aoIds); } catch (e) { log('sistem', 'Dodaci nisu provizionirani', String(e.message || e), 'warn'); }
   const trx = one('SELECT id FROM transactions WHERE user_id = ? AND ext_id IS NULL ORDER BY id DESC LIMIT 1', id);
   if (trx) run('UPDATE transactions SET ext_id = ? WHERE id = ?', ses.id, trx.id);
   const u = one('SELECT * FROM users WHERE id = ?', id);

@@ -55,15 +55,16 @@ function baseUrl() {
 const money = (n) => `${CUR[settings.get('currency')] || '€'}${Number(n || 0).toFixed(2)}`;
 
 /** Napravi narudžbu. kind: 'buy' | 'renew' (Telegram bot) | 'site' (web sajt). Vraća { id, url }. */
-async function createOrder({ chat, kind, plan, userId, tgName, email, price, couponId, discount, card }) {
+async function createOrder({ chat, kind, plan, userId, tgName, email, price, couponId, discount, addons, card }) {
   const s = settings.load();
   if (!ready()) throw new Error('PayPal nije podešen.');
   const b = baseUrl();
   if (!b) throw new Error('Upiši adresu panela (Postavke → Opšte → Adresa panela).');
   const cur = s.currency || 'EUR';
   const amount = Number(price ?? plan.price).toFixed(2);
-  const r = run('INSERT INTO bot_orders (chat, kind, plan_id, user_id, amount, currency, status, tg_name, created_at, email, coupon_id, discount) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-    String(chat || ''), kind, plan.id, userId || null, Number(amount), cur, 'new', String(tgName || '').slice(0, 64), now(), String(email || '').slice(0, 120), couponId || null, Number(discount) || 0);
+  const aoStr = Array.isArray(addons) ? addons.join(',') : '';
+  const r = run('INSERT INTO bot_orders (chat, kind, plan_id, user_id, amount, currency, status, tg_name, created_at, email, coupon_id, discount, addons) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    String(chat || ''), kind, plan.id, userId || null, Number(amount), cur, 'new', String(tgName || '').slice(0, 64), now(), String(email || '').slice(0, 120), couponId || null, Number(discount) || 0, aoStr);
   const oid = Number(r.lastInsertRowid);
   const res = await pp('POST', '/v2/checkout/orders', {
     intent: 'CAPTURE',
@@ -120,6 +121,8 @@ function fulfil(o, cap) {
       userId = core.createUser({ username: 'sajt', role: 'owner', id: 0 }, { plan_id: o.plan_id, email: o.email, paid: o.amount, method: 'PayPal', note: 'Kupljeno na sajtu', contact: o.email });
       run('INSERT OR IGNORE INTO purchases (session, user_id, email, ts) VALUES (?,?,?,?)', o.pp_id, userId, o.email, now());
       require('./coupons').used({ id: o.pp_id, metadata: { coupon_id: o.coupon_id, discount: o.discount }, amount_total: Math.round(o.amount * 100) }, userId);
+      const aoIds = String(o.addons || '').split(',').map((x) => x.trim()).filter(Boolean);
+      if (aoIds.length) try { require('./addons').provision(userId, aoIds); } catch (e) { log('sistem', 'Dodaci nisu provizionirani', String(e.message || e), 'warn'); }
     } else if (o.kind === 'buy') {
       userId = core.createUser(SYSTEM, { plan_id: o.plan_id, paid: o.amount, method: 'PayPal', note: `Kupljeno preko Telegram bota${o.tg_name ? ' · @' + o.tg_name : ''}`, contact: o.tg_name ? '@' + o.tg_name : `tg:${o.chat}` });
       run('UPDATE users SET tg_chat = ? WHERE id = ?', o.chat, userId);
