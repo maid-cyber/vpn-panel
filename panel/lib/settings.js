@@ -45,6 +45,7 @@ const SCHEMA = [
     { key: 'block_adult', type: 'toggle', label: 'Blokada sadržaja za odrasle', sub: 'AdGuard Family DNS (blokira i reklame)', def: false },
     { key: 'block_malware', type: 'toggle', label: 'Blokada malvera i phishinga', sub: 'Quad9 DNS (AdGuard već blokira i ovo)', def: true },
     { key: 'block_private', type: 'toggle', label: 'Zabrani pristup lokalnim mrežama servera', sub: 'Preporučeno uključeno', def: true },
+    { key: 'block_smtp', type: 'toggle', label: 'Blokada odlaznog spama (SMTP port 25)', sub: 'Sprječava slanje mejl-spama kroz tvoje servere — glavni uzrok abuse prijava i banova hostera. Preporučeno uključeno.', def: true },
     { key: 'dns', type: 'select', label: 'DNS kad nijedna blokada nije uključena', options: ['1.1.1.1', '8.8.8.8', '9.9.9.9'], labels: ['Cloudflare 1.1.1.1', 'Google 8.8.8.8', 'Quad9 9.9.9.9'], def: '1.1.1.1' },
     { key: 'heartbeat_sec', type: 'select', label: 'Server se javlja panelu svakih', options: ['10', '15', '30', '60'], labels: ['10 sekundi', '15 sekundi', '30 sekundi', '60 sekundi'], def: '15' },
     { key: 'offline_sec', type: 'select', label: 'Server je offline ako šuti', options: ['45', '90', '180'], labels: ['45 sekundi', '90 sekundi', '3 minute'], def: '45' },

@@ -99,6 +99,8 @@ function nodeConfig(server) {
     // DNS kupca (port 53) ide u Xray DNS: tako blokiranje radi i kad stranica sakrije ime (ECH, šifrovani SNI)
     const rules = [{ type: 'field', inboundTag: ['api'], outboundTag: 'api' }, { type: 'field', inboundTag: tags, port: '53', outboundTag: 'dns-out' }];
     if (s.block_private) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'block' });
+    // Odlazni SMTP (port 25) → blokada spama kroz servere (sprječava abuse prijave i banove hostera)
+    if (s.block_smtp !== false) rules.push({ type: 'field', network: 'tcp', port: '25', outboundTag: 'block' });
     // P2P serveri dozvoljavaju torrent, ostali ga blokiraju (ako je blokada uključena)
     if (s.block_torrent && !serverTags(server).includes('p2p')) rules.push({ type: 'field', protocol: ['bittorrent'], outboundTag: 'block' });
     if (s.block_ads) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });

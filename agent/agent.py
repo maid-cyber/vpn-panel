@@ -17,7 +17,7 @@ import threading
 import time
 import urllib.request
 
-VERSION = "1.4.1"
+VERSION = "1.5.0"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
@@ -474,6 +474,45 @@ def apply_wg(wg, iface):
     return subprocess.run(["ip", "link", "show", "wg0"], capture_output=True).returncode == 0
 
 
+def apply_shield():
+    """Zaštita od zloupotrebe (abuse shield). Sprječava banove hostera i krađu ključeva:
+      - odlazni SMTP (port 25): blokada mejl-spama kroz server,
+      - cloud metadata (169.254.169.254): klijent ne može ukrasti ključeve hostera,
+      - privatne/lokalne mreže: klijent ne može napadati server ni druge klijente hostera.
+    Pravila stoje u zasebnim lancima (VPNSH*) pa se svaki put isprazne i iznova dodaju (idempotentno).
+    Xray promet dodatno pokrivaju pravila iz panela (block_private, block_smtp)."""
+    if DRY:
+        return
+    PRIV = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "100.64.0.0/10"]
+
+    def rule(bin_, args):
+        subprocess.run([bin_] + args, capture_output=True)
+
+    def setup(bin_):
+        for chain, jump in (("VPNSHF", "FORWARD"), ("VPNSHO", "OUTPUT")):
+            rule(bin_, ["-N", chain])
+            rule(bin_, ["-F", chain])
+            if subprocess.run([bin_, "-C", jump, "-j", chain], capture_output=True).returncode != 0:
+                rule(bin_, ["-I", jump, "1", "-j", chain])
+
+    # ---- IPv4 ----
+    setup("iptables")
+    rule("iptables", ["-A", "VPNSHF", "-d", "10.66.0.0/16", "-j", "RETURN"])   # VPN interno (port forwarding, lanci) se ne dira
+    for ch in ("VPNSHF", "VPNSHO"):
+        rule("iptables", ["-A", ch, "-p", "tcp", "--dport", "25", "-j", "REJECT"])   # odlazni spam
+    rule("iptables", ["-A", "VPNSHO", "-d", "169.254.169.254", "-j", "DROP"])        # metadata (host/Xray izlaz)
+    for net in PRIV:
+        rule("iptables", ["-A", "VPNSHF", "-d", net, "-j", "DROP"])                  # klijent ne smije u privatne mreže
+    # ---- IPv6 (ako postoji) ----
+    if shutil.which("ip6tables"):
+        setup("ip6tables")
+        for ch in ("VPNSHF", "VPNSHO"):
+            rule("ip6tables", ["-A", ch, "-p", "tcp", "--dport", "25", "-j", "REJECT"])
+            rule("ip6tables", ["-A", ch, "-d", "fd00:ec2::254", "-j", "DROP"])
+        rule("ip6tables", ["-A", "VPNSHF", "-d", "fc00::/7", "-j", "DROP"])
+    log("Abuse shield aktivan (spam/metadata/privatne mreže)")
+
+
 def service_ok(name):
     if DRY:
         return True
@@ -601,6 +640,7 @@ def main():
     pending = {}            # promet koji nije poslan (panel nedostupan)
     fails = 0
     log(f"Agent {VERSION} pokrenut, panel {panel}{' (probni način)' if DRY else ''}")
+    apply_shield()   # odmah na startu (i poslije reboota kad se iptables isprazne)
     meter.cpu()
     meter.net_mbps(iface)
     while True:
@@ -641,6 +681,7 @@ def main():
                 peer_ids = {p["pub"]: p["id"] for p in (cfg.get("wg") or {}).get("peers", [])}
                 ok_x = apply_xray(cfg.get("xray"))
                 apply_wg(cfg.get("wg"), iface)
+                apply_shield()
                 if ok_x or not cfg.get("xray"):
                     applied = cfg["hash"]
                 log("Konfiguracija", applied, "·", len(cfg.get("user_ids", [])), "aktivnih korisnika")
