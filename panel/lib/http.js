@@ -14,6 +14,8 @@ function send(res, code, body, headers = {}) {
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'no-referrer',
+    'x-frame-options': 'DENY',                               // protiv clickjackinga (panel i stranica kupca)
+    'content-security-policy': "frame-ancestors 'none'",     // isto, za moderne preglednike
     ...headers,
   });
   res.end(data);
@@ -40,7 +42,13 @@ function readBody(req, limit = 1 << 20, raw = false) {
 function clientIp(req) {
   const remote = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
   const fwd = req.headers['x-forwarded-for'];
-  if (fwd && (remote === '127.0.0.1' || remote === '::1')) return String(fwd).split(',')[0].trim();
+  // Iza reverznog proxyja (Caddy na localhostu) pravu IP dodaje proxy na KRAJ liste.
+  // Uzimamo zadnji unos — prvi je lako lažirati (klijent ga pošalje), pa bi se inače
+  // mogao zaobići lockout prijave i IP whitelist, i lažirati upozorenja o novoj IP.
+  if (fwd && (remote === '127.0.0.1' || remote === '::1')) {
+    const parts = String(fwd).split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1].replace(/^::ffff:/, '');
+  }
   return remote;
 }
 

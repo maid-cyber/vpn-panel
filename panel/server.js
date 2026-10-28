@@ -67,6 +67,8 @@ async function onRequest(req, res) {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   const ip = clientIp(req);
+  // HSTS: preko HTTPS reci pregledniku da ubuduće nikad ne ide na HTTP (sprječava downgrade napad)
+  if (isHttps(req)) res.setHeader('strict-transport-security', 'max-age=31536000; includeSubDomains');
   try {
     if (p.startsWith('/s/')) return await sub.handle(req, res, p);
     if (p.startsWith('/agent/') || p.startsWith('/install/')) return await nodes.handle(req, res, p);

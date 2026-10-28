@@ -21,6 +21,9 @@ function checkPassword(pw, stored) {
 function validPassword(pw) {
   return typeof pw === 'string' && pw.length >= 8;
 }
+// Lažni hash iste cijene: provjeravamo šifru i kad korisnik ne postoji, da se po vremenu
+// odgovora ne može saznati koja korisnička imena postoje (user enumeration).
+const DUMMY_HASH = hashPassword(crypto.randomBytes(16).toString('hex'));
 
 // ---------- TOTP (Google Authenticator) ----------
 const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -122,5 +125,5 @@ function can(admin, perm) {
 
 module.exports = {
   hashPassword, checkPassword, validPassword, newTotpSecret, checkTotp, totpAt,
-  ipAllowed, isLocked, addFail, clearFails, createSession, getSession, deleteSession, can,
+  ipAllowed, isLocked, addFail, clearFails, createSession, getSession, deleteSession, can, DUMMY_HASH,
 };

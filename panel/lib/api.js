@@ -48,7 +48,9 @@ route('POST', 'login', 'public', async (c) => {
   const a = any && !any.disabled ? any : null;
   // na ulazu za resellere prijavljuju se samo reselleri, a na admin ulazu samo admini (ako je poseban panel uključen)
   const wrongDoor = a && ((c.portal === 'reseller' && a.role !== 'reseller') || (c.portal === 'admin' && a.role === 'reseller' && settings.get('res_portal')));
-  if (!a || wrongDoor || !auth.checkPassword(password, a.pass_hash)) { auth.addFail(c.ip); log(String(username || '?'), 'Neuspješna prijava', '', 'warn'); fail(401, 'Pogrešno korisničko ime ili šifra.'); }
+  // uvijek provjeri šifru (i kad nalog ne postoji) — da se po vremenu odgovora ne otkrije koja imena postoje
+  const passOk = auth.checkPassword(password, a ? a.pass_hash : auth.DUMMY_HASH);
+  if (!a || wrongDoor || !passOk) { auth.addFail(c.ip); log(String(username || '?'), 'Neuspješna prijava', '', 'warn'); fail(401, 'Pogrešno korisničko ime ili šifra.'); }
   if (a.totp_on) {
     if (!code) return { need2fa: true };
     if (!auth.checkTotp(a.totp_secret, code)) { auth.addFail(c.ip); fail(401, 'Pogrešan 2FA kod.'); }
