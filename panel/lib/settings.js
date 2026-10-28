@@ -149,7 +149,7 @@ const SCHEMA = [
     { key: 'app_repo', type: 'text', label: 'GitHub repozitorij aplikacija', sub: 'Odavde sajt uzima zadnji Android APK i Windows instalaciju', def: 'maid-cyber/veltrix-app', mono: true },
   ] },
   { id: 'dodaci', title: 'Dodaci (prodaja na sajtu)', desc: 'Kupac na checkoutu sam odabere dodatke i plati ih zajedno s planom. Cijena je mjesečna i naplaćuje se × broj mjeseci plana. Provizioniranje je automatsko (osim Dedicated IP-a kad nema slobodnog servera — tada dobiješ obavijest da ga dodijeliš ručno).', rows: [
-    { key: 'ao_on', type: 'toggle', label: 'Prodaja dodataka na sajtu', sub: 'Glavni prekidač. Isključeno: dodaci se prikazuju samo informativno, bez kupovine.', def: false },
+    { key: 'ao_on', type: 'toggle', label: 'Prodaja dodataka na sajtu', sub: 'Glavni prekidač. Isključeno: dodaci se prikazuju samo informativno, bez kupovine. Uključeno: kupac ih bira na checkoutu uz plan.', def: true },
     { key: 'ao_dip_on', grp: 'dip', type: 'toggle', label: 'Dedicated IP', sub: 'Privatna IP adresa — dodjeljuje se slobodan server označen tagom "dedicated". Ako ga nema, kupac svejedno plati i dobiješ obavijest da dodijeliš ručno.', def: true },
     { key: 'ao_dip_price', grp: 'dip', type: 'number', label: 'Cijena Dedicated IP /mj', def: 2.99 },
     { key: 'ao_mh_on', grp: 'mh', type: 'toggle', label: 'Double VPN', sub: 'Promet kroz dva servera (lanci / MultiHop). Dok je uključeno, Double VPN je dostupan samo kupcima koji su ga kupili.', def: true },

@@ -346,6 +346,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
   <div class="head reveal"><span class="tag red" data-t="ao_tag">Dodaci</span><h2 data-t="ao_h">Pojačaj svoj plan</h2><p data-t="ao_p"></p></div>
   <div class="addons" id="addons"></div>
   <p class="note" id="addNote"></p>
+  <div id="aoCta" style="text-align:center;margin-top:20px"></div>
 </div></section>
 
 <section id="aplikacije"><div class="wrap">
@@ -449,6 +450,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
       ao_pick: 'Dodaci (opcionalno)',
       ao_note: 'Dodatke uključuje podrška na tvom nalogu. Trebaš neki? Javi nam se.',
       ao_note_buy: 'Odaberi dodatke na checkoutu i plati ih zajedno s planom. Cijena je mjesečna × broj mjeseci plana.',
+      ao_cta: 'Izaberi plan i dodatke →',
       addons: [
         ['dip', 'Dedicated IP', 'Tvoja privatna IP adresa — bez dijeljenja i bez blok-lista. Idealno za banke, posao i stabilan pristup.', 2.99],
         ['mh', 'Double VPN', 'Promet kroz dva servera (MultiHop) za dodatni sloj privatnosti i zaštite.', 1.49],
@@ -533,6 +535,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
       ao_pick: 'Add-ons (optional)',
       ao_note: 'Add-ons are enabled by support on your account. Need one? Get in touch.',
       ao_note_buy: 'Pick your add-ons at checkout and pay for them together with your plan. Price is monthly × the number of months in your plan.',
+      ao_cta: 'Choose a plan & add-ons →',
       addons: [
         ['dip', 'Dedicated IP', 'Your own private IP — no sharing, no blocklists. Great for banking, work and stable access.', 2.99],
         ['mh', 'Double VPN', 'Route your traffic through two servers (MultiHop) for an extra layer of privacy.', 1.49],
@@ -690,6 +693,7 @@ dialog .err{color:var(--red2);font-size:14px;min-height:20px}
     const aoSell = (D.addons || []).length > 0;
     document.getElementById('addons').innerHTML = (L.addons || []).map(([id, nm, ds, pr]) => `<div class="addon reveal"><div class="ai">${ico(aico[id] || 'bolt')}</div><div class="an">${esc(nm)}<span class="anew">${esc(L.ao_new)}</span></div><p class="ad">${esc(ds)}</p><div class="ap">+${esc(money(aoPrice[id] ?? pr))}<span>${esc(L.ao_per)}</span></div></div>`).join('');
     document.getElementById('addNote').textContent = aoSell ? (L.ao_note_buy || L.ao_note) : L.ao_note;
+    document.getElementById('aoCta').innerHTML = (aoSell && D.buy) ? `<a class="btn red" href="#cijene">${esc(L.ao_cta)}</a>` : '';
     const hrefs = [D.apk || D.releases, D.exe || D.releases, D.deb || D.releases, 'https://hiddify.com/'];
     document.getElementById('apps').innerHTML = L.apps.map(([i, h, p, b], n) => { const ext = hrefs[n] && /^https?:/.test(hrefs[n]); return `<div class="card app reveal"><div class="os"><i>${ico(i)}</i><h3>${esc(h)}</h3></div><p>${esc(p)}</p>${hrefs[n] ? `<a class="btn ${n === 0 ? 'red' : ''}" href="${esc(hrefs[n])}" ${ext ? 'target="_blank" rel="noopener"' : ''}>${esc(b)}</a>` : ''}</div>`; }).join('');
     // preprodaja
