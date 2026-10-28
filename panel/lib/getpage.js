@@ -13,6 +13,7 @@ const ICON = {
   android: '<path d="M6 9h12v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M8 9a4 4 0 0 1 8 0M9 5 8 3m7 2 1-2M4 11v4m16-4v4"/>',
   windows: '<path d="M3 5.5 10.5 4.5v7H3zM12 4.3 21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z"/>',
   apple: '<path d="M16 3c0 1.5-1.4 3-3 3 0-1.6 1.4-3 3-3zM19 16.5c-.5 1.2-1.7 3.5-3.2 3.5-1 0-1.3-.6-2.5-.6s-1.6.6-2.5.6C7.8 20 6 16.4 6 13.6 6 11 7.8 9.5 9.5 9.5c1 0 1.9.7 2.5.7s1.4-.7 2.6-.7c1 0 2 .4 2.7 1.3-2.3 1.4-2 4.6.2 5.7z"/>',
+  linux: '<ellipse cx="12" cy="13.5" rx="5.5" ry="7.5"/><circle cx="12" cy="6" r="3.2"/><circle cx="10.7" cy="6" r=".5" fill="currentColor"/><circle cx="13.3" cy="6" r=".5" fill="currentColor"/><path d="M11 8.2l1 .9 1-.9M9.6 20.5 8 22M14.4 20.5 16 22"/>',
 };
 
 function wordmark(brand) {
@@ -42,6 +43,7 @@ async function page(req) {
 
   const androidHref = d.apk ? '/download/android' : (d.page || '#');
   const windowsHref = d.exe ? '/download/windows' : (d.page || '#');
+  const linuxHref = d.deb ? '/download/linux' : (d.page || '#');
 
   const cards = [
     card({
@@ -55,6 +57,12 @@ async function page(req) {
       desc: 'Ista aplikacija za računar: izbor servera, split tunneling i test brzine.',
       href: windowsHref, btn: 'Preuzmi za Windows', dl: !!d.exe,
       note: 'Pokreni <b>.exe</b> instalaciju. Ako Windows upozori, klikni „More info → Run anyway".',
+    }),
+    card({
+      icon: 'linux', name: 'Linux', meta: d.debBuild ? `Verzija ${d.debBuild} · Debian / Ubuntu` : 'Debian / Ubuntu / Mint',
+      desc: 'Ista aplikacija za Linux: izbor servera, split tunneling i test brzine.',
+      href: linuxHref, btn: 'Preuzmi .deb', dl: !!d.deb,
+      note: 'Instaliraj: <b>sudo apt install ./AdiLink-VPN.deb</b>. Pri spajanju potvrdi lozinkom (VPN tunel traži administratorska prava).',
     }),
     card({
       icon: 'apple', name: 'iPhone i Mac', meta: 'Privremeno preko Hiddify',
@@ -89,7 +97,8 @@ header a.back:hover{color:var(--text)}
 .badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:22px 0 0}
 .badge{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:13.5px;color:var(--soft)}
 .badge svg{width:15px;height:15px;color:var(--red2)}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:40px 0 0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:40px 0 0}
+@media(max-width:980px){.grid{grid-template-columns:repeat(2,1fr)}}
 .app{background:linear-gradient(180deg,var(--card),#101017);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;transition:border-color .2s,transform .2s}
 .app:hover{border-color:var(--line2);transform:translateY(-3px)}
 .app-h{display:flex;align-items:center;gap:13px;margin:0 0 14px}

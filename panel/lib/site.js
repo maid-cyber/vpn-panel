@@ -36,10 +36,11 @@ async function downloads() {
     const best = (prefix, ext) => list.filter((x) => !x.draft && String(x.tag_name).startsWith(prefix))
       .map((x) => ({ n: Number(String(x.tag_name).replace(/\D+/g, '')) || 0, a: (x.assets || []).find((a) => a.name.endsWith(ext)), ts: Date.parse(x.published_at) || 0 }))
       .filter((x) => x.a).sort((a, b) => b.n - a.n)[0];
-    const a = best('build-', '.apk'), w = best('win-', '.exe');
+    const a = best('build-', '.apk'), w = best('win-', '.exe'), lx = best('linux-', '.deb');
     // za privatni repozitorij fajl se skida preko API adrese (a.url) sa tokenom
-    dl = { t: now(), apk: a?.a?.browser_download_url || '', exe: w?.a?.browser_download_url || '', page, apkApi: a?.a?.url || '', exeApi: w?.a?.url || '',
-      apkBuild: a?.n || 0, exeBuild: w?.n || 0, apkTs: a?.ts || 0, exeTs: w?.ts || 0 };
+    dl = { t: now(), apk: a?.a?.browser_download_url || '', exe: w?.a?.browser_download_url || '', deb: lx?.a?.browser_download_url || '', page,
+      apkApi: a?.a?.url || '', exeApi: w?.a?.url || '', debApi: lx?.a?.url || '',
+      apkBuild: a?.n || 0, exeBuild: w?.n || 0, debBuild: lx?.n || 0, apkTs: a?.ts || 0, exeTs: w?.ts || 0, debTs: lx?.ts || 0 };
   } catch { dl = { ...dl, t: now() - 3000000, page }; }
   return dl;
 }
@@ -70,7 +71,7 @@ function siteData(d) {
     servers: servers.length, protocols: { vless: !!s.proto_vless, ss: !!s.proto_ss, wg: !!s.proto_wg },
     blocks: { ads: !!s.block_ads, malware: !!s.block_malware },
     // preuzimanje ide sa tvoje adrese (panel skine sa GitHuba i čuva kod sebe)
-    apk: d.apk ? '/download/android' : '', exe: d.exe ? '/download/windows' : '', releases: d.page,
+    apk: d.apk ? '/download/android' : '', exe: d.exe ? '/download/windows' : '', deb: d.deb ? '/download/linux' : '', releases: d.page,
     legal: s.legal_on !== false,
     trial: !!(s.app_trial && one('SELECT id FROM plans WHERE active = 1 AND trial = 1 LIMIT 1')),
     reseller: s.res_portal !== false && s.res_signup ? (s.reseller_path || '/reseller') : '',

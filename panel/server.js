@@ -82,7 +82,7 @@ async function onRequest(req, res) {
       const s0 = settings.load();
       return await require('./lib/growth').trial(req, res, (s0.sub_url || s0.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`).replace(/\/+$/, ''));
     }
-    { const dm = p.match(/^\/download\/(android|windows)(?:\.apk|\.exe)?$/); if (dm && req.method === 'GET') return await require('./lib/downloads').handle(req, res, dm[1]); }
+    { const dm = p.match(/^\/download\/(android|windows|linux)(?:\.apk|\.exe|\.deb)?$/); if (dm && req.method === 'GET') return await require('./lib/downloads').handle(req, res, dm[1]); }
     if (p === '/app/config' && req.method === 'GET') return send(res, 200, sub.appConfig(), { 'cache-control': 'no-store' });
     if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
     // logo za e-mailove (e-mail programi ne prikazuju SVG ni ugrađene slike, treba prava adresa)
