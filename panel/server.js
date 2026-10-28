@@ -107,7 +107,7 @@ async function onRequest(req, res) {
       if (p === '/buy' && req.method === 'POST') return await site.buy(req, res);
       if (p === '/buy/status' && req.method === 'GET') return site.status(req, res, url);
       if (p === '/kupljeno' && req.method === 'GET') return site.bought(req, res);
-      if (p === '/assets/globe.js' || /^\/assets\/fonts\/[\w.-]+\.woff$/.test(p) || /^\/assets\/flags\/[a-z]{2}\.png$/.test(p)) return serveStatic(res, p.slice(8));
+      if (p === '/assets/globe.js' || /^\/assets\/fonts\/[\w.-]+\.woff$/.test(p) || /^\/assets\/flags\/[a-z]{2}\.png$/.test(p) || /^\/assets\/app\/[\w.-]+\.png$/.test(p)) return serveStatic(res, p.slice(8));
     }
 
     // dva ulaza: tajna admin adresa i (ako je uključeno) posebna adresa za resellere
