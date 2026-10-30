@@ -149,7 +149,8 @@ ${wg.map((sv) => `<div class="row"><span>${vpn.FLAGS(sv.country)} ${esc(sv.city 
 <li>U ruteru otvori <b>VPN → WireGuard → Add / Import</b>, ubaci fajl ili zalijepi config, pa snimi.</li>
 <li>Uključi tunel. Svi uređaji spojeni na taj ruter su od sada na VPN-u.</li>
 </ol>
-<p class="muted" style="margin:10px 0 0">Jedan ruter koristi jednu lokaciju. Za drugu lokaciju ubaci drugi config.</p></details>
+<p class="muted" style="margin:10px 0 0">Jedan ruter koristi jednu lokaciju. Za drugu lokaciju ubaci drugi config.</p>
+<p style="margin:12px 0 0"><a href="/ruter" target="_blank" rel="noopener" style="color:var(--red);font-weight:600">Detaljno uputstvo za GL.iNet, Asus, OpenWrt… →</a></p></details>
 <script>function wgCopy(id,b){var o=b.textContent;fetch(location.pathname.replace(/[/]$/,'')+'/wg/'+id).then(function(r){return r.text()}).then(function(t){return navigator.clipboard.writeText(t)}).then(function(){b.textContent='Kopirano ✓';setTimeout(function(){b.textContent=o},2000)}).catch(function(){b.textContent='Greška';setTimeout(function(){b.textContent=o},2000)})}</script>
 </section>` : ''}
 ${support ? `<p class="muted" style="text-align:center">Podrška: ${esc(support)}</p>` : ''}

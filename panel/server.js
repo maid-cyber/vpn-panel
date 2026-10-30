@@ -99,6 +99,7 @@ async function onRequest(req, res) {
       const site = require('./lib/site');
       if (p === '/' && req.method === 'GET') return await site.page(req, res);
       if (/^\/(preuzmi|app|get)$/.test(p) && req.method === 'GET') return await require('./lib/getpage').handle(req, res);
+      if (/^\/(ruter|router)$/.test(p) && req.method === 'GET') return await require('./lib/router').handle(req, res);
       if (/^\/(privatnost|privacy|uslovi|terms)$/.test(p) && req.method === 'GET') {
         if (settings.get('legal_on') === false) return send(res, 404, 'Not found');
         return require('./lib/legal').handle(req, res, p);
