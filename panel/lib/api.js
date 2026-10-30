@@ -635,7 +635,7 @@ route('POST', 'servers/:id/maintenance', 'servers', (c) => {
   return { ok: true };
 });
 // ---------- detalji servera: grafikoni, historija rada, kupci spojeni sada, komande
-const SRV_CMDS = ['restart_vpn', 'reboot', 'update_agent', 'speedtest'];
+const SRV_CMDS = ['restart_vpn', 'reboot', 'update_agent', 'update_system', 'speedtest'];
 route('GET', 'servers/:id/detail', 'servers', (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));
   if (!sv) fail(404, 'Server ne postoji.');
@@ -667,6 +667,20 @@ route('POST', 'servers/:id/cmd', 'servers', (c) => {
   const r = run('INSERT INTO server_cmds (server_id, cmd, by, created_at) VALUES (?,?,?,?)', sv.id, cmd, c.auth.me.username, now());
   log(c.auth.me.username, `Komanda serveru: ${require('./nodes').CMD_LABEL[cmd]}`, sv.name, cmd === 'reboot' ? 'warn' : 'info');
   return { id: Number(r.lastInsertRowid) };
+});
+// Ista komanda na SVE servere odjednom (npr. ažuriranje agenta ili sistema)
+route('POST', 'servers/cmd-all', 'servers', (c) => {
+  const cmd = String(c.body.cmd || '');
+  if (!SRV_CMDS.includes(cmd)) fail(400, 'Nepoznata komanda.');
+  const list = all('SELECT id, name FROM servers WHERE enabled = 1 AND last_seen > 0');
+  let n = 0;
+  for (const sv of list) {
+    if (one('SELECT id FROM server_cmds WHERE server_id = ? AND cmd = ? AND done_at IS NULL AND created_at > ?', sv.id, cmd, now() - 600000)) continue;
+    run('INSERT INTO server_cmds (server_id, cmd, by, created_at) VALUES (?,?,?,?)', sv.id, cmd, c.auth.me.username, now());
+    n++;
+  }
+  log(c.auth.me.username, `Komanda svim serverima: ${require('./nodes').CMD_LABEL[cmd] || cmd}`, `${n}/${list.length} servera`, cmd === 'reboot' ? 'warn' : 'info');
+  return { sent: n, total: list.length };
 });
 route('POST', 'servers/:id/locate', 'servers', async (c) => {
   const sv = one('SELECT * FROM servers WHERE id = ?', Number(c.params.id));

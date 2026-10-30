@@ -226,6 +226,6 @@ async function handle(req, res, p) {
   }
   fail(404, 'Nepoznato.');
 }
-const CMD_LABEL = { restart_vpn: 'restart VPN-a', reboot: 'restart servera', update_agent: 'ažuriranje agenta', speedtest: 'test brzine' };
+const CMD_LABEL = { restart_vpn: 'restart VPN-a', reboot: 'restart servera', update_agent: 'ažuriranje agenta', update_system: 'ažuriranje sistema', speedtest: 'test brzine' };
 
 module.exports = { handle, installScript, liveFlows, flowsFromIps, CMD_LABEL };

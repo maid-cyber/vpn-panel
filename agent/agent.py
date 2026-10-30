@@ -17,7 +17,7 @@ import threading
 import time
 import urllib.request
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 CONF = "/etc/vpn-agent/agent.json"
 XRAY_CONF = "/usr/local/etc/xray/config.json"
 XRAY_BIN = "/usr/local/bin/xray"
@@ -614,6 +614,19 @@ def run_cmd(panel, token, c):
                 if DRY:
                     return report(True, json.dumps({"down": 912.4, "up": 845.1, "ping": 4}))
                 return report(True, json.dumps(speedtest()))
+            if cmd == "update_system":
+                if DRY:
+                    return report(True, "Sistem ažuriran: 0 paketa (probni način)")
+                env = {**os.environ, "DEBIAN_FRONTEND": "noninteractive"}
+                subprocess.run(["apt-get", "update", "-y"], capture_output=True, text=True, timeout=300, env=env)
+                up = subprocess.run(["apt-get", "-y", "-o", "Dpkg::Options::=--force-confold", "upgrade"],
+                                    capture_output=True, text=True, timeout=1800, env=env)
+                oku = up.returncode == 0
+                n = sum(1 for ln in (up.stdout or "").splitlines() if ln.startswith(("Unpacking ", "Setting up ")))
+                reboot = os.path.exists("/var/run/reboot-required")
+                msg = (f"Sistem ažuriran · {n} paketa" + (" · potreban restart servera" if reboot else "")) if oku \
+                    else ("Greška pri ažuriranju: " + (up.stderr or up.stdout or "")[-300:])
+                return report(oku, msg)
             return report(False, "Agent ne zna ovu komandu. Ažuriraj agenta.")
         except Exception as e:  # noqa: BLE001
             report(False, str(e)[-500:])

@@ -1541,6 +1541,7 @@
   const CMD_BTN = { restart_vpn: ['refresh', 'Restartuj VPN', 'Xray i WireGuard se restartuju. Spojeni kupci se odspoje na par sekundi i aplikacije se same ponovo spoje.', ''],
     speedtest: ['bolt', 'Test brzine', 'Server mjeri brzinu svoje internet veze (Cloudflare). Traje oko 20 sekundi i troši oko 100 MB prometa.', ''],
     update_agent: ['down', 'Ažuriraj agent', 'Agent na serveru preuzima najnoviju verziju iz panela i ponovo se pokreće. Kupci ostaju spojeni.', ''],
+    update_system: ['shield', 'Ažuriraj sistem', 'Server instalira sigurnosne i sistemske nadogradnje (apt update i upgrade). Kupci ostaju spojeni; rijetko traži restart servera.', ''],
     reboot: ['plug', 'Restartuj server', 'Cijeli server se restartuje. Kupci na ovom serveru nemaju VPN 1–2 minute, aplikacije se same spoje kad se vrati.', 'danger'] };
   function cmdResult(c) {
     if (!c.done_at) return `<span class="tag t-warn">${c.sent_at ? 'izvršava se…' : 'čeka server…'}</span>`;
@@ -1627,6 +1628,10 @@
         <div class="stat"><div class="l"><span>Promet ovaj mjesec</span>${ic('down')}</div><div class="v">${bytes(tm)}</div><div class="s muted">svi serveri</div></div>
         <div class="stat"><div class="l"><span>Trošak servera</span>${ic('money')}</div><div class="v">${money(cost)}</div><div class="s muted">mjesečno</div></div>
       </section>
+      ${can('servers') && servers.filter((s) => s.enabled).length ? `<div class="srvbulk"><span class="muted">Svi serveri odjednom:</span>
+        <button class="btn sm" data-a="cmdAll" data-cmd="update_agent">${ic('down')}Ažuriraj agent</button>
+        <button class="btn sm" data-a="cmdAll" data-cmd="update_system">${ic('shield')}Ažuriraj sistem</button>
+        <button class="btn sm" data-a="cmdAll" data-cmd="restart_vpn">${ic('refresh')}Restartuj VPN</button></div>` : ''}
       ${chainsHtml(chains, servers)}
       ${servers.length > 5 ? `<div class="srvbar">
         <label class="srvfind">${ic('search')}<input class="input" id="srvQ" placeholder="Traži po imenu, državi ili IP adresi…" value="${esc(srvQ)}" autocomplete="off"></label>
@@ -2557,6 +2562,13 @@
     srvAct: async (d) => { try { await POST(`servers/${d.id}/${d.act}`); if (d.back) pageServer(d.id); else pageServers(); } catch (e) { fail(e); } },
     srvMore: (d) => srvMore(d.id).catch(fail),
     srvCmd: (d) => srvCmd(d.id, d.cmd).catch(fail),
+    cmdAll: async (d) => {
+      const names = { update_agent: 'Ažuriraj agent', update_system: 'Ažuriraj sistem', restart_vpn: 'Restartuj VPN', reboot: 'Restartuj server' };
+      const txt = { update_agent: 'Svi serveri preuzimaju najnoviju verziju agenta i restartuju ga. Kupci ostaju spojeni.', update_system: 'Svi serveri instaliraju sigurnosne i sistemske nadogradnje (apt upgrade). Kupci ostaju spojeni; rijetko traži restart.', restart_vpn: 'Na svim serverima se restartuje VPN. Kupci se odspoje na par sekundi i aplikacije se same vrate.', reboot: 'Svi serveri se restartuju. VPN pada 1–2 minute.' };
+      const label = names[d.cmd] || d.cmd;
+      if (!(await ask(label + ' — svi serveri', txt[d.cmd] || '', label, d.cmd === 'reboot'))) return;
+      try { const r = await POST('servers/cmd-all', { cmd: d.cmd }); toast(`Poslano na ${r.sent} od ${r.total} servera. Preuzimaju za par sekundi.`); } catch (e) { fail(e); }
+    },
     srvRange: (d) => pageServer(d.id, d.r).catch(fail),
     openRes: (d, el) => {
       S.selRes = Number(d.id);

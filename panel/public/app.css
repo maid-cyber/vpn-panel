@@ -878,3 +878,7 @@ b .odot { width: 7px; height: 7px; vertical-align: 2px; margin-right: 4px; }
 .noc .mk::after{width:12px;height:12px;border-width:2px}
 @keyframes radar{0%{width:12px;height:12px;opacity:.7}100%{width:54px;height:54px;opacity:0}}
 @media (prefers-reduced-motion:reduce){.noc .flows .nbeam{animation:none;stroke-dasharray:none;opacity:.5}}
+
+/* bulk komande svim serverima */
+.srvbulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card2)}
+.srvbulk .muted{font-size:13px;margin-right:4px}
