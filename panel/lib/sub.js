@@ -140,8 +140,18 @@ ${apps.map((k, n) => k === 'veltrix'
 </section>
 ${botName ? `<section class="card"><h2>Podsjetnici na Telegram</h2><p class="muted" style="margin-top:0">${u.tg_chat ? 'Telegram je povezan ✓ Javit ćemo ti prije isteka.' : 'Poveži Telegram i javit ćemo ti prije nego nalog istekne. Možeš i pitati za stanje naloga.'}</p>
 <a class="btn" href="https://t.me/${esc(botName)}?start=${esc(u.sub_token)}">${u.tg_chat ? 'Otvori bota' : 'Poveži Telegram'}</a></section>` : ''}
-${wg.length ? `<section class="card"><h2>WireGuard (rezervna opcija)</h2><p class="muted" style="margin-top:0">Za službenu WireGuard aplikaciju. Preuzmi fajl ili skeniraj QR u aplikaciji.</p>
-${wg.map((sv) => `<div class="row"><span>${vpn.FLAGS(sv.country)} ${esc(sv.city || sv.name)}</span><span><a href="${esc(link)}/wg/${sv.id}" style="color:var(--red)">Preuzmi</a> · <a href="${esc(link)}/wg/${sv.id}?qr=1" style="color:var(--red)">QR</a></span></div>`).join('')}</section>` : ''}
+${wg.length ? `<section class="card"><h2>Na ruteru ili u WireGuard aplikaciji</h2><p class="muted" style="margin-top:0">Ubaci VPN u <b>ruter</b> i cijela kuća ide kroz VPN (TV, konzola, svi telefoni) — bez aplikacije na svakom uređaju. Radi na ruterima koji podržavaju WireGuard (GL.iNet, Asus, OpenWrt, pfSense…). Isti fajl radi i u službenoj <b>WireGuard</b> aplikaciji.</p>
+${wg.map((sv) => `<div class="row"><span>${vpn.FLAGS(sv.country)} ${esc(sv.city || sv.name)}</span><span><a href="${esc(link)}/wg/${sv.id}" style="color:var(--red)">Preuzmi</a> · <button type="button" onclick="wgCopy(${sv.id},this)" style="background:none;border:0;color:var(--red);cursor:pointer;font:inherit;padding:0">Kopiraj</button> · <a href="${esc(link)}/wg/${sv.id}?qr=1" target="_blank" rel="noopener" style="color:var(--red)">QR</a></span></div>`).join('')}
+<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Kako ubaciti VPN na ruter</summary>
+<ol class="muted" style="margin:10px 0 0;padding-left:20px;line-height:1.75">
+<li>Provjeri da ruter podržava <b>WireGuard</b> (GL.iNet putni ruteri, Asus s novijim firmverom/Merlin, OpenWrt, pfSense/OPNsense). Ruteri od provajdera često ne podržavaju — tada je najlakši GL.iNet.</li>
+<li>Za željenu lokaciju klikni <b>Preuzmi</b> (.conf fajl) ili <b>Kopiraj</b> (config tekst).</li>
+<li>U ruteru otvori <b>VPN → WireGuard → Add / Import</b>, ubaci fajl ili zalijepi config, pa snimi.</li>
+<li>Uključi tunel. Svi uređaji spojeni na taj ruter su od sada na VPN-u.</li>
+</ol>
+<p class="muted" style="margin:10px 0 0">Jedan ruter koristi jednu lokaciju. Za drugu lokaciju ubaci drugi config.</p></details>
+<script>function wgCopy(id,b){var o=b.textContent;fetch(location.pathname.replace(/[/]$/,'')+'/wg/'+id).then(function(r){return r.text()}).then(function(t){return navigator.clipboard.writeText(t)}).then(function(){b.textContent='Kopirano ✓';setTimeout(function(){b.textContent=o},2000)}).catch(function(){b.textContent='Greška';setTimeout(function(){b.textContent=o},2000)})}</script>
+</section>` : ''}
 ${support ? `<p class="muted" style="text-align:center">Podrška: ${esc(support)}</p>` : ''}
 </main></body></html>`;
 }
