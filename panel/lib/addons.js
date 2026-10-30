@@ -104,4 +104,45 @@ function ofUser(u) {
   return { ids, pending: !!u.ded_pending && ids.includes('dip') };
 }
 
-module.exports = { DEFS, IDS, enabled, isOn, priceOf, forSite, months, quote, provision, ofUser, freePfPort, freeDedicated };
+const NAMES = { dip: 'Dedicated IP', mh: 'Double VPN', pf: 'Port forwarding' };
+const nameOf = (id) => NAMES[id] || id;
+
+/** Koliko mjeseci je ostalo na planu (za naplatu dokupa, min 1). Zaokruženo kao i na checkoutu. */
+function monthsLeft(u) {
+  const ms = (u.expires_at || 0) - now();
+  return Math.max(1, Math.round(ms / (30 * 86400000)));
+}
+
+/** Dodaci koje kupac JOŠ nema — za dokup na stranici naloga. Cijena = mjesečno × preostali mjeseci plana. */
+function availableFor(u) {
+  const have = new Set(ofUser(u).ids);
+  const m = monthsLeft(u);
+  return forSite().filter((a) => {
+    if (have.has(a.id)) return false;
+    if (a.id === 'pf' && u.pf_port) return false;
+    if (a.id === 'mh' && u.mh_on) return false;
+    if (a.id === 'dip' && u.ded_pending) return false;
+    return true;
+  }).map((a) => ({ id: a.id, name: nameOf(a.id), price: a.price, months: m, total: Math.round(a.price * m * 100) / 100 }));
+}
+
+/**
+ * Isporuči dokupljeni dodatak postojećem kupcu: provizioniraj + zabilježi uplatu (jednom po ext_id).
+ * Zove se iz PayPal capture-a i Stripe webhooka.
+ */
+function purchaseFulfil(userId, ids, amount, method, extId) {
+  if (extId && one('SELECT id FROM transactions WHERE ext_id = ?', extId)) return;   // već obrađeno
+  const u = one('SELECT * FROM users WHERE id = ?', userId);
+  ids = (Array.isArray(ids) ? ids : []).filter((x) => DEFS[x]);
+  if (!u || !ids.length) return;
+  const r = provision(userId, ids);
+  const names = ids.map(nameOf).join(', ');
+  const t = run('INSERT INTO transactions (ts, type, amount, user_id, actor, method, note) VALUES (?,?,?,?,?,?,?)',
+    now(), 'sale', Number(amount) || 0, userId, 'kupac', String(method || ''), `Dodatak: ${names}`);
+  if (extId) run('UPDATE transactions SET ext_id = ? WHERE id = ?', extId, Number(t.lastInsertRowid));
+  try { require('./notify').notify('n_payment', `Uplata €${amount} · dodatak (${names}) · ${u.username}`); } catch {}
+  log('sajt', 'Kupac dokupio dodatak', `${u.username}: ${names} · €${amount}`);
+  return r;
+}
+
+module.exports = { DEFS, IDS, NAMES, nameOf, enabled, isOn, priceOf, forSite, months, monthsLeft, quote, provision, ofUser, availableFor, purchaseFulfil, freePfPort, freeDedicated };

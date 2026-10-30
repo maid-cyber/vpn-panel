@@ -61,10 +61,13 @@ function page(u, link, s, owner, botName, reqUrl) {
   const cur = ({ EUR: '€', USD: '$', BAM: 'KM ', CHF: 'CHF ' })[s.currency] || '€';
   const paid = /[?&]placeno=1/.test(reqUrl || '');
   const brand = esc(wl ? owner.brand : s.brand);
-  const aoInfo = require('./addons').ofUser(u);   // kupljeni dodaci (bez PF, on ima svoj red)
+  const addonsLib = require('./addons');
+  const aoInfo = addonsLib.ofUser(u);   // kupljeni dodaci (bez PF, on ima svoj red)
   const AO_LBL = { dip: 'Dedicated IP', mh: 'Double VPN' };
   const aoRow = aoInfo.ids.filter((id) => AO_LBL[id]).map((id) =>
     `${AO_LBL[id]}${id === 'dip' && aoInfo.pending ? ' <span class="muted" style="font-size:12px">· čeka dodjelu</span>' : ''}`).join(' · ');
+  const aoAvail = addonsLib.availableFor(u);   // dodaci koje kupac može dokupiti
+  const payOk = !!(s.stripe_on && s.stripe_secret) || require('./paypal').ready();
   return `<!doctype html><html lang="bs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${brand} · moj nalog</title><meta name="robots" content="noindex">
 <style>
@@ -99,6 +102,10 @@ ${renew.length ? `<section class="card"><h2>Produži pretplatu</h2><p class="mut
 ${one('SELECT id FROM coupons WHERE active = 1 AND (expires_at = 0 OR expires_at > ?) AND (max_uses = 0 OR used < max_uses) LIMIT 1', now()) ? '<input id="cpn" placeholder="Kod za popust (ako ga imaš)" autocomplete="off" style="width:100%;min-height:46px;border-radius:12px;border:1px solid #2c2c37;background:#0d0d12;color:var(--text);padding:0 12px;font:inherit;text-transform:uppercase;margin-bottom:8px;box-sizing:border-box">' : ''}
 <div style="display:flex;flex-direction:column;gap:8px">${renew.map((pl) => `<button class="btn${pl === renew[0] ? ' red' : ''}" type="button" onclick="pay(${pl.id},this)">${esc(pl.name)} · ${pl.days} dana · ${esc(cur)}${pl.price}</button>`).join('')}</div>
 <script>function pay(id,b){const o=b.textContent;b.disabled=true;b.textContent='Otvaram plaćanje…';fetch(location.pathname.replace(/[/]$/,'')+'/renew',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({plan_id:id,coupon:(document.getElementById('cpn')||{}).value||''})}).then(r=>r.json()).then(j=>{if(j.url)location.href=j.url;else{b.textContent=j.error||'Greška';setTimeout(()=>{b.textContent=o;b.disabled=false},3500)}}).catch(()=>{b.textContent='Greška, pokušaj ponovo';b.disabled=false})}</script></section>` : ''}
+${aoAvail.length && payOk ? `<section class="card"><h2>Dodaci</h2><p class="muted" style="margin-top:0">Dokupi dodatak na svoj nalog. Naplaćuje se za preostalo vrijeme plana.</p>
+<div style="display:flex;flex-direction:column;gap:8px">${aoAvail.map((a) => `<button class="btn" type="button" onclick="buyAddon('${esc(a.id)}',this)">${esc(a.name)} · ${esc(cur)}${a.total}${a.months > 1 ? ` <span style="opacity:.65;font-weight:400">za ${a.months} mj</span>` : ''}</button>`).join('')}</div>
+<p class="muted" style="margin:10px 0 0;font-size:12.5px">Dedicated IP uključujemo mi (dobiješ ga čim dodijelimo server); ostali se uključe odmah.</p>
+<script>function buyAddon(id,b){const o=b.innerHTML;b.disabled=true;b.textContent='Otvaram plaćanje…';fetch(location.pathname.replace(/[/]$/,'')+'/addon',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({addon_id:id})}).then(r=>r.json()).then(j=>{if(j.url)location.href=j.url;else{b.textContent=j.error||'Greška';setTimeout(()=>{b.innerHTML=o;b.disabled=false},3500)}}).catch(()=>{b.textContent='Greška, pokušaj ponovo';b.disabled=false})}</script></section>` : ''}
 ${ref ? `<section class="card"><h2>Pozovi prijatelja</h2><p class="muted" style="margin-top:0">Kad prijatelj instalira aplikaciju, upiše tvoj kod i prvi put plati, obojica dobijete ${ref.days} dana gratis.</p>
 <div style="text-align:center;font:700 26px ui-monospace,Consolas,monospace;letter-spacing:3px;margin:8px 0">${esc(ref.code)}</div>
 <div class="muted" style="text-align:center">Pozvano: ${ref.invited} · nagrađeno: ${ref.rewarded}</div></section>` : ''}
@@ -216,7 +223,7 @@ function appJson(u, s, link) {
 }
 
 async function handle(req, res, p) {
-  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app)|\/(renew)|\/(diag)|\/(qr\.png))?$/);
+  const m = p.match(/^\/s\/([\w-]{8,40})(?:\/wg\/(\d+)|\/(app)|\/(renew)|\/(diag)|\/(qr\.png)|\/(addon))?$/);
   if (!m) return send(res, 404, 'Not found');
   const u = one('SELECT * FROM users WHERE sub_token = ?', m[1]);
   if (!u) return send(res, 404, 'Link nije ispravan ili je zamijenjen novim.');
@@ -227,6 +234,7 @@ async function handle(req, res, p) {
 
   if (m[3]) { noteApp(u, req.headers['user-agent']); return send(res, 200, { ...appJson(u, s, link), ...growth.appInfo(u) }, { 'cache-control': 'no-store' }); }
   if (m[4] && req.method === 'POST') return growth.renew(req, res, u, link);
+  if (m[7] && req.method === 'POST') return growth.addonBuy(req, res, u, link);
   if (m[6]) return send(res, 200, require('./qrpng').png(link), { 'content-type': 'image/png', 'cache-control': 'private, max-age=3600' });
   if (m[5]) { if (req.method !== 'POST') return send(res, 405, 'POST'); return require('./diag').receive(req, res, u); }
   if (m[2]) {

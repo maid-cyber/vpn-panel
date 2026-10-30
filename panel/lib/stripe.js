@@ -61,6 +61,10 @@ async function webhook(req, res) {
     const ses = ev.data.object;
     const rid = Number(ses.metadata?.reseller_id || ses.client_reference_id);
     if (ses.payment_status === 'paid' && ses.metadata?.purpose === 'renew') require('./growth').paidRenew(ses);
+    if (ses.payment_status === 'paid' && ses.metadata?.purpose === 'addon') {
+      const aoIds = String(ses.metadata?.addons || '').split(',').map((x) => x.trim()).filter(Boolean);
+      require('./addons').purchaseFulfil(Number(ses.metadata?.user_id), aoIds, (ses.amount_total || 0) / 100, 'Stripe (kartica)', ses.id);
+    }
     if (ses.payment_status === 'paid' && ses.metadata?.purpose === 'buy') {
       const s0 = settings.load();
       require('./site').paidBuy(ses, (s0.sub_url || s0.panel_url || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`));

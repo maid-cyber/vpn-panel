@@ -124,6 +124,42 @@ async function renew(req, res, u, link) {
   return send(res, 200, { url: j.url });
 }
 
+// POST /s/:token/addon  { addon_id }  →  { url }   (dokup dodatka za postojeći nalog)
+async function addonBuy(req, res, u, link) {
+  const s = settings.load();
+  const b = await readBody(req, 4096).catch(() => ({}));
+  const addons = require('./addons');
+  const id = String(b.addon_id || '');
+  const a = addons.availableFor(u).find((x) => x.id === id);
+  if (!a) return send(res, 400, { error: 'Dodatak nije dostupan.' });
+  const price = a.total;
+  if (!(s.stripe_on && s.stripe_secret)) {
+    try {
+      const o = await require('./paypal').createOrder({ kind: 'addon_web', chat: u.tg_chat || '', userId: u.id, plan: { id: 0, name: `Dodatak: ${a.name}` }, price, addons: [id], email: u.email });
+      if (!o.url) return send(res, 502, { error: 'PayPal nije vratio link za plaćanje.' });
+      log(u.username, 'Kupac započeo kupovinu dodatka (PayPal)', `${a.name} · €${price}`);
+      return send(res, 200, { url: o.url });
+    } catch (e) { return send(res, 502, { error: e.message }); }
+  }
+  const form = new URLSearchParams({
+    mode: 'payment', success_url: `${link}?placeno=1`, cancel_url: link,
+    client_reference_id: `user:${u.id}`,
+    'metadata[purpose]': 'addon', 'metadata[user_id]': String(u.id), 'metadata[addons]': id,
+    'line_items[0][quantity]': '1',
+    'line_items[0][price_data][currency]': String(s.currency || 'EUR').toLowerCase(),
+    'line_items[0][price_data][unit_amount]': String(Math.round(price * 100)),
+    'line_items[0][price_data][product_data][name]': `${s.brand} · ${a.name}`,
+  });
+  if (u.email) form.set('customer_email', u.email);
+  const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'POST', headers: { authorization: `Bearer ${s.stripe_secret}`, 'content-type': 'application/x-www-form-urlencoded' }, body: form.toString(), signal: AbortSignal.timeout(20000),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) return send(res, 502, { error: `Stripe: ${j.error?.message || r.status}` });
+  log(u.username, 'Kupac započeo kupovinu dodatka', `${a.name} · €${price}`);
+  return send(res, 200, { url: j.url });
+}
+
 /** Stripe je potvrdio uplatu kupca: produži nalog (jednom po uplati) i nagradi preporuku. */
 function paidRenew(ses) {
   const uid = Number(ses.metadata?.user_id), pid = Number(ses.metadata?.plan_id);
@@ -154,4 +190,4 @@ function paidRenew(ses) {
   }
 }
 
-module.exports = { trial, renew, paidRenew, appInfo, refCode, renewPlans };
+module.exports = { trial, renew, addonBuy, paidRenew, appInfo, refCode, renewPlans };

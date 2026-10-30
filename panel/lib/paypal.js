@@ -126,11 +126,16 @@ function fulfil(o, cap) {
     } else if (o.kind === 'buy') {
       userId = core.createUser(SYSTEM, { plan_id: o.plan_id, paid: o.amount, method: 'PayPal', note: `Kupljeno preko Telegram bota${o.tg_name ? ' · @' + o.tg_name : ''}`, contact: o.tg_name ? '@' + o.tg_name : `tg:${o.chat}` });
       run('UPDATE users SET tg_chat = ? WHERE id = ?', o.chat, userId);
+    } else if (o.kind === 'addon_web') {
+      // postojeći kupac dokupio dodatak: provizioniraj i zabilježi (purchaseFulfil sam upisuje transakciju + ext_id)
+      const aoIds = String(o.addons || '').split(',').map((x) => x.trim()).filter(Boolean);
+      require('./addons').purchaseFulfil(o.user_id, aoIds, o.amount, 'PayPal', cap.id);
     } else {
       if (o.coupon_id) require('./coupons').used({ id: cap.id, metadata: { coupon_id: o.coupon_id, discount: o.discount }, amount_total: Math.round(o.amount * 100) }, o.user_id);
       require('./growth').paidRenew({ id: cap.id, metadata: { user_id: o.user_id, plan_id: o.plan_id }, amount_total: Math.round(o.amount * 100), method: 'PayPal', actor: o.kind === 'renew_web' ? 'kupac (PayPal)' : 'Telegram bot' });
     }
-    const trx = one('SELECT id FROM transactions WHERE user_id = ? AND ext_id IS NULL ORDER BY id DESC LIMIT 1', userId);
+    // addon_web sam upisuje transakciju i ext_id; ostali kindovi ovdje povežu zadnju transakciju s uplatom
+    const trx = o.kind === 'addon_web' ? null : one('SELECT id FROM transactions WHERE user_id = ? AND ext_id IS NULL ORDER BY id DESC LIMIT 1', userId);
     if (trx) run('UPDATE transactions SET ext_id = ? WHERE id = ?', cap.id, trx.id);
     run("UPDATE bot_orders SET status = 'paid', user_id = ?, paid_at = ?, capture_id = ? WHERE id = ?", userId, now(), cap.id, o.id);
   } catch (e) {
@@ -140,13 +145,13 @@ function fulfil(o, cap) {
     throw e;
   }
   const done = one('SELECT * FROM bot_orders WHERE id = ?', o.id);
-  log(o.kind === 'site' ? 'sajt' : 'sistem', { site: 'Kupljeno na sajtu (PayPal)', buy: 'Kupljeno preko bota (PayPal)', renew: 'Produženo preko bota (PayPal)', renew_web: 'Kupac produžio nalog (PayPal)' }[o.kind], `#${o.id} · ${money(o.amount)}`);
+  log(o.kind === 'site' ? 'sajt' : 'sistem', { site: 'Kupljeno na sajtu (PayPal)', buy: 'Kupljeno preko bota (PayPal)', renew: 'Produženo preko bota (PayPal)', renew_web: 'Kupac produžio nalog (PayPal)', addon_web: 'Dodatak plaćen (PayPal)' }[o.kind] || 'PayPal uplata', `#${o.id} · ${money(o.amount)}`);
   if (o.kind === 'site') {
     if (o.email && require('./mail').configured()) {
       require('./welcome').send(userId, 'buy', o.email, baseUrl()).catch((e) => log('sistem', 'E-mail kupcu nije poslan', String(e.message || e), 'warn'));
       require('./invoice').sendForUser(userId, o.email).catch((e) => log('sistem', 'Faktura kupcu nije poslana', String(e.message || e), 'warn'));
     }
-  } else if (o.chat) require('./cbot').delivered(done).catch((e) => console.error('cbot delivered', e));
+  } else if (o.chat && o.kind !== 'addon_web') require('./cbot').delivered(done).catch((e) => console.error('cbot delivered', e));
   return done;
 }
 
