@@ -844,12 +844,17 @@
         <button class="btn danger" data-a="uAct" data-act="delete" data-id="${u.id}">Obriši</button>
         ${can('users') ? `<a class="btn" style="grid-column:1/-1" href="#/dijagnostika?u=${u.id}">${ic('act')}Dijagnostika: zašto ne radi?</a>` : ''}
       </div>
-      ${!isRes() && u.pf_on ? `<div style="margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--card2)">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:14px;display:flex;align-items:center;gap:7px">${ic('act')}Port forwarding</b>
-          ${u.pf_port ? `<button class="btn sm danger" data-a="pf" data-act="off" data-id="${u.id}">Isključi</button>` : `<button class="btn sm red" data-a="pf" data-act="on" data-id="${u.id}">Dodijeli port</button>`}</div>
-        ${u.pf_port
-          ? `<div class="muted" style="font-size:13px;margin-top:8px">Otvoreni port: <b class="mono" style="color:var(--text)">${u.pf_port}</b> (TCP i UDP). Radi kad je kupac spojen preko <b style="color:var(--text)">WireGuarda</b>.${u.pf_hosts?.length ? `<br>Adresa: ${u.pf_hosts.map((h) => `<span class="mono" style="color:var(--text)">${esc(h.host)}:${u.pf_port}</span>`).join(' · ')}` : '<br><span class="warn">Nema WireGuard servera koji korisnik može koristiti.</span>'}</div>`
-          : '<div class="muted" style="font-size:13px;margin-top:8px">Dodijeli kupcu otvoreni port za hosting, P2P ili daljinski pristup (preko WireGuarda).</div>'}
+      ${!isRes() && u.addons ? `<div style="margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--card2)">
+        <b style="font-size:14px;display:flex;align-items:center;gap:7px">${ic('act')}Dodaci</b>
+        <div class="muted" style="font-size:12px;margin:3px 0 4px">Uključi besplatno bilo kom korisniku — ne naplaćuje se.</div>
+        ${[
+          ['pf', 'Port forwarding', u.addons.pf, u.addons.pf ? `Port <b class="mono" style="color:var(--text)">${u.addons.pf_port}</b> · TCP/UDP preko WireGuarda${u.pf_hosts?.length ? ` · ${u.pf_hosts.map((h) => `<span class="mono" style="color:var(--text)">${esc(h.host)}:${u.addons.pf_port}</span>`).join(' ')}` : ''}` : 'Otvoreni port za hosting, P2P ili daljinski pristup (preko WireGuarda)'],
+          ['mh', 'Double VPN', u.addons.mh, 'Promet kroz dva servera (lanci / MultiHop)'],
+          ['dip', 'Dedicated IP', u.addons.dip && !u.addons.dip_pending, u.addons.dip_pending ? '<span class="warn">Plaćeno · čeka slobodan server s tagom "dedicated"</span>' : u.addons.dip_server ? `Server: <b style="color:var(--text)">${esc(u.addons.dip_server)}</b>` : 'Privatna IP (dodijeli server označen tagom "dedicated")'],
+        ].map(([id, name, on, desc]) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)">
+          <div style="min-width:0"><div style="font-size:13.5px;font-weight:600">${name}${on ? ' <span style="color:#5fe0a0">✓</span>' : ''}</div><div class="muted" style="font-size:12px">${desc}</div></div>
+          <button class="btn sm ${(id === 'dip' ? u.addons.dip : on) ? 'danger' : 'red'}" data-a="addon" data-id="${u.id}" data-addon="${id}" data-act="${(id === 'dip' ? u.addons.dip : on) ? 'off' : 'on'}">${(id === 'dip' ? u.addons.dip : on) ? 'Isključi' : 'Uključi'}</button>
+        </div>`).join('')}
       </div>` : ''}
       <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px" class="muted">
         ${u.contact ? `<div>Kontakt: <span style="color:var(--text)">${esc(u.contact)}</span></div>` : ''}
@@ -2505,6 +2510,7 @@
     editNote: (d) => editNote(d.id).catch(fail),
     uAct: (d) => userAction(d.id, d.act),
     pf: async (d) => { try { if (d.act === 'on') { const r = await POST(`users/${d.id}/portforward`); toast(`Port ${r.port} dodijeljen kupcu.`); } else { await DEL(`users/${d.id}/portforward`); toast('Port forwarding isključen.'); } refreshUser(); } catch (e) { fail(e); } },
+    addon: async (d) => { try { const nm = { pf: 'Port forwarding', mh: 'Double VPN', dip: 'Dedicated IP' }[d.addon] || 'Dodatak'; const r = await POST(`users/${d.id}/addon`, { addon: d.addon, on: d.act === 'on' }); const pend = d.act === 'on' && d.addon === 'dip' && r.state?.dip_pending; toast(`${nm} ${d.act === 'on' ? (pend ? 'označen — čeka slobodan dedicated server' : 'uključen') : 'isključen'}.`); refreshUser(); } catch (e) { fail(e); } },
     links: () => showLinks(),
     sendCustomer: () => sendCustomer().catch(fail),
     unblock: async (d) => { try { await PUT('users/' + d.id, { unblock: true }); toast('Odblokiran.'); refreshUser(); } catch (e) { fail(e); } },

@@ -107,6 +107,38 @@ function ofUser(u) {
 const NAMES = { dip: 'Dedicated IP', mh: 'Double VPN', pf: 'Port forwarding' };
 const nameOf = (id) => NAMES[id] || id;
 
+/** Isključi dodatke korisniku (admin, besplatno). */
+function remove(userId, ids) {
+  const u = one('SELECT * FROM users WHERE id = ?', userId);
+  if (!u) return;
+  const core = require('./core');
+  const have = new Set(String(u.addons || '').split(',').map((x) => x.trim()).filter(Boolean));
+  for (const id of [...new Set(ids)]) {
+    if (!DEFS[id]) continue;
+    if (id === 'pf') { run('UPDATE users SET pf_port = 0 WHERE id = ?', userId); } else if (id === 'mh') { run('UPDATE users SET mh_on = 0 WHERE id = ?', userId); } else if (id === 'dip') {
+      for (const sv of all('SELECT id, dedicated_to FROM servers')) {
+        const list = String(sv.dedicated_to || '').split(',').map(Number).filter(Boolean);
+        if (list.includes(Number(userId))) run('UPDATE servers SET dedicated_to = ? WHERE id = ?', list.filter((x) => x !== Number(userId)).join(','), sv.id);
+      }
+      run('UPDATE users SET ded_pending = 0 WHERE id = ?', userId);
+    }
+    have.delete(id);
+    core.history(userId, `Dodatak isključen: ${nameOf(id)}`);
+  }
+  run('UPDATE users SET addons = ? WHERE id = ?', [...have].join(','), userId);
+}
+
+/** Stanje dodataka na korisniku (za admin prikaz). */
+function stateFor(u) {
+  const dedSv = all("SELECT name, dedicated_to FROM servers")
+    .find((sv) => String(sv.dedicated_to || '').split(',').map(Number).includes(Number(u.id)));
+  return {
+    pf: !!u.pf_port, pf_port: u.pf_port || 0,
+    mh: !!u.mh_on,
+    dip: !!dedSv || !!u.ded_pending, dip_server: dedSv ? dedSv.name : null, dip_pending: !!u.ded_pending && !dedSv,
+  };
+}
+
 /** Koliko mjeseci je ostalo na planu (za naplatu dokupa, min 1). Zaokruženo kao i na checkoutu. */
 function monthsLeft(u) {
   const ms = (u.expires_at || 0) - now();
@@ -145,4 +177,4 @@ function purchaseFulfil(userId, ids, amount, method, extId) {
   return r;
 }
 
-module.exports = { DEFS, IDS, NAMES, nameOf, enabled, isOn, priceOf, forSite, months, monthsLeft, quote, provision, ofUser, availableFor, purchaseFulfil, freePfPort, freeDedicated };
+module.exports = { DEFS, IDS, NAMES, nameOf, enabled, isOn, priceOf, forSite, months, monthsLeft, quote, provision, remove, stateFor, ofUser, availableFor, purchaseFulfil, freePfPort, freeDedicated };

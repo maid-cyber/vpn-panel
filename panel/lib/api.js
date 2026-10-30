@@ -379,6 +379,7 @@ function userDetail(c, me) {
     wg: settings.get('proto_wg') ? servers.filter((s) => s.wg_pub).map((s) => ({ id: s.id, server: s.name, url: `${link}/wg/${s.id}` })) : [],
     pf_on: !!settings.get('pf_on'), pf_port: u.pf_port || 0,
     pf_hosts: u.pf_port ? servers.filter((s) => s.wg_pub && s.host).map((s) => ({ server: s.name, host: s.host })) : [],
+    addons: require('./addons').stateFor(u),
     history: all('SELECT ts, text FROM user_history WHERE user_id = ? ORDER BY id DESC LIMIT 30', u.id),
   };
 }
@@ -445,6 +446,18 @@ route('DELETE', 'users/:id/portforward', 'users', (c) => {
   core.history(u.id, 'Port forwarding isključen');
   log(c.auth.me.username, 'Port forwarding isključen', u.username);
   return { ok: true };
+});
+// Admin: ručno (besplatno) uključi/isključi dodatak bilo kom korisniku
+route('POST', 'users/:id/addon', 'users', (c) => {
+  const u = core.getUser(c.params.id);
+  const addons = require('./addons');
+  const addon = String(c.body.addon || '');
+  const on = !!c.body.on;
+  if (!addons.DEFS[addon]) fail(400, 'Nepoznat dodatak.');
+  if (on) addons.provision(u.id, [addon]); else addons.remove(u.id, [addon]);
+  log(c.auth.me.username, `Dodatak ${on ? 'uključen' : 'isključen'} (admin)`, `${u.username}: ${addons.nameOf(addon)}`);
+  const fresh = one('SELECT * FROM users WHERE id = ?', u.id);
+  return { addon, state: addons.stateFor(fresh) };
 });
 route('PUT', 'res/users/:id', 'res', (c) => {
   const u = core.getUser(c.params.id, c.auth.me);
